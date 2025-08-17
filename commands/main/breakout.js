@@ -143,9 +143,9 @@ export default {
       const currentOp = await stateManager.getCurrentOperation(interaction.guildId);
       console.log(`⚠️ Found interrupted ${currentOp.type} operation for guild ${interaction.guildId}`);
       
-      await interaction.reply({ 
-        content: `Found an interrupted breakout operation. Attempting to resume the previous '${currentOp.type}' command...`, 
-        ephemeral: true 
+      await replyOrEdit(interaction, {
+        content: `Found an interrupted breakout operation. Attempting to resume the previous '${currentOp.type}' command...`,
+        ephemeral: true
       });
     }
     
@@ -182,25 +182,23 @@ export default {
  * @returns {Promise<void>}
  */
 async function handleCreateCommand(interaction) {
-  await safeReply(interaction, async () => {
-    const numRooms = interaction.options.getInteger("number");
-    const force = interaction.options.getBoolean("force") || false;
-    console.log(`🔢 Number of breakout rooms to create: ${numRooms} (force: ${force})`);
+  const numRooms = interaction.options.getInteger("number");
+  const force = interaction.options.getBoolean("force") || false;
+  console.log(`🔢 Number of breakout rooms to create: ${numRooms} (force: ${force})`);
 
-    try {
-      const result = await createBreakoutRooms(interaction, numRooms, force);
-      
-      if (result.success) {
-        return replyOrEdit(interaction, result.message);
-      } else {
-        console.error(`❌ Error creating breakout rooms:`, result.error);
-        return replyOrEdit(interaction, result.message);
-      }
-    } catch (error) {
-      console.error(`❌ Error in handleCreateCommand:`, error);
-      return replyOrEdit(interaction, "An unexpected error occurred while creating breakout rooms. Please try again later.");
+  try {
+    const result = await createBreakoutRooms(interaction, numRooms, force);
+    
+    if (result.success) {
+      return replyOrEdit(interaction, result.message);
+    } else {
+      console.error(`❌ Error creating breakout rooms:`, result.error);
+      return replyOrEdit(interaction, result.message);
     }
-  }, { deferReply: true, ephemeral: false });
+  } catch (error) {
+    console.error(`❌ Error in handleCreateCommand:`, error);
+    return replyOrEdit(interaction, "An unexpected error occurred while creating breakout rooms. Please try again later.");
+  }
 }
 
 /**
@@ -209,98 +207,96 @@ async function handleCreateCommand(interaction) {
  * @returns {Promise<void>}
  */
 async function handleDistributeCommand(interaction) {
-  await safeReply(interaction, async () => {
-    const mainRoom = interaction.options.getChannel('mainroom');
-    const facilitatorsInput = interaction.options.getString('facilitators');
-    const force = interaction.options.getBoolean('force') || false;
-    console.log(`🎯 Main room selected: ${mainRoom.name} (force: ${force})`);
-    
-    // Process facilitators if provided
-    const facilitators = new Set();
-    if (facilitatorsInput) {
-      const mentionPattern = /<@!?(\d+)>/g;
-      const matches = facilitatorsInput.matchAll(mentionPattern);
-      for (const match of matches) {
-        facilitators.add(match[1]);
-      }
-      console.log(`👥 Facilitators identified: ${facilitators.size}`);
+  const mainRoom = interaction.options.getChannel('mainroom');
+  const facilitatorsInput = interaction.options.getString('facilitators');
+  const force = interaction.options.getBoolean('force') || false;
+  console.log(`🎯 Main room selected: ${mainRoom.name} (force: ${force})`);
+  
+  // Process facilitators if provided
+  const facilitators = new Set();
+  if (facilitatorsInput) {
+    const mentionPattern = /<@!?(\d+)>/g;
+    const matches = facilitatorsInput.matchAll(mentionPattern);
+    for (const match of matches) {
+      facilitators.add(match[1]);
     }
+    console.log(`👥 Facilitators identified: ${facilitators.size}`);
+  }
 
-    const breakoutRooms = breakoutRoomManager.getRooms(interaction.guildId);
-    
-    if (breakoutRooms.length === 0) {
-      console.log(`❌ Error: No breakout rooms found`);
-      return replyOrEdit(interaction, 'No breakout rooms found! Please create breakout rooms first with `/breakout create`.');
-    }
-    
-    const usersInMainRoom = mainRoom.members;
-    
-    if (usersInMainRoom.size === 0) {
-      console.log(`⚠️ No users found in ${mainRoom.name}`);
-      return replyOrEdit(interaction, `There are no users in ${mainRoom.name}.`);
-    }
+  const breakoutRooms = breakoutRoomManager.getRooms(interaction.guildId);
+  
+  if (breakoutRooms.length === 0) {
+    console.log(`❌ Error: No breakout rooms found`);
+    return replyOrEdit(interaction, 'No breakout rooms found! Please create breakout rooms first with `/breakout create`.');
+  }
+  
+  const usersInMainRoom = mainRoom.members;
+  
+  if (usersInMainRoom.size === 0) {
+    console.log(`⚠️ No users found in ${mainRoom.name}`);
+    return replyOrEdit(interaction, `There are no users in ${mainRoom.name}.`);
+  }
 
-    // Filter out facilitators before distribution
-    const usersToDistribute = Array.from(usersInMainRoom.values())
-      .filter(member => !facilitators.has(member.user.id));
+  // Filter out facilitators before distribution
+  const usersToDistribute = Array.from(usersInMainRoom.values())
+    .filter(member => !facilitators.has(member.user.id));
+  
+  console.log(`🧩 Distributing ${usersToDistribute.length} users among ${breakoutRooms.length} breakout rooms (excluding ${facilitators.size} facilitators)`);
+  const distribution = distributeUsers(usersToDistribute, breakoutRooms);
+  
+  // Use the recovery-compatible distribute function
+  const result = await distributeToBreakoutRooms(interaction, mainRoom, distribution, force);
+  
+  if (!result.success) {
+    return replyOrEdit(interaction, result.message);
+  }
+  
+  // Create embed for nice formatting
+  console.log(`📝 Creating response embed`);
+  const embed = new EmbedBuilder()
+    .setTitle('Breakout Room Assignment')
+    .setColor('#00FF00')
+    .setDescription(`Split users from ${mainRoom.name} into ${breakoutRooms.length} breakout rooms.`)
+    .setTimestamp();
+  
+  // Add facilitators field if any exist
+  if (facilitators.size > 0) {
+    const facilitatorUsers = Array.from(usersInMainRoom.values())
+      .filter(member => facilitators.has(member.user.id))
+      .map(member => member.user.tag)
+      .join('\n');
     
-    console.log(`🧩 Distributing ${usersToDistribute.length} users among ${breakoutRooms.length} breakout rooms (excluding ${facilitators.size} facilitators)`);
-    const distribution = distributeUsers(usersToDistribute, breakoutRooms);
-    
-    // Use the recovery-compatible distribute function
-    const result = await distributeToBreakoutRooms(interaction, mainRoom, distribution, force);
-    
-    if (!result.success) {
-      return replyOrEdit(interaction, result.message);
-    }
-    
-    // Create embed for nice formatting
-    console.log(`📝 Creating response embed`);
-    const embed = new EmbedBuilder()
-      .setTitle('Breakout Room Assignment')
-      .setColor('#00FF00')
-      .setDescription(`Split users from ${mainRoom.name} into ${breakoutRooms.length} breakout rooms.`)
-      .setTimestamp();
-    
-    // Add facilitators field if any exist
-    if (facilitators.size > 0) {
-      const facilitatorUsers = Array.from(usersInMainRoom.values())
-        .filter(member => facilitators.has(member.user.id))
-        .map(member => member.user.tag)
-        .join('\n');
-      
-      embed.addFields({
-        name: '👥 Facilitators',
-        value: facilitatorUsers || 'None',
-        inline: false
-      });
-      console.log(`📊 Added ${facilitators.size} facilitators to embed`);
-    }
-    
-    // Add fields for each breakout room
-    breakoutRooms.forEach(room => {
-      const usersInRoom = distribution[room.id]?.map(u => u.user.tag).join('\n') || 'No users assigned';
-      embed.addFields({
-        name: room.name,
-        value: usersInRoom,
-        inline: true
-      });
-      console.log(`📊 Added ${room.name} stats to embed: ${distribution[room.id]?.length || 0} users`);
+    embed.addFields({
+      name: '👥 Facilitators',
+      value: facilitatorUsers || 'None',
+      inline: false
     });
-    
-    // Add error field if any
-    if (result.moveResults.failed && result.moveResults.failed.length > 0) {
-      embed.addFields({
-        name: 'Failed Moves',
-        value: result.moveResults.failed.join('\n'),
-        inline: false
-      });
-      console.log(`⚠️ Added ${result.moveResults.failed.length} failed moves to embed`);
-    }
-    
-    console.log(`📤 Sending breakout room results to Discord`);
-    return replyOrEdit(interaction, { embeds: [embed] });
-  }, { deferReply: true, ephemeral: false });
+    console.log(`📊 Added ${facilitators.size} facilitators to embed`);
+  }
+  
+  // Add fields for each breakout room
+  breakoutRooms.forEach(room => {
+    const usersInRoom = distribution[room.id]?.map(u => u.user.tag).join('\n') || 'No users assigned';
+    embed.addFields({
+      name: room.name,
+      value: usersInRoom,
+      inline: true
+    });
+    console.log(`📊 Added ${room.name} stats to embed: ${distribution[room.id]?.length || 0} users`);
+  });
+  
+  // Add error field if any
+  if (result.moveResults.failed && result.moveResults.failed.length > 0) {
+    embed.addFields({
+      name: 'Failed Moves',
+      value: result.moveResults.failed.join('\n'),
+      inline: false
+    });
+    console.log(`⚠️ Added ${result.moveResults.failed.length} failed moves to embed`);
+  }
+  
+  console.log(`📤 Sending breakout room results to Discord`);
+  return replyOrEdit(interaction, { embeds: [embed] });
 }
 
 /**
@@ -309,33 +305,27 @@ async function handleDistributeCommand(interaction) {
  * @returns {Promise<void>}
  */
 async function handleEndCommand(interaction) {
-  await safeReply(
-    interaction,
-    async () => {
-      // Get the main voice channel from user input or from the manager
-      let mainChannel = interaction.options.getChannel("main_room");
-      const force = interaction.options.getBoolean("force") || false;
-      
-      // If no main channel is specified, try to get it from the manager
-      if (!mainChannel) {
-        mainChannel = breakoutRoomManager.getMainRoom(interaction.guildId);
-        if (!mainChannel) {
-          return replyOrEdit(interaction, "Please specify a main voice channel where users should be moved back.");
-        }
-      }
-      
-      console.log(`🎯 Target main voice channel: ${mainChannel.name} (${mainChannel.id}) (force: ${force})`);
-      
-      const result = await endBreakoutSession(interaction, mainChannel, force);
-      
-      if (result.success) {
-        return replyOrEdit(interaction, result.message);
-      } else {
-        return replyOrEdit(interaction, result.message || "Failed to end breakout session.");
-      }
-    },
-    { deferReply: true, ephemeral: false }
-  );
+  // Get the main voice channel from user input or from the manager
+  let mainChannel = interaction.options.getChannel("main_room");
+  const force = interaction.options.getBoolean("force") || false;
+  
+  // If no main channel is specified, try to get it from the manager
+  if (!mainChannel) {
+    mainChannel = breakoutRoomManager.getMainRoom(interaction.guildId);
+    if (!mainChannel) {
+      return replyOrEdit(interaction, "Please specify a main voice channel where users should be moved back.");
+    }
+  }
+  
+  console.log(`🎯 Target main voice channel: ${mainChannel.name} (${mainChannel.id}) (force: ${force})`);
+  
+  const result = await endBreakoutSession(interaction, mainChannel, force);
+  
+  if (result.success) {
+    return replyOrEdit(interaction, result.message);
+  } else {
+    return replyOrEdit(interaction, result.message || "Failed to end breakout session.");
+  }
 }
 
 /**
@@ -344,35 +334,33 @@ async function handleEndCommand(interaction) {
  * @returns {Promise<void>}
  */
 async function handleTimerCommand(interaction) {
-  await safeReply(interaction, async () => {
-    const minutes = interaction.options.getInteger("minutes");
-    console.log(`⏱️ Setting breakout timer for ${minutes} minutes`);
+  const minutes = interaction.options.getInteger("minutes");
+  console.log(`⏱️ Setting breakout timer for ${minutes} minutes`);
+  
+  const breakoutRooms = breakoutRoomManager.getRooms(interaction.guildId);
+  
+  if (breakoutRooms.length === 0) {
+    console.log(`❌ Error: No breakout rooms found`);
+    return replyOrEdit(interaction, 'No breakout rooms found! Please create breakout rooms first with `/breakout create`.');
+  }
     
-    const breakoutRooms = breakoutRoomManager.getRooms(interaction.guildId);
+  // Calculate reminder time
+  const fiveMinWarningTime = minutes - 5;
+  // Set up the timer data (converting minutes to milliseconds)
+  const timerData = {
+    totalMinutes: minutes,
+    startTime: Date.now(),
+    guildId: interaction.guildId,
+    breakoutRooms: breakoutRooms.map(room => room.id),
+    fiveMinSent: fiveMinWarningTime <= 0, // Skip if total time is less than 5 minutes
+  };
     
-    if (breakoutRooms.length === 0) {
-      console.log(`❌ Error: No breakout rooms found`);
-      return replyOrEdit(interaction, 'No breakout rooms found! Please create breakout rooms first with `/breakout create`.');
-    }
-      
-    // Calculate reminder time
-    const fiveMinWarningTime = minutes - 5;
-    // Set up the timer data (converting minutes to milliseconds)
-    const timerData = {
-      totalMinutes: minutes,
-      startTime: Date.now(),
-      guildId: interaction.guildId,
-      breakoutRooms: breakoutRooms.map(room => room.id),
-      fiveMinSent: fiveMinWarningTime <= 0, // Skip if total time is less than 5 minutes
-    };
-      
-    // Store timer data in state manager
-    await stateManager.setTimerData(interaction.guildId, timerData);
-    // Start the timer monitoring process
-    monitorBreakoutTimer(timerData, interaction);
-    
-    return replyOrEdit(interaction, `⏱️ Breakout timer set for ${minutes} minutes. Reminder will be sent at 5 minute mark.`);
-  }, { deferReply: true, ephemeral: false });
+  // Store timer data in state manager
+  await stateManager.setTimerData(interaction.guildId, timerData);
+  // Start the timer monitoring process
+  monitorBreakoutTimer(timerData, interaction);
+  
+  return replyOrEdit(interaction, `⏱️ Breakout timer set for ${minutes} minutes. Reminder will be sent at 5 minute mark.`);
 }
 
 /**
@@ -381,32 +369,30 @@ async function handleTimerCommand(interaction) {
  * @returns {Promise<void>}
  */
 async function handleBroadcastCommand(interaction) {
-  await safeReply(interaction, async () => {
-    const message = interaction.options.getString('message');
-    console.log(`📢 Broadcasting message: "${message}"`);
+  const message = interaction.options.getString('message');
+  console.log(`📢 Broadcasting message: "${message}"`);
 
-    const result = await broadcastToBreakoutRooms(interaction.guildId, message);
+  const result = await broadcastToBreakoutRooms(interaction.guildId, message);
 
-    if (result.success) {
-      const embed = new EmbedBuilder()
-        .setTitle('Broadcast Results')
-        .setColor('#00FF00')
-        .setDescription('Message broadcast complete')
-        .addFields(
-          { name: 'Successfully Sent To', value: result.sent.join('\n') || 'None', inline: true }
-        );
+  if (result.success) {
+    const embed = new EmbedBuilder()
+      .setTitle('Broadcast Results')
+      .setColor('#00FF00')
+      .setDescription('Message broadcast complete')
+      .addFields(
+        { name: 'Successfully Sent To', value: result.sent.join('\n') || 'None', inline: true }
+      );
 
-      if (result.failed.length > 0) {
-        embed.addFields(
-          { name: 'Failed To Send To', value: result.failed.join('\n'), inline: true }
-        );
-      }
-
-      return replyOrEdit(interaction, { embeds: [embed] });
-    } else {
-      return replyOrEdit(interaction, result.message);
+    if (result.failed.length > 0) {
+      embed.addFields(
+        { name: 'Failed To Send To', value: result.failed.join('\n'), inline: true }
+      );
     }
-  }, { deferReply: true, ephemeral: false });
+
+    return replyOrEdit(interaction, { embeds: [embed] });
+  } else {
+    return replyOrEdit(interaction, result.message);
+  }
 }
 
 /**
@@ -415,17 +401,15 @@ async function handleBroadcastCommand(interaction) {
  * @returns {Promise<void>}
  */
 async function handleSendMessageCommand(interaction) {
-  await safeReply(interaction, async () => {
-    const channel = interaction.options.getChannel('channel');
-    const message = interaction.options.getString('message');
-    
-    console.log(`📨 Sending message to ${channel.name}: "${message}"`);
+  const channel = interaction.options.getChannel('channel');
+  const message = interaction.options.getString('message');
+  
+  console.log(`📨 Sending message to ${channel.name}: "${message}"`);
 
-    const result = await sendMessageToChannel(channel, message);
+  const result = await sendMessageToChannel(channel, message);
 
-    return replyOrEdit(interaction, {
-      content: result.message,
-      ephemeral: !result.success
-    });
-  }, { deferReply: true, ephemeral: false });
+  return replyOrEdit(interaction, {
+    content: result.message,
+    ephemeral: !result.success
+  });
 }
