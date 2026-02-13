@@ -30,8 +30,8 @@ function distributeUsers(
     console.log(`🏗️ Created distribution bucket for room: ${room.name}`);
   });
 
-  // Convert users collection to array if it's not already
-  const userArray = Array.isArray(users) ? users : Array.from(users.values());
+  // Convert users collection to array if it's not already, and create a copy to avoid mutation
+  const userArray = Array.isArray(users) ? [...users] : Array.from(users.values());
   console.log(`👤 Total users to distribute: ${userArray.length}`);
 
   // Shuffle users for randomness

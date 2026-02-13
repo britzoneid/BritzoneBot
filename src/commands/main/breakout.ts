@@ -270,7 +270,7 @@ async function handleDistributeCommand(interaction: ChatInputCommandInteraction)
   // Use the recovery-compatible distribute function
   const result = await distributeToBreakoutRooms(
     interaction,
-    mainRoom as VoiceChannel,
+    mainRoom,
     distribution,
     force,
   );

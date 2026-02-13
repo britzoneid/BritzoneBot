@@ -1,24 +1,10 @@
-import { ChannelType, type Guild, type VoiceChannel, type GuildMember, type CommandInteraction } from 'discord.js';
+import { ChannelType, type Guild, type VoiceChannel, type VoiceBasedChannel, type GuildMember, type CommandInteraction } from 'discord.js';
 import breakoutRoomManager from './breakoutRoomManager.js';
 import stateManager from './breakoutStateManager.js';
 import createChannel from './createChannel.js';
 import moveUser from './moveUser.js';
 import type { OperationResult } from '../types/index.js';
 import type { UserDistribution } from './distributeUsers.js';
-
-/**
- * Get the parent category from a channel if it has one
- * @param channel The channel to get parent from
- * @returns The parent channel or null if no parent
- */
-function getChannelParent(channel: any): any {
-  if (!channel) return null;
-  // GuildBasedChannels (non-threads) have a parent property
-  if ('parent' in channel && channel.parent) return channel.parent;
-  // Threads have a parent as well
-  if ('isThread' in channel && channel.isThread?.() && 'parent' in channel) return channel.parent;
-  return null;
-}
 
 /**
  * Result of checking for existing breakout rooms
@@ -141,7 +127,9 @@ export async function createBreakoutRooms(
   try {
     const createdChannels: VoiceChannel[] = [];
     // Get parent category from channel if available, otherwise use guild as fallback
-    const channelParent = getChannelParent(interaction.channel);
+    // Use type guard to safely access parent property
+    const channel = interaction.channel;
+    const channelParent = (channel && 'parent' in channel) ? channel.parent : null;
     const parent = channelParent || interaction.guild;
 
     // Create each breakout room with checkpointing
@@ -184,7 +172,8 @@ export async function createBreakoutRooms(
     // Complete operation
     await stateManager.completeOperation(guildId);
 
-    const hasParent = getChannelParent(interaction.channel) !== null;
+    const channel = interaction.channel;
+    const hasParent = (channel && 'parent' in channel && channel.parent) !== null;
     return {
       success: true,
       message: `Successfully created ${numRooms} breakout voice channels${
@@ -206,7 +195,7 @@ export async function createBreakoutRooms(
  */
 export async function distributeToBreakoutRooms(
   interaction: CommandInteraction,
-  mainRoom: VoiceChannel,
+  mainRoom: VoiceBasedChannel,
   distribution: UserDistribution,
   force: boolean = false,
 ): Promise<OperationResult> {

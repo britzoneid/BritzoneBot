@@ -1,4 +1,4 @@
-import { ChannelType, type Client } from 'discord.js';
+import { ChannelType, type ChatInputCommandInteraction } from 'discord.js';
 import stateManager from './breakoutStateManager.js';
 
 /**
@@ -19,7 +19,7 @@ export interface TimerData {
  * @param timerData Timer configuration data
  * @param interaction The Discord command interaction
  */
-export async function monitorBreakoutTimer(timerData: TimerData, interaction: any): Promise<void> {
+export async function monitorBreakoutTimer(timerData: TimerData, interaction: ChatInputCommandInteraction): Promise<void> {
   const { totalMinutes, startTime, guildId, breakoutRooms } = timerData;
   const endTime = startTime + totalMinutes * 60 * 1000;
   let timerState = await stateManager.getTimerData(guildId);

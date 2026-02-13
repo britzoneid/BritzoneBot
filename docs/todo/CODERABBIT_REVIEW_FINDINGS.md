@@ -3,7 +3,8 @@
 **Date:** February 13, 2026  
 **PR:** #1 - refactor: Complete TypeScript migration  
 **Total Issues:** 40  
-**Severity Breakdown:** 4 Critical | 7 Major | 11 Minor | 18 Trivial
+**Fixed Issues:** 8 (4 Critical + 4 Major)  
+**Severity Breakdown:** 4 Critical \u2705 | 7 Major (4 \u2705) | 11 Minor | 18 Trivial
 
 ---
 
@@ -223,6 +224,7 @@ async getTimerData(guildId: string): Promise<TimerData | null> {
 
 ### 5. Unsafe Narrowing from `VoiceChannel | StageChannel` to `VoiceChannel` in `src/commands/main/breakout.ts` (Line 272)
 
+**Status:** ✅ FIXED  
 **Severity:** 🟠 Major  
 **Type:** Type Safety - Unsafe casting  
 **File:** `src/commands/main/breakout.ts`  
@@ -230,6 +232,9 @@ async getTimerData(guildId: string): Promise<TimerData | null> {
 
 **Description:**
 Line 224 types `mainRoom` as `VoiceChannel | StageChannel` (the subcommand accepts both `GuildVoice` and `GuildStageVoice`). However, Line 272 casts it to `VoiceChannel` without checking type.
+
+**Resolution:**
+Updated `distributeToBreakoutRooms` function signature to accept `VoiceBasedChannel` instead of `VoiceChannel`, which is the proper Discord.js type union that encompasses both `VoiceChannel` and `StageChannel`. Removed unnecessary type cast in the command handler.
 
 **Impact:**
 If a user selects a stage channel, `distributeToBreakoutRooms` receives a `StageChannel` masquerading as a `VoiceChannel`. This could cause subtle runtime issues since stage channels have different permission and behavior semantics than voice channels.
@@ -398,6 +403,7 @@ const commandFiles = fs.readdirSync(commandsPath).filter((file) =>
 
 ### 9. Unsafe Type Narrowing for `interaction.channel.parent` in `src/helpers/breakoutOperations.ts` (Lines 116-117, 162)
 
+**Status:** ✅ FIXED  
 **Severity:** 🟠 Major  
 **Type:** Type Safety - Unsafe casting  
 **File:** `src/helpers/breakoutOperations.ts`  
@@ -405,6 +411,9 @@ const commandFiles = fs.readdirSync(commandsPath).filter((file) =>
 
 **Description:**
 The code uses `(interaction.channel as any)?.parent` which bypasses type safety. `interaction.channel` has well-defined types in discord.js, and using `as any` negates type checking.
+
+**Resolution:**
+Replaced unsafe `as any` casts with proper type guards using `'parent' in channel` checks. This leverages TypeScript's type narrowing capabilities while maintaining type safety. Also removed the now-unnecessary `getChannelParent` helper function.
 
 **Current Code:**
 ```typescript
@@ -435,6 +444,7 @@ Apply the same fix where the pattern recurs (around line 162).
 
 ### 10. Input Array Mutated In-Place by Shuffle in `src/helpers/distributeUsers.ts` (Line 33, 39-42)
 
+**Status:** ✅ FIXED  
 **Severity:** 🟠 Major  
 **Type:** Bug - Unexpected side effect  
 **File:** `src/helpers/distributeUsers.ts`  
@@ -442,6 +452,9 @@ Apply the same fix where the pattern recurs (around line 162).
 
 **Description:**
 When callers pass an array to `distributeUsers`, the function doesn't create a copy. The Fisher-Yates shuffle on lines 39–42 reorders the input array in-place, causing unexpected side effects for callers.
+
+**Resolution:**
+Updated the array handling to always create a copy before shuffling: `const userArray = Array.isArray(users) ? [...users] : Array.from(users.values());`. This prevents unintended side effects on the caller's original array.
 
 **Current Code:**
 ```typescript
@@ -469,6 +482,7 @@ const userArray = Array.isArray(users) ? [...users] : Array.from(users.values())
 
 ### 11. `interaction: any` Type Parameter in `breakoutTimerHelper` in `src/helpers/breakoutTimerHelper.ts` (Line 22)
 
+**Status:** ✅ FIXED  
 **Severity:** 🟠 Major  
 **Type:** Type Safety - Untyped parameter  
 **File:** `src/helpers/breakoutTimerHelper.ts`  
@@ -477,6 +491,9 @@ const userArray = Array.isArray(users) ? [...users] : Array.from(users.values())
 
 **Description:**
 The function accepts `interaction: any` which is a significant type-safety gap. The PR claims "strict mode with zero `any` types," but this parameter is untyped.
+
+**Resolution:**
+Changed the parameter type from `any` to `ChatInputCommandInteraction`, which is the proper Discord.js type that provides the `client` property accessed by the function. Updated imports to include `ChatInputCommandInteraction` from `discord.js`.
 
 **Current Code:**
 ```typescript
