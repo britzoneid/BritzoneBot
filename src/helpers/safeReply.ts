@@ -1,4 +1,4 @@
-import type { RepliableInteraction } from 'discord.js';
+import type { RepliableInteraction, CommandInteraction } from 'discord.js';
 
 /**
  * Options for safeReply function
@@ -10,15 +10,15 @@ export interface SafeReplyOptions {
 
 /**
  * Safely handles Discord interactions with built-in error handling for expired interactions
- * 
+ *
  * This is a fully typed version of your safeReply helper.
  * It demonstrates proper TypeScript patterns for your codebase.
- * 
+ *
  * @param interaction The Discord interaction to handle
  * @param handler Async function that handles the interaction
  * @param options Options for handling the interaction
  * @returns boolean indicating success
- * 
+ *
  * @example
  * ```typescript
  * await safeReply(
@@ -31,7 +31,7 @@ export interface SafeReplyOptions {
  * ```
  */
 export async function safeReply(
-  interaction: RepliableInteraction,
+  interaction: RepliableInteraction | CommandInteraction,
   handler: () => Promise<void>,
   options: SafeReplyOptions = {},
 ): Promise<boolean> {
@@ -89,6 +89,21 @@ export async function safeReply(
     console.log(`❌ Unexpected error in safeReply for interaction ${interaction.id}`);
     return false;
   }
+}
+
+/**
+ * Replies to an interaction appropriately based on its state (deferred or replied)
+ * @param interaction The Discord interaction
+ * @param content Content to send
+ * @returns Promise resolving to the message or interaction response
+ */
+export function replyOrEdit(
+  interaction: RepliableInteraction | CommandInteraction,
+  content: string | any,
+): Promise<any> {
+  return interaction.replied || interaction.deferred
+    ? interaction.editReply(content)
+    : interaction.reply(content);
 }
 
 export default safeReply;
