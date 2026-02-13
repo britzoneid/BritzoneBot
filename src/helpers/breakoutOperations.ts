@@ -117,10 +117,22 @@ export async function createBreakoutRooms(
   }
 
   // If force is true and rooms exist, end the current session first
-  if (force && existingRooms.exists && interaction.channel) {
+  if (force && existingRooms.exists) {
     console.log(`🔄 Force flag enabled, cleaning up ${existingRooms.rooms.length} existing rooms`);
-    const mainChannel = interaction.channel; // Use current channel as fallback
-    await endBreakoutSession(interaction, mainChannel as VoiceChannel, true);
+    const storedMain = breakoutRoomManager.getMainRoom(guildId);
+    if (storedMain) {
+      await endBreakoutSession(interaction, storedMain, true);
+    } else {
+      // No main room known — just delete rooms without moving members
+      for (const room of existingRooms.rooms) {
+        try {
+          await room.delete('Force cleanup');
+        } catch {
+          /* ignore */
+        }
+      }
+      breakoutRoomManager.clearSession(guildId);
+    }
   }
 
   // Start new operation
