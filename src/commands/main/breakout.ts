@@ -155,6 +155,7 @@ const command: Command = {
         content: `Found an interrupted breakout operation. Attempting to resume the previous '${currentOp?.type}' command...`,
         ephemeral: true,
       });
+      return;
     }
 
     // Check if user has permission to use this command
@@ -164,7 +165,7 @@ const command: Command = {
       !member.permissions.has(PermissionFlagsBits.MoveMembers)
     ) {
       console.log(`🔒 Permission denied to ${interaction.user.tag} for breakout command`);
-      await interaction.reply({
+      await replyOrEdit(interaction, {
         content: 'You do not have permission to use this command.',
         ephemeral: true,
       });
