@@ -1,4 +1,4 @@
-import type { VoiceChannel } from 'discord.js';
+import type { VoiceChannel, VoiceBasedChannel } from 'discord.js';
 
 /**
  * Represents a breakout session for a guild
@@ -7,7 +7,7 @@ interface BreakoutSession {
   /** Array of breakout room channels */
   rooms?: VoiceChannel[];
   /** The main voice channel */
-  mainRoom?: VoiceChannel;
+  mainRoom?: VoiceBasedChannel;
 }
 
 /**
@@ -37,7 +37,7 @@ class BreakoutRoomManager {
    * @param guildId The Discord guild ID
    * @param mainRoom The main voice channel
    */
-  setMainRoom(guildId: string, mainRoom: VoiceChannel): void {
+  setMainRoom(guildId: string, mainRoom: VoiceBasedChannel): void {
     const session = this.sessions.get(guildId) || {};
     session.mainRoom = mainRoom;
     this.sessions.set(guildId, session);
@@ -59,7 +59,7 @@ class BreakoutRoomManager {
    * @param guildId The Discord guild ID
    * @returns The main voice channel or undefined
    */
-  getMainRoom(guildId: string): VoiceChannel | undefined {
+  getMainRoom(guildId: string): VoiceBasedChannel | undefined {
     const session = this.sessions.get(guildId);
     return session?.mainRoom;
   }

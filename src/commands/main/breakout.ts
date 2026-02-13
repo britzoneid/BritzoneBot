@@ -5,6 +5,7 @@ import {
   EmbedBuilder,
   type ChatInputCommandInteraction,
   type VoiceChannel,
+  type VoiceBasedChannel,
   type StageChannel,
   type GuildMember,
 } from 'discord.js';
@@ -338,7 +339,7 @@ async function handleEndCommand(interaction: ChatInputCommandInteraction): Promi
   if (!interaction.guildId) return;
 
   // Get the main voice channel from user input or from the manager
-  let mainChannel = interaction.options.getChannel('main_room') as VoiceChannel | null;
+  let mainChannel = interaction.options.getChannel('main_room') as VoiceBasedChannel | null;
   const force = interaction.options.getBoolean('force') || false;
 
   // If no main channel is specified, try to get it from the manager

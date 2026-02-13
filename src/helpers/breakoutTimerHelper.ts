@@ -1,4 +1,4 @@
-import { ChannelType, type ChatInputCommandInteraction } from 'discord.js';
+import { ChannelType, type ChatInputCommandInteraction, type Client, type GuildBasedChannel } from 'discord.js';
 import stateManager from './breakoutStateManager.js';
 
 /**
@@ -102,7 +102,7 @@ export async function sendReminderWithRetry(
     }
 
     const textChannel = guild.channels.cache.find(
-      (c) =>
+      (c: GuildBasedChannel) =>
         c.type === ChannelType.GuildText &&
         c.name.toLowerCase().includes(voiceChannel.name.toLowerCase().replace(/\s+/g, '-')),
     );

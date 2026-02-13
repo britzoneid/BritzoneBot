@@ -130,7 +130,8 @@ export async function createBreakoutRooms(
     // Use type guard to safely access parent property
     const channel = interaction.channel;
     const channelParent = (channel && 'parent' in channel) ? channel.parent : null;
-    const parent = channelParent || interaction.guild;
+    // Ensure parent is only Guild or CategoryChannel (required by createChannel)
+    const parent = (channelParent && 'children' in channelParent) ? channelParent : interaction.guild;
 
     // Create each breakout room with checkpointing
     for (let i = 1; i <= numRooms; i++) {
@@ -154,9 +155,9 @@ export async function createBreakoutRooms(
 
       console.log(`📂 Creating voice channel: ${roomName}`);
       try {
-        const channel = await createChannel(parent, roomName);
-        createdChannels.push(channel);
-        await stateManager.updateProgress(guildId, `create_room_${i}`, { channelId: channel.id });
+        const createdChannel = await createChannel(parent, roomName);
+        createdChannels.push(createdChannel);
+        await stateManager.updateProgress(guildId, `create_room_${i}`, { channelId: createdChannel.id });
       } catch (error) {
         console.error(`❌ Failed to create ${roomName}:`, error);
         throw error;
@@ -172,8 +173,8 @@ export async function createBreakoutRooms(
     // Complete operation
     await stateManager.completeOperation(guildId);
 
-    const channel = interaction.channel;
-    const hasParent = (channel && 'parent' in channel && channel.parent) !== null;
+    const cmdChannel = interaction.channel;
+    const hasParent = (cmdChannel && 'parent' in cmdChannel && cmdChannel.parent) !== null;
     return {
       success: true,
       message: `Successfully created ${numRooms} breakout voice channels${
@@ -327,7 +328,7 @@ export async function distributeToBreakoutRooms(
  */
 export async function endBreakoutSession(
   interaction: CommandInteraction,
-  mainChannel: VoiceChannel,
+  mainChannel: VoiceBasedChannel,
   force: boolean = false,
 ): Promise<OperationResult> {
   const guildId = interaction.guildId;
