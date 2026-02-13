@@ -210,6 +210,20 @@ class BreakoutStateManager {
   }
 
   /**
+   * Clear the current operation without marking as completed
+   * Used when resuming an operation to prevent infinite recursion
+   */
+  async clearCurrentOperation(guildId: string): Promise<void> {
+    await this.initialize();
+    const guildState = this.inMemoryState[guildId] as GuildState | undefined;
+
+    if (guildState?.currentOperation) {
+      delete guildState.currentOperation;
+      await this.saveState();
+    }
+  }
+
+  /**
    * Get completed steps for the current operation
    */
   async getCompletedSteps(guildId: string): Promise<Record<string, OperationStep>> {

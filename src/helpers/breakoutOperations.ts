@@ -536,6 +536,9 @@ async function resumeOperation(interaction: CommandInteraction): Promise<Operati
 
   console.log(`🔁 Resuming ${currentOp.type} operation for guild ${guildId}`);
 
+  // Clear the operation flag to prevent infinite recursion when operation handlers check again
+  await stateManager.clearCurrentOperation(guildId);
+
   switch (currentOp.type) {
     case 'create':
       // For create, just restart with the same params
