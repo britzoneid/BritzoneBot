@@ -261,6 +261,7 @@ class BreakoutStateManager {
    * @returns Timer data object or null if not found
    */
   async getTimerData(guildId: string): Promise<TimerData | null> {
+    await this.initialize();
     const timerKey = `timer_${guildId}`;
     return (this.inMemoryState[timerKey] as TimerData) || null;
   }
