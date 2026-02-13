@@ -10,9 +10,9 @@
   "description": "Discord bot designed to manage breakout rooms for voice channels",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "deploy": "node deployCommandsLocal.js",
-    "dev": "nodemon index.js"
+    "start": "bun index.js",
+    "deploy": "bun deployCommandsLocal.js",
+    "dev": "bun index.js"
   },
   "engines": {
     "node": ">=22.12.0"
