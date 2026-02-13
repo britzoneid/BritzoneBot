@@ -8,7 +8,7 @@
 import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Client, Collection, GatewayIntentBits, Events } from 'discord.js';
+import { Client, Collection, GatewayIntentBits } from 'discord.js';
 import consoleStamp from 'console-stamp';
 import type { BritzoneClient, Command, Event } from './types/index.js';
 

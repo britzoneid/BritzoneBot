@@ -42,9 +42,12 @@ const event: Event<typeof Events.InteractionCreate> = {
     );
 
     try {
-      await command.execute(interaction);
+      // Type assertion: if interaction is ChatInputCommand, command.execute expects CommandInteraction
+      if ('execute' in command) {
+        await command.execute(interaction as any);
+      }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+
       console.error(`❌ Error executing command ${interaction.commandName}:`, error);
 
       // Handle different interaction states (replied, deferred, or untouched)

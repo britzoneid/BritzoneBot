@@ -1,4 +1,4 @@
-import type { Interaction } from 'discord.js';
+import type { RepliableInteraction } from 'discord.js';
 
 /**
  * Options for safeReply function
@@ -31,7 +31,7 @@ export interface SafeReplyOptions {
  * ```
  */
 export async function safeReply(
-  interaction: Interaction,
+  interaction: RepliableInteraction,
   handler: () => Promise<void>,
   options: SafeReplyOptions = {},
 ): Promise<boolean> {
@@ -53,13 +53,13 @@ export async function safeReply(
         const error = deferError instanceof Error ? deferError : new Error(String(deferError));
 
         // If we can't defer, the interaction likely expired
-        if ('code' in error && error.code === 10062) {
+        if ('code' in error && (error as any).code === 10062) {
           console.log(`⏱️ Interaction ${interaction.id} expired before deferring`);
           return false;
         }
 
         // Handle network errors gracefully
-        if (error.code === 'EAI_AGAIN' || error.message === 'Defer reply timeout') {
+        if ((error as any).code === 'EAI_AGAIN' || error.message === 'Defer reply timeout') {
           console.log(
             `🌐 Network issue while deferring interaction ${interaction.id}: ${error.message}`,
           );
