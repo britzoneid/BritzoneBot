@@ -26,40 +26,83 @@ export class DistributeOperation {
     const currentOp = await stateManager.getCurrentOperation(guildId);
     const isResuming = currentOp?.type === operationType;
 
+    // Use a local variable for distribution to allow overriding from state
+    let activeDistribution = distribution;
+
     if (isResuming) {
       console.log(`🔄 Resuming distribute operation for guild ${guildId}`);
+
+      // Reconstruct distribution from stored state
+      if (currentOp?.params?.distribution) {
+        try {
+          const storedPlan = currentOp.params.distribution as Record<string, string[]>;
+          const reconstructed: UserDistribution = {};
+          console.log(`📦 Reconstructing distribution plan from saved state...`);
+
+          for (const [roomId, userIds] of Object.entries(storedPlan)) {
+            reconstructed[roomId] = [];
+            for (const userId of userIds) {
+              try {
+                // Try cache first, then fetch
+                let member = interaction.guild.members.cache.get(userId);
+                if (!member) {
+                  member = await interaction.guild.members.fetch(userId);
+                }
+
+                if (member) {
+                  reconstructed[roomId].push(member);
+                } else {
+                  console.warn(`⚠️ User ${userId} from stored plan not found in guild`);
+                }
+              } catch (err) {
+                console.warn(`⚠️ Failed to fetch user ${userId} for resume:`, err);
+              }
+            }
+          }
+          activeDistribution = reconstructed;
+          console.log(`✅ Reconstructed plan for ${Object.keys(activeDistribution).length} rooms`);
+        } catch (error) {
+          console.error(`❌ Failed to reconstruct distribution plan:`, error);
+          // Fallback to provided distribution if reconstruction fails?
+          // Or fail? If we fail here, we might be in a bad state.
+          // Let's log and continue with provided distribution but warn.
+          console.warn(`⚠️ Falling back to fresh distribution plan due to error.`);
+        }
+      }
     } else {
-        // Check if distribution is already active
-        const isDistributionActive = await distributionService.hasActiveDistribution(guildId);
-        if (isDistributionActive && !force) {
-            return {
-            success: false,
-            message:
-                "Users are already distributed to breakout rooms. Use '/breakout distribute' with the force flag set to true to redistribute, or use '/breakout end' first to end the current session.",
-            };
-        }
+      // Check if distribution is already active
+      const isDistributionActive = await distributionService.hasActiveDistribution(guildId);
+      if (isDistributionActive && !force) {
+        return {
+          success: false,
+          message:
+            "Users are already distributed to breakout rooms. Use '/breakout distribute' with the force flag set to true to redistribute, or use '/breakout end' first to end the current session.",
+        };
+      }
 
-        // If force is true and distribution is active, we should technically clean up.
-        // But similar to CreateOperation, avoiding circular dependency for now.
-        // The original code called endBreakoutSession.
-        if (force && isDistributionActive) {
-            console.log(`🔄 Force flag enabled, proceeding with redistribution (previous session implicit end)`);
-            // We'll rely on the new distribution simply moving users, effectively "stealing" them from old rooms.
-            // But we should probably clear the session manager's main room if it changes?
-            // sessionManager.setMainRoom handles overwrite.
-        }
+      // If force is true and distribution is active, we should technically clean up.
+      // But similar to CreateOperation, avoiding circular dependency for now.
+      // The original code called endBreakoutSession.
+      if (force && isDistributionActive) {
+        console.log(
+          `🔄 Force flag enabled, proceeding with redistribution (previous session implicit end)`,
+        );
+        // We'll rely on the new distribution simply moving users, effectively "stealing" them from old rooms.
+        // But we should probably clear the session manager's main room if it changes?
+        // sessionManager.setMainRoom handles overwrite.
+      }
 
-        // Store distribution plan for recovery
-        const distributionPlan: Record<string, string[]> = {};
-        for (const [roomId, users] of Object.entries(distribution)) {
-            distributionPlan[roomId] = users.map((user) => user.id);
-        }
+      // Store distribution plan for recovery
+      const distributionPlan: Record<string, string[]> = {};
+      for (const [roomId, users] of Object.entries(distribution)) {
+        distributionPlan[roomId] = users.map((user) => user.id);
+      }
 
-        // Start new operation
-        await stateManager.startOperation(guildId, operationType, {
-            mainRoomId: mainRoom.id,
-            distribution: distributionPlan,
-        });
+      // Start new operation
+      await stateManager.startOperation(guildId, operationType, {
+        mainRoomId: mainRoom.id,
+        distribution: distributionPlan,
+      });
     }
 
     try {
@@ -70,11 +113,11 @@ export class DistributeOperation {
       const steps = await stateManager.getCompletedSteps(guildId);
 
       if (!steps['set_main_room']) {
-          sessionManager.setMainRoom(guildId, mainRoom);
-          await stateManager.updateProgress(guildId, 'set_main_room');
+        sessionManager.setMainRoom(guildId, mainRoom);
+        await stateManager.updateProgress(guildId, 'set_main_room');
       } else {
-           // Ensure session manager is in sync if we restarted the bot
-           sessionManager.setMainRoom(guildId, mainRoom);
+        // Ensure session manager is in sync if we restarted the bot
+        sessionManager.setMainRoom(guildId, mainRoom);
       }
 
       const movePromises: Promise<void>[] = [];
@@ -83,8 +126,8 @@ export class DistributeOperation {
         failed: [] as string[],
       };
 
-      // Process each room
-      for (const [roomId, users] of Object.entries(distribution)) {
+      // Process each room using the active distribution
+      for (const [roomId, users] of Object.entries(activeDistribution)) {
         const room = interaction.guild.channels.cache.get(roomId) as VoiceChannel | undefined;
 
         if (!room) {
@@ -125,7 +168,8 @@ export class DistributeOperation {
           console.log(`🚚 Attempting to move ${user.user.tag} to channel: ${room.name}`);
 
           movePromises.push(
-            distributionService.moveUserToRoom(user, room)
+            distributionService
+              .moveUserToRoom(user, room)
               .then(async () => {
                 moveResults.success.push(`${user.user.tag} → ${room.name}`);
                 console.log(`✅ Successfully moved ${user.user.tag} to ${room.name}`);
