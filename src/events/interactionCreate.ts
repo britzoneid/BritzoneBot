@@ -42,9 +42,12 @@ const event: Event<typeof Events.InteractionCreate> = {
     );
 
     try {
-      // Type assertion: if interaction is ChatInputCommand, command.execute expects CommandInteraction
+      // At this point, interaction is ChatInputCommandInteraction (narrowed by isChatInputCommand())
+      // The command must be a SlashCommand since we're handling a chat input command
       if ('execute' in command) {
-        await command.execute(interaction as any);
+        // Use a type assertion here because Collections don't have strong value typing
+        // We've already verified the command has execute via the 'in' check
+        await (command as any).execute(interaction);
       }
     } catch (error) {
 

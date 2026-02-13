@@ -7,6 +7,20 @@ import type { OperationResult } from '../types/index.js';
 import type { UserDistribution } from './distributeUsers.js';
 
 /**
+ * Get the parent category from a channel if it has one
+ * @param channel The channel to get parent from
+ * @returns The parent channel or null if no parent
+ */
+function getChannelParent(channel: any): any {
+  if (!channel) return null;
+  // GuildBasedChannels (non-threads) have a parent property
+  if ('parent' in channel && channel.parent) return channel.parent;
+  // Threads have a parent as well
+  if ('isThread' in channel && channel.isThread?.() && 'parent' in channel) return channel.parent;
+  return null;
+}
+
+/**
  * Result of checking for existing breakout rooms
  */
 export interface ExistingRoomsResult {
@@ -114,7 +128,9 @@ export async function createBreakoutRooms(
 
   try {
     const createdChannels: VoiceChannel[] = [];
-    const parent = (interaction.channel as any)?.parent || interaction.guild;
+    // Get parent category from channel if available, otherwise use guild as fallback
+    const channelParent = getChannelParent(interaction.channel);
+    const parent = channelParent || interaction.guild;
 
     // Create each breakout room with checkpointing
     for (let i = 1; i <= numRooms; i++) {
@@ -156,10 +172,11 @@ export async function createBreakoutRooms(
     // Complete operation
     await stateManager.completeOperation(guildId);
 
+    const hasParent = getChannelParent(interaction.channel) !== null;
     return {
       success: true,
       message: `Successfully created ${numRooms} breakout voice channels${
-        (interaction.channel as any)?.parent ? ' in the same category' : ''
+        hasParent ? ' in the same category' : ''
       }!`,
     };
   } catch (error) {

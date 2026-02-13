@@ -9,6 +9,16 @@ export interface SafeReplyOptions {
 }
 
 /**
+ * Safely extract error code from an Error object
+ * @param error The error to extract code from
+ * @returns The error code if present, otherwise undefined
+ */
+function getErrorCode(error: Error): string | number | undefined {
+  const errorObj = error as any; // Errors from different sources have code properties
+  return errorObj.code;
+}
+
+/**
  * Safely handles Discord interactions with built-in error handling for expired interactions
  *
  * This is a fully typed version of your safeReply helper.
@@ -51,15 +61,16 @@ export async function safeReply(
         console.log(`🔄 Successfully deferred interaction ${interaction.id}`);
       } catch (deferError) {
         const error = deferError instanceof Error ? deferError : new Error(String(deferError));
+        const errorCode = getErrorCode(error);
 
         // If we can't defer, the interaction likely expired
-        if ('code' in error && (error as any).code === 10062) {
+        if (errorCode === 10062) {
           console.log(`⏱️ Interaction ${interaction.id} expired before deferring`);
           return false;
         }
 
         // Handle network errors gracefully
-        if ((error as any).code === 'EAI_AGAIN' || error.message === 'Defer reply timeout') {
+        if (errorCode === 'EAI_AGAIN' || error.message === 'Defer reply timeout') {
           console.log(
             `🌐 Network issue while deferring interaction ${interaction.id}: ${error.message}`,
           );
