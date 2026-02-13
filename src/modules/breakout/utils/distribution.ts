@@ -1,4 +1,5 @@
 import type { GuildMember, VoiceChannel, StageChannel } from 'discord.js';
+import { randomInt } from 'node:crypto';
 
 /**
  * Result of user distribution
@@ -37,7 +38,7 @@ export function distributeUsers(
   // Shuffle users for randomness
   console.log(`🔀 Shuffling users for random distribution`);
   for (let i = userArray.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = randomInt(0, i + 1);
     [userArray[i], userArray[j]] = [userArray[j], userArray[i]];
   }
 
