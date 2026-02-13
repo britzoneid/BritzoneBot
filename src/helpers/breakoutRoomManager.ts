@@ -1,24 +1,31 @@
+import type { VoiceChannel } from 'discord.js';
+
 /**
- * @typedef {Object} BreakoutSession
- * @property {import('discord.js').VoiceChannel[]} rooms - Array of breakout room channels
- * @property {import('discord.js').VoiceChannel} mainRoom - The main voice channel
+ * Represents a breakout session for a guild
  */
+interface BreakoutSession {
+  /** Array of breakout room channels */
+  rooms?: VoiceChannel[];
+  /** The main voice channel */
+  mainRoom?: VoiceChannel;
+}
 
 /**
  * Manages breakout room sessions for Discord guilds
  */
 class BreakoutRoomManager {
+  private sessions: Map<string, BreakoutSession>;
+
   constructor() {
-    /** @type {Map<string, BreakoutSession>} */
-    this.sessions = new Map();
+    this.sessions = new Map<string, BreakoutSession>();
   }
 
   /**
    * Stores breakout rooms for a guild
-   * @param {string} guildId - The Discord guild ID
-   * @param {import('discord.js').VoiceChannel[]} rooms - Array of voice channels
+   * @param guildId The Discord guild ID
+   * @param rooms Array of voice channels
    */
-  storeRooms(guildId, rooms) {
+  storeRooms(guildId: string, rooms: VoiceChannel[]): void {
     const session = this.sessions.get(guildId) || {};
     session.rooms = rooms;
     this.sessions.set(guildId, session);
@@ -27,10 +34,10 @@ class BreakoutRoomManager {
 
   /**
    * Sets the main room for a guild's breakout session
-   * @param {string} guildId - The Discord guild ID
-   * @param {import('discord.js').VoiceChannel} mainRoom - The main voice channel
+   * @param guildId The Discord guild ID
+   * @param mainRoom The main voice channel
    */
-  setMainRoom(guildId, mainRoom) {
+  setMainRoom(guildId: string, mainRoom: VoiceChannel): void {
     const session = this.sessions.get(guildId) || {};
     session.mainRoom = mainRoom;
     this.sessions.set(guildId, session);
@@ -39,29 +46,29 @@ class BreakoutRoomManager {
 
   /**
    * Gets the breakout rooms for a guild
-   * @param {string} guildId - The Discord guild ID
-   * @returns {import('discord.js').VoiceChannel[]} Array of voice channels or empty array
+   * @param guildId The Discord guild ID
+   * @returns Array of voice channels or empty array
    */
-  getRooms(guildId) {
+  getRooms(guildId: string): VoiceChannel[] {
     const session = this.sessions.get(guildId);
     return session?.rooms || [];
   }
 
   /**
    * Gets the main room for a guild
-   * @param {string} guildId - The Discord guild ID
-   * @returns {import('discord.js').VoiceChannel|undefined} The main voice channel or undefined
+   * @param guildId The Discord guild ID
+   * @returns The main voice channel or undefined
    */
-  getMainRoom(guildId) {
+  getMainRoom(guildId: string): VoiceChannel | undefined {
     const session = this.sessions.get(guildId);
     return session?.mainRoom;
   }
 
   /**
    * Clears session data for a guild
-   * @param {string} guildId - The Discord guild ID
+   * @param guildId The Discord guild ID
    */
-  clearSession(guildId) {
+  clearSession(guildId: string): void {
     this.sessions.delete(guildId);
     console.log(`🧹 Cleared breakout session for guild ${guildId}`);
   }

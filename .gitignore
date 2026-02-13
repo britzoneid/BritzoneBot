@@ -3,3 +3,5 @@ node_modules/
 guildList.json
 data/breakoutState.json
 log/
+dist/
+*.tsbuildinfo

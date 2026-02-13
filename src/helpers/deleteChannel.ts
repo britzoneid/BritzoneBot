@@ -1,10 +1,11 @@
+import type { VoiceChannel } from 'discord.js';
+
 /**
  * Safely deletes a voice channel
- * @param {import('discord.js').VoiceChannel} channel - The channel to delete
- * @param {string} reason - Reason for deletion
- * @returns {Promise<void>}
+ * @param channel The channel to delete
+ * @param reason Reason for deletion
  */
-async function deleteChannel(channel, reason = 'Channel cleanup') {
+async function deleteChannel(channel: VoiceChannel, reason: string = 'Channel cleanup'): Promise<void> {
   try {
     console.log(`🗑️ Attempting to delete channel: ${channel.name}`);
     await channel.delete(reason);

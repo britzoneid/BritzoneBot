@@ -2,10 +2,64 @@ import fs from 'fs/promises';
 import path from 'path';
 
 /**
+ * Single operation step data
+ */
+interface OperationStep {
+  completed: boolean;
+  timestamp: number;
+  [key: string]: any;
+}
+
+/**
+ * Operation progress tracking
+ */
+interface OperationProgress {
+  started: boolean;
+  completed: boolean;
+  steps: Record<string, OperationStep>;
+  startTime: number;
+  completedTime?: number;
+}
+
+/**
+ * Current operation details
+ */
+interface CurrentOperation {
+  type: string;
+  params: Record<string, any>;
+  progress: OperationProgress;
+}
+
+/**
+ * Guild state data
+ */
+interface GuildState {
+  currentOperation?: CurrentOperation;
+  history?: CurrentOperation[];
+}
+
+/**
+ * Timer data for breakout sessions
+ */
+interface TimerData {
+  totalMinutes: number;
+  startTime: number;
+  guildId: string;
+  breakoutRooms: string[];
+  fiveMinSent: boolean;
+  [key: string]: any;
+}
+
+/**
  * Manages state persistence for breakout room operations to enable recovery
  * from network interruptions or other failures.
  */
 class BreakoutStateManager {
+  private statePath: string;
+  private stateFile: string;
+  private inMemoryState: Record<string, GuildState | TimerData>;
+  private initialized: boolean;
+
   constructor() {
     this.statePath = path.join(process.cwd(), 'data');
     this.stateFile = path.join(this.statePath, 'breakoutState.json');
@@ -17,7 +71,7 @@ class BreakoutStateManager {
    * Initialize the state manager, ensuring the data directory exists
    * and loading any existing state
    */
-  async initialize() {
+  async initialize(): Promise<void> {
     if (this.initialized) return;
 
     try {
@@ -33,12 +87,12 @@ class BreakoutStateManager {
   /**
    * Load state from disk
    */
-  async loadState() {
+  async loadState(): Promise<void> {
     try {
       const data = await fs.readFile(this.stateFile, 'utf8');
       this.inMemoryState = JSON.parse(data);
       console.log('📤 Loaded breakout state data');
-    } catch (error) {
+    } catch (error: any) {
       if (error.code !== 'ENOENT') {
         console.error('❌ Error loading breakout state:', error);
       }
@@ -50,7 +104,7 @@ class BreakoutStateManager {
   /**
    * Save state to disk
    */
-  async saveState() {
+  async saveState(): Promise<void> {
     try {
       await this.initialize();
       await fs.writeFile(this.stateFile, JSON.stringify(this.inMemoryState, null, 2));
@@ -63,21 +117,22 @@ class BreakoutStateManager {
   /**
    * Start tracking a new operation
    */
-  async startOperation(guildId, operationType, params) {
+  async startOperation(guildId: string, operationType: string, params: Record<string, any>): Promise<void> {
     await this.initialize();
     if (!this.inMemoryState[guildId]) {
-      this.inMemoryState[guildId] = {};
+      this.inMemoryState[guildId] = {} as GuildState;
     }
 
-    this.inMemoryState[guildId].currentOperation = {
+    const guildState = this.inMemoryState[guildId] as GuildState;
+    guildState.currentOperation = {
       type: operationType,
       params,
       progress: {
         started: true,
         completed: false,
         steps: {},
-        startTime: Date.now()
-      }
+        startTime: Date.now(),
+      },
     };
 
     console.log(`📝 Started tracking ${operationType} operation for guild ${guildId}`);
@@ -87,17 +142,19 @@ class BreakoutStateManager {
   /**
    * Update progress for an operation
    */
-  async updateProgress(guildId, step, data = {}) {
+  async updateProgress(guildId: string, step: string, data: Record<string, any> = {}): Promise<boolean> {
     await this.initialize();
-    if (!this.inMemoryState[guildId]?.currentOperation) {
+    const guildState = this.inMemoryState[guildId] as GuildState | undefined;
+    
+    if (!guildState?.currentOperation) {
       console.log(`⚠️ No operation in progress for guild ${guildId}`);
       return false;
     }
 
-    this.inMemoryState[guildId].currentOperation.progress.steps[step] = {
+    guildState.currentOperation.progress.steps[step] = {
       completed: true,
       timestamp: Date.now(),
-      ...data
+      ...data,
     };
 
     console.log(`✅ Updated progress for guild ${guildId}: ${step}`);
@@ -108,25 +165,25 @@ class BreakoutStateManager {
   /**
    * Complete an operation
    */
-  async completeOperation(guildId) {
+  async completeOperation(guildId: string): Promise<void> {
     await this.initialize();
-    if (!this.inMemoryState[guildId]?.currentOperation) return;
+    const guildState = this.inMemoryState[guildId] as GuildState | undefined;
+    
+    if (!guildState?.currentOperation) return;
 
-    this.inMemoryState[guildId].currentOperation.progress.completed = true;
-    this.inMemoryState[guildId].currentOperation.progress.completedTime = Date.now();
-    
+    guildState.currentOperation.progress.completed = true;
+    guildState.currentOperation.progress.completedTime = Date.now();
+
     // Move current operation to history
-    if (!this.inMemoryState[guildId].history) {
-      this.inMemoryState[guildId].history = [];
+    if (!guildState.history) {
+      guildState.history = [];
     }
-    
-    this.inMemoryState[guildId].history.push(
-      this.inMemoryState[guildId].currentOperation
-    );
-    
+
+    guildState.history.push(guildState.currentOperation);
+
     // Clear current operation
-    delete this.inMemoryState[guildId].currentOperation;
-    
+    delete guildState.currentOperation;
+
     console.log(`🏁 Completed operation for guild ${guildId}`);
     await this.saveState();
   }
@@ -134,33 +191,39 @@ class BreakoutStateManager {
   /**
    * Check if there's an operation in progress
    */
-  async hasOperationInProgress(guildId) {
+  async hasOperationInProgress(guildId: string): Promise<boolean> {
     await this.initialize();
-    return !!this.inMemoryState[guildId]?.currentOperation && 
-           !this.inMemoryState[guildId].currentOperation.progress.completed;
+    const guildState = this.inMemoryState[guildId] as GuildState | undefined;
+    
+    return (
+      !!guildState?.currentOperation && !guildState.currentOperation.progress.completed
+    );
   }
 
   /**
    * Get the current operation details
    */
-  async getCurrentOperation(guildId) {
+  async getCurrentOperation(guildId: string): Promise<CurrentOperation | undefined> {
     await this.initialize();
-    return this.inMemoryState[guildId]?.currentOperation;
+    const guildState = this.inMemoryState[guildId] as GuildState | undefined;
+    return guildState?.currentOperation;
   }
 
   /**
    * Get completed steps for the current operation
    */
-  async getCompletedSteps(guildId) {
+  async getCompletedSteps(guildId: string): Promise<Record<string, OperationStep>> {
     await this.initialize();
-    if (!this.inMemoryState[guildId]?.currentOperation) return {};
-    return this.inMemoryState[guildId].currentOperation.progress.steps;
+    const guildState = this.inMemoryState[guildId] as GuildState | undefined;
+    
+    if (!guildState?.currentOperation) return {};
+    return guildState.currentOperation.progress.steps;
   }
 
   /**
    * Clear state for a guild
    */
-  async clearGuildState(guildId) {
+  async clearGuildState(guildId: string): Promise<void> {
     await this.initialize();
     delete this.inMemoryState[guildId];
     await this.saveState();
@@ -169,11 +232,10 @@ class BreakoutStateManager {
 
   /**
    * Sets timer data for a guild
-   * @param {string} guildId - The guild ID
-   * @param {Object} timerData - Timer data object
-   * @returns {Promise<void>}
+   * @param guildId The guild ID
+   * @param timerData Timer data object
    */
-  async setTimerData(guildId, timerData) {
+  async setTimerData(guildId: string, timerData: TimerData): Promise<void> {
     console.log(`💾 Storing timer data for guild ${guildId}`);
     this.inMemoryState[`timer_${guildId}`] = timerData;
     await this.saveState();
@@ -181,19 +243,19 @@ class BreakoutStateManager {
 
   /**
    * Gets timer data for a guild
-   * @param {string} guildId - The guild ID
-   * @returns {Promise<Object|null>} Timer data object or null if not found
+   * @param guildId The guild ID
+   * @returns Timer data object or null if not found
    */
-  async getTimerData(guildId) {
-    return this.inMemoryState[`timer_${guildId}`] || null;
+  async getTimerData(guildId: string): Promise<TimerData | null> {
+    const timerKey = `timer_${guildId}`;
+    return (this.inMemoryState[timerKey] as TimerData) || null;
   }
 
   /**
    * Clears timer data for a guild
-   * @param {string} guildId - The guild ID
-   * @returns {Promise<void>}
+   * @param guildId The guild ID
    */
-  async clearTimerData(guildId) {
+  async clearTimerData(guildId: string): Promise<void> {
     console.log(`🗑️ Clearing timer data for guild ${guildId}`);
     delete this.inMemoryState[`timer_${guildId}`];
     await this.saveState();

@@ -1,18 +1,24 @@
 {
   "type": "module",
-  "dependencies": {
-    "console-stamp": "^3.1.2",
-    "discord.js": "^14.18.0",
-    "dotenv": "^16.4.7"
-  },
   "name": "britzone-bot",
   "version": "1.1.0",
   "description": "Discord bot designed to manage breakout rooms for voice channels",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "start": "node index.js",
-    "deploy": "node deployCommandsLocal.js",
-    "dev": "nodemon index.js"
+    "build": "tsc",
+    "start": "bun dist/index.js",
+    "deploy": "bun dist/deployCommandsLocal.js",
+    "dev": "bun --watch src/index.ts",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "console-stamp": "^3.1.2",
+    "discord.js": "^14.25.1",
+    "dotenv": "^16.6.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.0"
   },
   "engines": {
     "node": ">=22.12.0"
