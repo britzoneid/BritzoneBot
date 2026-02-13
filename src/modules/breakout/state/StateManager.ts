@@ -59,12 +59,14 @@ export class StateManager {
   private stateFile: string;
   private inMemoryState: Record<string, GuildState | TimerData>;
   private initialized: boolean;
+  private saveQueue: Promise<void>;
 
   constructor() {
     this.statePath = path.join(process.cwd(), 'data');
     this.stateFile = path.join(this.statePath, 'breakoutState.json');
     this.inMemoryState = {};
     this.initialized = false;
+    this.saveQueue = Promise.resolve();
   }
 
   /**
@@ -102,16 +104,24 @@ export class StateManager {
   }
 
   /**
-   * Save state to disk
+   * Save state to disk with concurrency safety
    */
   async saveState(): Promise<void> {
-    try {
-      await this.initialize();
-      await fs.writeFile(this.stateFile, JSON.stringify(this.inMemoryState, null, 2));
-      console.log('💾 Saved breakout state data');
-    } catch (error) {
-      console.error('❌ Error saving breakout state:', error);
-    }
+    // Queue the save operation to prevent race conditions with file writes
+    const nextSave = this.saveQueue.then(async () => {
+      try {
+        await this.initialize();
+        await fs.writeFile(this.stateFile, JSON.stringify(this.inMemoryState, null, 2));
+        console.log('💾 Saved breakout state data');
+      } catch (error) {
+        console.error('❌ Error saving breakout state:', error);
+      }
+    });
+
+    // Update the queue reference, catching errors to ensure the queue allows future writes
+    this.saveQueue = nextSave.catch(() => {});
+
+    return nextSave;
   }
 
   /**
