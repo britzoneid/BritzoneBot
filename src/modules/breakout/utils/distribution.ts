@@ -13,7 +13,7 @@ export interface UserDistribution {
  * @param breakoutRooms Array of breakout room channels
  * @returns Mapping of breakout room IDs to arrays of users
  */
-function distributeUsers(
+export function distributeUsers(
   users: GuildMember[] | Map<string, GuildMember>,
   breakoutRooms: Array<VoiceChannel | StageChannel>,
 ): UserDistribution {

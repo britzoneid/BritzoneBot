@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, type CommandInteraction } from 'discord.js';
 import type { Command } from '../../types/index.js';
-import safeReply, { replyOrEdit } from '../../helpers/safeReply.js';
+import safeReply, { replyOrEdit } from '../../lib/discord/response.js';
 
 const command: Command = {
   data: new SlashCommandBuilder()

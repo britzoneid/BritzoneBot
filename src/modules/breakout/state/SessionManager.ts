@@ -13,7 +13,7 @@ interface BreakoutSession {
 /**
  * Manages breakout room sessions for Discord guilds
  */
-class BreakoutRoomManager {
+export class SessionManager {
   private sessions: Map<string, BreakoutSession>;
 
   constructor() {
@@ -75,4 +75,4 @@ class BreakoutRoomManager {
 }
 
 // Export a singleton instance
-export default new BreakoutRoomManager();
+export default new SessionManager();
