@@ -1,4 +1,4 @@
-import type { SlashCommandBuilder, ContextMenuCommandBuilder } from '@discordjs/builders';
+import type { SlashCommandBuilder, ContextMenuCommandBuilder, SlashCommandSubcommandsOnlyBuilder } from '@discordjs/builders';
 import type { CommandInteraction, ContextMenuCommandInteraction } from 'discord.js';
 
 /**
@@ -6,7 +6,7 @@ import type { CommandInteraction, ContextMenuCommandInteraction } from 'discord.
  */
 export interface SlashCommand {
   type?: 'slash';
-  data: SlashCommandBuilder;
+  data: SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder;
   execute(interaction: CommandInteraction): Promise<void>;
   cooldown?: number;
 }
