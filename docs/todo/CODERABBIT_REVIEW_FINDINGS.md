@@ -364,6 +364,7 @@ Update persistence logic to serialize both maps separately or wrap them explicit
 
 ### 8. File Filter Matches `.d.ts` Declaration Files in `src/deployCommandsLocal.ts` (Line 34)
 
+**Status:** ✅ FIXED  
 **Severity:** 🟠 Major  
 **Type:** Bug - Type declaration file loading  
 **File:** `src/deployCommandsLocal.ts`  
@@ -375,29 +376,23 @@ The file filter uses `endsWith('.ts')` which also matches `.d.ts` declaration fi
 **Impact:**
 `.d.ts` declaration files will fail or produce invalid command modules when dynamically imported. The compiled output will try to import type definitions as runnable code.
 
-Note: `src/index.ts` (line 74) correctly filters only `.js` files, but this location does not.
-
-**Current Code:**
-```typescript
-const commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.ts') || file.endsWith('.js'));
-```
+Note: `src/index.ts` (line 74) correctly filters only `.js` files, but this location did not.
 
 **CodeRabbit Analysis:**
 > `file.endsWith('.ts')` matches `.d.ts` declaration files, which will fail or produce invalid command modules when dynamically imported.
 
-**Suggested Fix:**
+**Resolution:**
+Updated the filter to only match `.js` files since `deployCommandsLocal.ts` runs from the `dist/` directory after TypeScript compilation. Changed from:
 ```typescript
-const commandFiles = fs.readdirSync(commandsPath).filter((file) => 
-  (file.endsWith('.ts') && !file.endsWith('.d.ts')) || file.endsWith('.js')
-);
+const commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.ts') || file.endsWith('.js'));
 ```
 
-Or use a regex pattern:
+To:
 ```typescript
-const commandFiles = fs.readdirSync(commandsPath).filter((file) => 
-  /\.(?:ts|js)$/.test(file) && !file.endsWith('.d.ts')
-);
+const commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.js'));
 ```
+
+This ensures only compiled JavaScript files are loaded, excluding `.d.ts` declaration files that would otherwise cause runtime errors.
 
 ---
 

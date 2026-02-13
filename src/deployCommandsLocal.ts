@@ -31,7 +31,7 @@ const commandFolders = fs.readdirSync(foldersPath);
 for (const folder of commandFolders) {
   // Grab all the command files from the commands directory
   const commandsPath = path.join(foldersPath, folder);
-  const commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.ts') || file.endsWith('.js'));
+  const commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.js'));
   console.log(`loading commands from ${folder}/`);
   console.log(commandFiles);
 
