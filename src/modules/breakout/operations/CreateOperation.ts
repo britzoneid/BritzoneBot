@@ -107,7 +107,7 @@ export class CreateOperation {
       await stateManager.completeOperation(guildId);
 
       const cmdChannel = interaction.channel;
-      const hasParent = (cmdChannel && 'parent' in cmdChannel && cmdChannel.parent) !== null;
+      const hasParent = Boolean(cmdChannel && 'parent' in cmdChannel && cmdChannel.parent);
       return {
         success: true,
         message: `Successfully created ${numRooms} breakout voice channels${
