@@ -1,7 +1,7 @@
 # BritzoneBot
 
-[![Project Status](https://img.shields.io/badge/Status-Stable-brightgreen.svg)](https://github.com/InvictusNavarchus/BritzoneBot)
-[![Version](https://img.shields.io/badge/Version-2.0.0-blue.svg)](https://github.com/InvictusNavarchus/BritzoneBot/releases)
+[![Project Status](https://img.shields.io/badge/Status-Stable-brightgreen.svg)](https://github.com/britzoneid/BritzoneBot)
+[![Version](https://img.shields.io/badge/Version-2.0.0-blue.svg)](https://github.com/britzoneid/BritzoneBot/releases)
 [![License](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://opensource.org/licenses/MIT)
 [![Bun Version](https://img.shields.io/badge/Bun-%3E=v1.3.0-FBF0DF?logo=bun)](https://bun.sh)
 
@@ -25,7 +25,7 @@ Follow these straightforward steps to deploy and configure BritzoneBot on your D
 1.  **Clone the Repository**:
 
     ```sh
-    git clone 'https://github.com/InvictusNavarchus/BritzoneBot.git'
+    git clone 'https://github.com/britzoneid/BritzoneBot.git'
     cd BritzoneBot
     ```
 
