@@ -21,6 +21,14 @@ interface GuildList {
 
 // Read and parse the guildList.json file
 const guildListPath = path.join(__dirname, '..', 'guildList.json');
+
+if (!fs.existsSync(guildListPath)) {
+  console.error(
+    'Error: guildList.json not found. Please copy guildList.json.example to guildList.json and configure your guild IDs.',
+  );
+  process.exit(1);
+}
+
 const guildList: GuildList = JSON.parse(fs.readFileSync(guildListPath, 'utf-8'));
 
 const commands: RESTPostAPIChatInputApplicationCommandsJSONBody[] = [];

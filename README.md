@@ -51,7 +51,13 @@ Follow these straightforward steps to deploy and configure BritzoneBot on your D
         TOKEN=your-bot-token
         ```
 
-    *   **Guild List Configuration**: Create a `guildList.json` file in the root directory. This file maps your Discord server names to their respective IDs. You'll need to retrieve your server IDs from Discord. An example `guildList.json` structure is provided below:
+    *   **Guild List Configuration**: Create a `guildList.json` file in the root directory. This is **required** for the deployment script to know where to register commands. You can copy the example file:
+
+        ```sh
+        cp guildList.json.example guildList.json
+        ```
+
+        Then edit `guildList.json` to map your Discord server names to their respective IDs:
 
         ```json
         {
