@@ -2,7 +2,7 @@
 
 [![Project Status](https://img.shields.io/badge/Status-Stable-brightgreen.svg)](https://github.com/InvictusNavarchus/BritzoneBot)
 [![License](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://opensource.org/licenses/MIT)
-[![Node.js Version](https://img.shields.io/badge/node-%3E=22.12.0-green.svg)](https://nodejs.org/en/)
+[![Bun Version](https://img.shields.io/badge/Bun-%3E=v1.3.0-black?logo=bun)](https://bun.sh)
 
 BritzoneBot is a Discord bot designed to manage breakout rooms for voice channels in a Discord server. It provides commands to create, distribute users among, and end breakout sessions with robust error handling and state management.
 
@@ -30,22 +30,28 @@ Follow these straightforward steps to deploy and configure BritzoneBot on your D
 
 2.  **Install Dependencies**:
 
-    Ensure you have Node.js and npm installed. Navigate to the cloned repository directory in your terminal and run:
+    Ensure you have [Bun](https://bun.sh) installed. Navigate to the cloned repository directory in your terminal and run:
 
     ```sh
-    npm install
+    bun install
     ```
 
 3.  **Configuration**:
 
-    *   **Environment Variables**: Create a `.env` file in the root directory of the repository. Add the following environment variables, replacing placeholders with your actual bot token and bot ID obtained from the [Discord Developer Portal](https://discord.com/developers/applications):
+    *   **Environment Variables**: Copy `.env.example` to `.env` in the root directory.
 
-        ```env
-        TOKEN=your-bot-token
-        BOT_ID=your-bot-id
+        ```sh
+        cp .env.example .env
         ```
 
-    *   **Guild List Configuration**: Create a `guildList.json` file in the root directory. This file maps your Discord server names to their respective IDs.  You'll need to retrieve your server IDs from Discord. An example `guildList.json` structure is provided below:
+        Fill in your bot credentials obtained from the [Discord Developer Portal](https://discord.com/developers/applications):
+
+        ```env
+        BOT_ID=your-bot-id
+        TOKEN=your-bot-token
+        ```
+
+    *   **Guild List Configuration**: Create a `guildList.json` file in the root directory. This file maps your Discord server names to their respective IDs. You'll need to retrieve your server IDs from Discord. An example `guildList.json` structure is provided below:
 
         ```json
         {
@@ -54,23 +60,35 @@ Follow these straightforward steps to deploy and configure BritzoneBot on your D
         }
         ```
 
-4.  **Deployment**:
+4.  **Build and Deploy**:
+
+    *   **Build the Project**: Compile the TypeScript source code to JavaScript.
+
+        ```sh
+        bun run build
+        ```
 
     *   **Local Command Deployment**: To register the bot's commands within your specified Discord servers, run:
 
         ```sh
-        npm run deploy
+        bun run deploy
         ```
         This script will deploy the commands to the guilds listed in your `guildList.json`.
 
 5.  **Run the Bot**:
 
-    Start the BritzoneBot using the following command:
+    *   **Production**: Start the bot using the compiled output:
 
-    ```sh
-    npm run start
-    ```
-    Ensure your terminal remains running to keep the bot online. For production deployments, consider using process managers like `pm2` or `systemd` to ensure bot uptime and automatic restarts.
+        ```sh
+        bun start
+        ```
+        Ensure your terminal remains running to keep the bot online. For production deployments, consider using process managers like `pm2` or `systemd`.
+
+    *   **Development**: Run the bot in development mode with live reloading:
+
+        ```sh
+        bun dev
+        ```
 
 ---
 
