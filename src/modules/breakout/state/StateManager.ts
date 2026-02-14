@@ -4,7 +4,7 @@ import path from 'path';
 /**
  * Single operation step data
  */
-interface OperationStep {
+export interface OperationStep {
   completed: boolean;
   timestamp: number;
   [key: string]: any;
@@ -13,7 +13,7 @@ interface OperationStep {
 /**
  * Operation progress tracking
  */
-interface OperationProgress {
+export interface OperationProgress {
   started: boolean;
   completed: boolean;
   steps: Record<string, OperationStep>;
@@ -24,7 +24,7 @@ interface OperationProgress {
 /**
  * Current operation details
  */
-interface CurrentOperation {
+export interface CurrentOperation {
   type: string;
   params: Record<string, any>;
   progress: OperationProgress;
@@ -41,7 +41,7 @@ interface GuildState {
 /**
  * Timer data for breakout sessions
  */
-interface TimerData {
+export interface TimerData {
   totalMinutes: number;
   startTime: number;
   guildId: string;
@@ -54,17 +54,19 @@ interface TimerData {
  * Manages state persistence for breakout room operations to enable recovery
  * from network interruptions or other failures.
  */
-class BreakoutStateManager {
+export class StateManager {
   private statePath: string;
   private stateFile: string;
   private inMemoryState: Record<string, GuildState | TimerData>;
   private initialized: boolean;
+  private saveQueue: Promise<void>;
 
   constructor() {
     this.statePath = path.join(process.cwd(), 'data');
     this.stateFile = path.join(this.statePath, 'breakoutState.json');
     this.inMemoryState = {};
     this.initialized = false;
+    this.saveQueue = Promise.resolve();
   }
 
   /**
@@ -78,9 +80,9 @@ class BreakoutStateManager {
       await fs.mkdir(this.statePath, { recursive: true });
       await this.loadState();
       this.initialized = true;
-      console.log('📂 BreakoutStateManager initialized');
+      console.log('📂 StateManager initialized');
     } catch (error) {
-      console.error('❌ Failed to initialize BreakoutStateManager:', error);
+      console.error('❌ Failed to initialize StateManager:', error);
     }
   }
 
@@ -102,16 +104,24 @@ class BreakoutStateManager {
   }
 
   /**
-   * Save state to disk
+   * Save state to disk with concurrency safety
    */
   async saveState(): Promise<void> {
-    try {
-      await this.initialize();
-      await fs.writeFile(this.stateFile, JSON.stringify(this.inMemoryState, null, 2));
-      console.log('💾 Saved breakout state data');
-    } catch (error) {
-      console.error('❌ Error saving breakout state:', error);
-    }
+    // Queue the save operation to prevent race conditions with file writes
+    const nextSave = this.saveQueue.then(async () => {
+      try {
+        await this.initialize();
+        await fs.writeFile(this.stateFile, JSON.stringify(this.inMemoryState, null, 2));
+        console.log('💾 Saved breakout state data');
+      } catch (error) {
+        console.error('❌ Error saving breakout state:', error);
+      }
+    });
+
+    // Update the queue reference, catching errors to ensure the queue allows future writes
+    this.saveQueue = nextSave.catch(() => {});
+
+    return nextSave;
   }
 
   /**
@@ -278,5 +288,4 @@ class BreakoutStateManager {
 }
 
 // Export a singleton instance
-const stateManager = new BreakoutStateManager();
-export default stateManager;
+export default new StateManager();

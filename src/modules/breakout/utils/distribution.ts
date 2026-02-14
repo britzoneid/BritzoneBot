@@ -1,4 +1,5 @@
 import type { GuildMember, VoiceChannel, StageChannel } from 'discord.js';
+import { randomInt } from 'node:crypto';
 
 /**
  * Result of user distribution
@@ -13,7 +14,7 @@ export interface UserDistribution {
  * @param breakoutRooms Array of breakout room channels
  * @returns Mapping of breakout room IDs to arrays of users
  */
-function distributeUsers(
+export function distributeUsers(
   users: GuildMember[] | Map<string, GuildMember>,
   breakoutRooms: Array<VoiceChannel | StageChannel>,
 ): UserDistribution {
@@ -37,7 +38,7 @@ function distributeUsers(
   // Shuffle users for randomness
   console.log(`🔀 Shuffling users for random distribution`);
   for (let i = userArray.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = randomInt(0, i + 1);
     [userArray[i], userArray[j]] = [userArray[j], userArray[i]];
   }
 
