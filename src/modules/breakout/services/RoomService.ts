@@ -20,6 +20,11 @@ class RoomService {
       const existingRooms = storedRooms.filter((room) => guild.channels.cache.has(room.id));
 
       if (existingRooms.length > 0) {
+        // Remove stale room reference
+        if (existingRooms.length !== storedRooms.length) {
+          sessionManager.storeRooms(guild.id, existingRooms);
+        }
+        
         return {
           exists: true,
           rooms: existingRooms,
