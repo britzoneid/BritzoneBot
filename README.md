@@ -135,5 +135,5 @@ Contributions are welcome! Please open an issue or submit a pull request for any
 
 ## 📜 License
 
-This project is licensed under the GPLv3 License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the AGPLv3 License - see the [LICENSE](LICENSE) file for details.
 
