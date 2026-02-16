@@ -21,10 +21,10 @@ consoleStamp(console, { format: ':date(HH:MM:ss)' });
 // LOGGING SETUP
 // ============================================================================
 
-// Use /app/data/log for Docker compatibility (writable volume mount)
-// Falls back to __dirname/log for local development
-const dataDir = process.env.DATA_DIR || path.join(__dirname, '..');
-const logDir = path.join(dataDir, 'data', 'log');
+// File logging temporarily disabled - causing issues with console override
+// Logs go to stdout which Docker captures anyway
+/* 
+const logDir = '/tmp/britzone-bot-logs';
 if (!fs.existsSync(logDir)) {
   fs.mkdirSync(logDir, { recursive: true });
 }
@@ -32,17 +32,13 @@ const logFile = path.join(logDir, `${new Date().toISOString().split('T')[0]}.log
 
 const originalConsoleLog = console.log;
 
-/**
- * Logs messages to both console and file
- * @param message The message to log
- * @param optionalParams Additional parameters
- */
 console.log = function(message: string, ...optionalParams: any[]): void {
   const timestamp = new Date().toISOString();
   const logMessage = `${timestamp} ${message}\n`;
   fs.appendFileSync(logFile, logMessage);
   originalConsoleLog.apply(console, [message, ...optionalParams]);
 };
+*/
 
 console.log('🚀 Starting the bot...');
 
@@ -141,6 +137,8 @@ client
   })
   .catch((err: Error) => {
     console.error(`❌ Failed to log in: ${err.message}`);
+    console.error('Full error:', err);
+    console.error('Error stack:', err.stack);
     process.exit(1);
   });
 

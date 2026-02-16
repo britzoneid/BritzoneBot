@@ -50,3 +50,9 @@ services:
       - /tmp:mode=1777,size=100M
     
     # No ports needed - bot communicates directly with Discord
+    # network_mode: "host"  # Disabled - conflicts with DNS configuration
+    
+    # Explicit DNS servers for rootless Docker DNS resolution
+    dns:
+      - 1.1.1.1  # Cloudflare
+      - 8.8.8.8  # Google
