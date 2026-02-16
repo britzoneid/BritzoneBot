@@ -42,7 +42,8 @@ services:
     
     # Read-only root filesystem for extra security
     # (except for /app/data which is mounted as writable)
-    read_only: true
+    # Temporarily disabled - causing network connectivity issues
+    # read_only: true
     
     # Temporary filesystem mounts for writable areas
     tmpfs:

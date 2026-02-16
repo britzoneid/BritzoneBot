@@ -21,9 +21,12 @@ consoleStamp(console, { format: ':date(HH:MM:ss)' });
 // LOGGING SETUP
 // ============================================================================
 
-const logDir = path.join(__dirname, 'log');
+// Use /app/data/log for Docker compatibility (writable volume mount)
+// Falls back to __dirname/log for local development
+const dataDir = process.env.DATA_DIR || path.join(__dirname, '..');
+const logDir = path.join(dataDir, 'data', 'log');
 if (!fs.existsSync(logDir)) {
-  fs.mkdirSync(logDir);
+  fs.mkdirSync(logDir, { recursive: true });
 }
 const logFile = path.join(logDir, `${new Date().toISOString().split('T')[0]}.log`);
 

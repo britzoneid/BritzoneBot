@@ -29,10 +29,7 @@ FROM oven/bun:1.3-alpine AS production
 # Install dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init
 
-# Create non-root user and group
-# Using UID 10000 to avoid conflicts with existing system users
-RUN addgroup -g 10000 botuser && \
-    adduser -D -u 10000 -G botuser botuser
+# Note: Base image already has 'bun' user with UID 1000, which matches most host users for rootless Docker
 
 # Set working directory
 WORKDIR /app
@@ -49,10 +46,10 @@ COPY --from=builder /build/dist ./dist
 
 # Create data directory for persistent state
 RUN mkdir -p /app/data && \
-    chown -R botuser:botuser /app
+    chown -R bun:bun /app
 
-# Switch to non-root user
-USER botuser
+# Switch to non-root user (bun user from base image, UID 1000)
+USER bun
 
 # Health check (optional - checks if process is running)
 # Discord bots don't have HTTP endpoints, so we just check process
