@@ -1,0 +1,47 @@
+# Git and version control
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+LICENSE
+docs/
+*.md
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Build artifacts and dependencies
+node_modules/
+dist/
+*.log
+
+# Development files
+guildList.json
+!guildList.json.example
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker files
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Data directory (state management - can be excluded from build)
+data/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
