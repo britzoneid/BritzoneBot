@@ -21,24 +21,7 @@ consoleStamp(console, { format: ':date(HH:MM:ss)' });
 // LOGGING SETUP
 // ============================================================================
 
-// File logging temporarily disabled - causing issues with console override
-// Logs go to stdout which Docker captures anyway
-/* 
-const logDir = '/tmp/britzone-bot-logs';
-if (!fs.existsSync(logDir)) {
-  fs.mkdirSync(logDir, { recursive: true });
-}
-const logFile = path.join(logDir, `${new Date().toISOString().split('T')[0]}.log`);
 
-const originalConsoleLog = console.log;
-
-console.log = function(message: string, ...optionalParams: any[]): void {
-  const timestamp = new Date().toISOString();
-  const logMessage = `${timestamp} ${message}\n`;
-  fs.appendFileSync(logFile, logMessage);
-  originalConsoleLog.apply(console, [message, ...optionalParams]);
-};
-*/
 
 console.log('🚀 Starting the bot...');
 
