@@ -4,7 +4,11 @@ import {
 	type VoiceChannel,
 } from 'discord.js';
 import type { OperationResult } from '../../../types/index.js';
-import roomService from '../services/RoomService.js';
+import {
+	createRoom,
+	deleteRoom,
+	hasExistingBreakoutRooms,
+} from '../services/room.js';
 import sessionManager from '../state/SessionManager.js';
 import stateManager from '../state/StateManager.js';
 
@@ -32,9 +36,7 @@ export class CreateOperation {
 			console.log(`🔄 Resuming create operation for guild ${guildId}`);
 		} else {
 			// Check for existing breakout rooms
-			const existingRooms = await roomService.hasExistingBreakoutRooms(
-				interaction.guild,
-			);
+			const existingRooms = await hasExistingBreakoutRooms(interaction.guild);
 			if (existingRooms.exists && !force) {
 				return {
 					success: false,
@@ -50,7 +52,7 @@ export class CreateOperation {
 				// Simple cleanup: delete rooms.
 				// Note: Ideally we would move users back to main room if known, but for simplicity/force we just delete.
 				for (const room of existingRooms.rooms) {
-					await roomService.deleteRoom(room);
+					await deleteRoom(room);
 				}
 				sessionManager.clearSession(guildId);
 			}
@@ -97,10 +99,7 @@ export class CreateOperation {
 
 				console.log(`📂 Creating voice channel: ${roomName}`);
 				try {
-					const createdChannel = await roomService.createRoom(
-						interaction,
-						roomName,
-					);
+					const createdChannel = await createRoom(interaction, roomName);
 					createdChannels.push(createdChannel);
 					await stateManager.updateProgress(guildId, stepKey, {
 						channelId: createdChannel.id,

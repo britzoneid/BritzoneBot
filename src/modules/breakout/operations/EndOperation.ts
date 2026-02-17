@@ -6,7 +6,7 @@ import {
 } from 'discord.js';
 import type { OperationResult } from '../../../types/index.js';
 import { moveUserToRoom } from '../services/distribution.js';
-import roomService from '../services/RoomService.js';
+import { deleteRoom } from '../services/room.js';
 import sessionManager from '../state/SessionManager.js';
 import stateManager from '../state/StateManager.js';
 
@@ -183,7 +183,7 @@ export class EndOperation {
 					const roomDeletedKey = `room_deleted_${room.id}`;
 					if (!steps[roomDeletedKey]) {
 						try {
-							await roomService.deleteRoom(
+							await deleteRoom(
 								guildRoom,
 								'Breakout room ended and members moved back to main room',
 							);
