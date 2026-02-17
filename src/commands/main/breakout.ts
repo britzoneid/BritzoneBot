@@ -238,20 +238,27 @@ async function handleCreateCommand(
 	);
 
 	try {
+		// Defer the reply immediately to prevent interaction timeout
+		// This gives us up to 15 minutes to complete the operation
+		await interaction.deferReply({ ephemeral: true });
+
 		const result = await executeCreate(interaction, numRooms, force);
 
 		if (result.success) {
-			await replyOrEdit(interaction, result.message);
+			await interaction.editReply(result.message);
 		} else {
 			console.error(`❌ Error creating breakout rooms:`, result);
-			await replyOrEdit(interaction, result.message);
+			await interaction.editReply(result.message);
 		}
 	} catch (error) {
 		console.error(`❌ Error in handleCreateCommand:`, error);
-		await replyOrEdit(
-			interaction,
-			'An unexpected error occurred while creating breakout rooms. Please try again later.',
-		);
+		try {
+			await interaction.editReply(
+				'An unexpected error occurred while creating breakout rooms. Please try again later.',
+			);
+		} catch (replyError) {
+			console.error('❌ Failed to send final error message:', replyError);
+		}
 	}
 }
 
@@ -285,10 +292,11 @@ async function handleDistributeCommand(
 
 	if (breakoutRooms.length === 0) {
 		console.log(`❌ Error: No breakout rooms found`);
-		await replyOrEdit(
-			interaction,
-			'No breakout rooms found! Please create breakout rooms first with `/breakout create`.',
-		);
+		await interaction.reply({
+			content:
+				'No breakout rooms found! Please create breakout rooms first with `/breakout create`.',
+			ephemeral: true,
+		});
 		return;
 	}
 
@@ -296,9 +304,15 @@ async function handleDistributeCommand(
 
 	if (usersInMainRoom.size === 0) {
 		console.log(`⚠️ No users found in ${mainRoom.name}`);
-		await replyOrEdit(interaction, `There are no users in ${mainRoom.name}.`);
+		await interaction.reply({
+			content: `There are no users in ${mainRoom.name}.`,
+			ephemeral: true,
+		});
 		return;
 	}
+
+	// Defer the reply before starting the long-running operation
+	await interaction.deferReply({ ephemeral: true });
 
 	// Filter out facilitators before distribution
 	const usersToDistribute = Array.from(usersInMainRoom.values()).filter(
@@ -322,7 +336,7 @@ async function handleDistributeCommand(
 	);
 
 	if (!result.success) {
-		await replyOrEdit(interaction, result.message);
+		await interaction.editReply(result.message);
 		return;
 	}
 
@@ -395,7 +409,7 @@ async function handleDistributeCommand(
 	}
 
 	console.log(`📤 Sending breakout room results to Discord`);
-	await replyOrEdit(interaction, { embeds: [embed] });
+	await interaction.editReply({ embeds: [embed] });
 }
 
 /**
@@ -418,10 +432,11 @@ async function handleEndCommand(
 		if (storedMainChannel) {
 			mainChannel = storedMainChannel;
 		} else {
-			await replyOrEdit(
-				interaction,
-				'Please specify a main voice channel where users should be moved back.',
-			);
+			await interaction.reply({
+				content:
+					'Please specify a main voice channel where users should be moved back.',
+				ephemeral: true,
+			});
 			return;
 		}
 	}
@@ -430,13 +445,15 @@ async function handleEndCommand(
 		`🎯 Target main voice channel: ${mainChannel.name} (${mainChannel.id}) (force: ${force})`,
 	);
 
+	// Defer the reply before starting the long-running operation
+	await interaction.deferReply({ ephemeral: true });
+
 	const result = await executeEnd(interaction, mainChannel, force);
 
 	if (result.success) {
-		await replyOrEdit(interaction, result.message);
+		await interaction.editReply(result.message);
 	} else {
-		await replyOrEdit(
-			interaction,
+		await interaction.editReply(
 			result.message || 'Failed to end breakout session.',
 		);
 	}

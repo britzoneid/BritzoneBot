@@ -112,7 +112,6 @@ export async function executeCreate(
 				}
 			}
 
-			console.log(`📂 Creating voice channel: ${roomName}`);
 			try {
 				const createdChannel = await createRoom(interaction, roomName);
 				createdChannels.push(createdChannel);
