@@ -8,8 +8,8 @@ import {
 	hasActiveDistribution,
 	moveUserToRoom,
 } from '../services/distribution.js';
-import sessionManager from '../state/SessionManager.js';
 import stateManager from '../state/StateManager.js';
+import { setMainRoom } from '../state/session.js';
 import type { UserDistribution } from '../utils/distribution.js';
 
 export async function executeDistribute(
@@ -126,11 +126,11 @@ export async function executeDistribute(
 		const steps = await stateManager.getCompletedSteps(guildId);
 
 		if (!steps['set_main_room']) {
-			sessionManager.setMainRoom(guildId, mainRoom);
+			setMainRoom(guildId, mainRoom);
 			await stateManager.updateProgress(guildId, 'set_main_room');
 		} else {
 			// Ensure session manager is in sync if we restarted the bot
-			sessionManager.setMainRoom(guildId, mainRoom);
+			setMainRoom(guildId, mainRoom);
 		}
 
 		const movePromises: Promise<void>[] = [];

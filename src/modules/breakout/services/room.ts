@@ -5,7 +5,7 @@ import {
 	type VoiceChannel,
 } from 'discord.js';
 import { createChannel } from '../../../lib/discord/channel.js';
-import sessionManager from '../state/SessionManager.js';
+import { clearSession, getRooms, storeRooms } from '../state/session.js';
 
 export interface ExistingRoomsResult {
 	exists: boolean;
@@ -20,7 +20,7 @@ export async function hasExistingBreakoutRooms(
 	guild: Guild,
 ): Promise<ExistingRoomsResult> {
 	// Check in room manager first
-	const storedRooms = sessionManager.getRooms(guild.id);
+	const storedRooms = getRooms(guild.id);
 	if (storedRooms && storedRooms.length > 0) {
 		// Verify rooms still exist in guild
 		const existingRooms = storedRooms.filter((room) =>
@@ -30,9 +30,9 @@ export async function hasExistingBreakoutRooms(
 		// Sync session manager if we found stale rooms
 		if (existingRooms.length !== storedRooms.length) {
 			if (existingRooms.length > 0) {
-				sessionManager.storeRooms(guild.id, existingRooms);
+				storeRooms(guild.id, existingRooms);
 			} else {
-				sessionManager.clearSession(guild.id);
+				clearSession(guild.id);
 			}
 		}
 

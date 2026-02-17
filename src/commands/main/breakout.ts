@@ -19,8 +19,8 @@ import {
 	sendMessageToChannel,
 } from '../../modules/breakout/services/message.js';
 import { monitorBreakoutTimer } from '../../modules/breakout/services/timer.js';
-import sessionManager from '../../modules/breakout/state/SessionManager.js';
 import stateManager from '../../modules/breakout/state/StateManager.js';
+import { getMainRoom, getRooms } from '../../modules/breakout/state/session.js';
 import { distributeUsers } from '../../modules/breakout/utils/distribution.js';
 import type { Command } from '../../types/index.js';
 
@@ -281,7 +281,7 @@ async function handleDistributeCommand(
 		console.log(`👥 Facilitators identified: ${facilitators.size}`);
 	}
 
-	const breakoutRooms = sessionManager.getRooms(interaction.guildId);
+	const breakoutRooms = getRooms(interaction.guildId);
 
 	if (breakoutRooms.length === 0) {
 		console.log(`❌ Error: No breakout rooms found`);
@@ -405,7 +405,7 @@ async function handleEndCommand(
 
 	// If no main channel is specified, try to get it from the manager
 	if (!mainChannel) {
-		const storedMainChannel = sessionManager.getMainRoom(interaction.guildId);
+		const storedMainChannel = getMainRoom(interaction.guildId);
 		if (storedMainChannel) {
 			mainChannel = storedMainChannel;
 		} else {
@@ -444,7 +444,7 @@ async function handleTimerCommand(
 	const minutes = interaction.options.getInteger('minutes', true);
 	console.log(`⏱️ Setting breakout timer for ${minutes} minutes`);
 
-	const breakoutRooms = sessionManager.getRooms(interaction.guildId);
+	const breakoutRooms = getRooms(interaction.guildId);
 
 	if (breakoutRooms.length === 0) {
 		console.log(`❌ Error: No breakout rooms found`);

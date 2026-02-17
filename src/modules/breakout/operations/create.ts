@@ -9,8 +9,8 @@ import {
 	deleteRoom,
 	hasExistingBreakoutRooms,
 } from '../services/room.js';
-import sessionManager from '../state/SessionManager.js';
 import stateManager from '../state/StateManager.js';
+import { clearSession, storeRooms } from '../state/session.js';
 
 /**
  * Executes the create breakout rooms operation
@@ -56,7 +56,7 @@ export async function executeCreate(
 			for (const room of existingRooms.rooms) {
 				await deleteRoom(room);
 			}
-			sessionManager.clearSession(guildId);
+			clearSession(guildId);
 		}
 
 		// Start new operation
@@ -116,7 +116,7 @@ export async function executeCreate(
 		await stateManager.updateProgress(guildId, 'store_rooms', {
 			roomIds: createdChannels.map((c) => c.id),
 		});
-		sessionManager.storeRooms(guildId, createdChannels);
+		storeRooms(guildId, createdChannels);
 
 		// Complete operation
 		await stateManager.completeOperation(guildId);

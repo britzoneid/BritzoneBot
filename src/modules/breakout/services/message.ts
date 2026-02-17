@@ -1,5 +1,5 @@
 import type { VoiceChannel } from 'discord.js';
-import sessionManager from '../state/SessionManager.js';
+import { getRooms } from '../state/session.js';
 
 export interface BroadcastResult {
 	success: boolean;
@@ -24,7 +24,7 @@ export async function broadcastToBreakoutRooms(
 	message: string,
 ): Promise<BroadcastResult> {
 	console.log(`📢 Broadcasting message to breakout rooms in guild ${guildId}`);
-	const rooms = sessionManager.getRooms(guildId);
+	const rooms = getRooms(guildId);
 
 	if (!rooms || rooms.length === 0) {
 		console.log('❌ No breakout rooms found for broadcasting');

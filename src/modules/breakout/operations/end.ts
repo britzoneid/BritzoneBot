@@ -7,8 +7,8 @@ import {
 import type { OperationResult } from '../../../types/index.js';
 import { moveUserToRoom } from '../services/distribution.js';
 import { deleteRoom } from '../services/room.js';
-import sessionManager from '../state/SessionManager.js';
 import stateManager from '../state/StateManager.js';
+import { clearSession, getRooms } from '../state/session.js';
 
 export async function executeEnd(
 	interaction: CommandInteraction,
@@ -51,7 +51,7 @@ export async function executeEnd(
 
 	if (!isResuming || breakoutRooms.length === 0) {
 		// Get breakout rooms
-		breakoutRooms = sessionManager.getRooms(guildId);
+		breakoutRooms = getRooms(guildId);
 
 		// If no stored rooms, identify them by name pattern as fallback
 		if (!breakoutRooms || breakoutRooms.length === 0) {
@@ -208,7 +208,7 @@ export async function executeEnd(
 
 		// Clear the stored session data
 		await stateManager.updateProgress(guildId, 'clear_session');
-		sessionManager.clearSession(guildId);
+		clearSession(guildId);
 
 		// Complete operation
 		await stateManager.completeOperation(guildId);
