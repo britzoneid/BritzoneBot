@@ -46,7 +46,7 @@ export async function moveUser(
  * @param member The guild member
  * @returns Collection of roles
  */
-export function getRoles(member: GuildMember): Collection<string, Role> {
+function getRoles(member: GuildMember): Collection<string, Role> {
 	console.log(`🏷️ Getting roles for user: ${member.user.tag}`);
 	const roles = member.roles.cache;
 	console.log(`🔖 Found ${roles.size} roles for ${member.user.tag}`);

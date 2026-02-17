@@ -51,7 +51,7 @@ export async function createChannel(
  * @param channel The channel to delete
  * @param reason Reason for deletion
  */
-export async function deleteChannel(
+async function deleteChannel(
 	channel: VoiceChannel,
 	reason: string = 'Channel cleanup',
 ): Promise<void> {
@@ -70,7 +70,7 @@ export async function deleteChannel(
  * @param voiceChannel The voice channel
  * @returns Collection of members in the voice channel
  */
-export function getUsers(
+function getUsers(
 	voiceChannel: VoiceChannel | StageChannel,
 ): Collection<string, GuildMember> {
 	console.log(`👥 Getting users from voice channel: ${voiceChannel.name}`);

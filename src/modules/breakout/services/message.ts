@@ -1,14 +1,14 @@
 import type { VoiceChannel } from 'discord.js';
 import { getRooms } from '../state/session.js';
 
-export interface BroadcastResult {
+interface BroadcastResult {
 	success: boolean;
 	sent: string[];
 	failed: string[];
 	message: string;
 }
 
-export interface ChannelMessageResult {
+interface ChannelMessageResult {
 	success: boolean;
 	message: string;
 }

@@ -66,5 +66,3 @@ export function distributeUsers(
 
 	return distribution;
 }
-
-export default distributeUsers;

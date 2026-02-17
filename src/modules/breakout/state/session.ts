@@ -74,6 +74,6 @@ export function clearSession(guildId: string): void {
 /**
  * Clears all sessions (useful for testing)
  */
-export function clearAllSessions(): void {
+function clearAllSessions(): void {
 	sessions.clear();
 }

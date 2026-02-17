@@ -7,7 +7,7 @@ import {
 import { createChannel } from '../../../lib/discord/channel.js';
 import { clearSession, getRooms, storeRooms } from '../state/session.js';
 
-export interface ExistingRoomsResult {
+interface ExistingRoomsResult {
 	exists: boolean;
 	rooms: VoiceChannel[];
 	source?: 'stored' | 'pattern';

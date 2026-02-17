@@ -4,7 +4,7 @@ import path from 'path';
 /**
  * Single operation step data
  */
-export interface OperationStep {
+interface OperationStep {
 	completed: boolean;
 	timestamp: number;
 	[key: string]: any;
@@ -13,7 +13,7 @@ export interface OperationStep {
 /**
  * Operation progress tracking
  */
-export interface OperationProgress {
+interface OperationProgress {
 	started: boolean;
 	completed: boolean;
 	steps: Record<string, OperationStep>;
@@ -24,7 +24,7 @@ export interface OperationProgress {
 /**
  * Current operation details
  */
-export interface CurrentOperation {
+interface CurrentOperation {
 	type: string;
 	params: Record<string, any>;
 	progress: OperationProgress;
@@ -225,7 +225,7 @@ export async function getCurrentOperation(
  * Clear the current operation without marking as completed
  * Used when resuming an operation to prevent infinite recursion
  */
-export async function clearCurrentOperation(guildId: string): Promise<void> {
+async function clearCurrentOperation(guildId: string): Promise<void> {
 	await initialize();
 	const guildState = inMemoryState[guildId] as GuildState | undefined;
 
@@ -251,7 +251,7 @@ export async function getCompletedSteps(
 /**
  * Clear state for a guild
  */
-export async function clearGuildState(guildId: string): Promise<void> {
+async function clearGuildState(guildId: string): Promise<void> {
 	await initialize();
 	delete inMemoryState[guildId];
 	await saveState();

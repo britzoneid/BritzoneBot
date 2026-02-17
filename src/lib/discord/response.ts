@@ -3,7 +3,7 @@ import type { CommandInteraction, RepliableInteraction } from 'discord.js';
 /**
  * Options for safeReply function
  */
-export interface SafeReplyOptions {
+interface SafeReplyOptions {
 	deferReply?: boolean;
 	ephemeral?: boolean;
 }
@@ -40,7 +40,7 @@ function getErrorCode(error: Error): string | number | undefined {
  * );
  * ```
  */
-export async function safeReply(
+async function safeReply(
 	interaction: RepliableInteraction | CommandInteraction,
 	handler: () => Promise<void>,
 	options: SafeReplyOptions = {},
