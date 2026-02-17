@@ -91,6 +91,8 @@ docker run -d \
   -v "$(pwd)/data:/app/data" \
   --memory=512m \
   --cpus=1.0 \
+  --dns 1.1.1.1 \
+  --dns 8.8.8.8 \
   britzone-bot:latest
 ```
 
