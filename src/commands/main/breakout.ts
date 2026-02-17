@@ -18,7 +18,7 @@ import {
 	broadcastToBreakoutRooms,
 	sendMessageToChannel,
 } from '../../modules/breakout/services/message.js';
-import timerService from '../../modules/breakout/services/TimerService.js';
+import { monitorBreakoutTimer } from '../../modules/breakout/services/timer.js';
 import sessionManager from '../../modules/breakout/state/SessionManager.js';
 import stateManager from '../../modules/breakout/state/StateManager.js';
 import { distributeUsers } from '../../modules/breakout/utils/distribution.js';
@@ -469,7 +469,7 @@ async function handleTimerCommand(
 	// Store timer data in state manager
 	await stateManager.setTimerData(interaction.guildId, timerData);
 	// Start the timer monitoring process
-	timerService.monitorBreakoutTimer(timerData, interaction);
+	monitorBreakoutTimer(timerData, interaction);
 
 	await replyOrEdit(
 		interaction,
