@@ -1,5 +1,6 @@
 import type { CommandInteraction, RepliableInteraction } from 'discord.js';
 import { MessageFlags } from 'discord.js';
+import { logger } from '../logger.js';
 
 /**
  * Options for handleInteraction function
@@ -61,7 +62,10 @@ export async function handleInteraction(
 				);
 
 				await Promise.race([deferPromise, timeoutPromise]);
-				console.log(`🔄 Successfully deferred interaction ${interaction.id}`);
+				logger.debug(
+					{ interactionId: interaction.id },
+					`🔄 Successfully deferred interaction`,
+				);
 			} catch (deferError) {
 				const error =
 					deferError instanceof Error
@@ -71,8 +75,9 @@ export async function handleInteraction(
 
 				// If we can't defer, the interaction likely expired
 				if (errorCode === 10062) {
-					console.log(
-						`⏱️ Interaction ${interaction.id} expired before deferring`,
+					logger.warn(
+						{ interactionId: interaction.id },
+						`⏱️ Interaction expired before deferring`,
 					);
 					return false;
 				}
@@ -82,14 +87,16 @@ export async function handleInteraction(
 					errorCode === 'EAI_AGAIN' ||
 					error.message === 'Defer reply timeout'
 				) {
-					console.log(
-						`🌐 Network issue while deferring interaction ${interaction.id}: ${error.message}`,
+					logger.warn(
+						{ interactionId: interaction.id, err: error },
+						`🌐 Network issue while deferring interaction`,
 					);
 					return false;
 				}
 
-				console.log(
-					`❓ Unknown error while deferring interaction: ${error.message}`,
+				logger.error(
+					{ interactionId: interaction.id, err: error },
+					`❓ Unknown error while deferring interaction`,
 				);
 				return false;
 			}
@@ -109,14 +116,16 @@ export async function handleInteraction(
 				handlerError instanceof Error
 					? handlerError
 					: new Error(String(handlerError));
-			console.log(
-				`❌ Handler error for interaction ${interaction.id}: ${error.message}`,
+			logger.error(
+				{ interactionId: interaction.id, err: error },
+				`❌ Handler error for interaction`,
 			);
 			return false;
 		}
 	} catch (error) {
-		console.log(
-			`❌ Unexpected error in handleInteraction for interaction ${interaction.id}`,
+		logger.error(
+			{ interactionId: interaction.id, err: error },
+			`❌ Unexpected error in handleInteraction`,
 		);
 		return false;
 	}

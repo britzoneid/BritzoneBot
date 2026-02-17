@@ -5,6 +5,7 @@ import {
 	type VoiceChannel,
 } from 'discord.js';
 import { createChannel } from '../../../lib/discord/channel.js';
+import { logger } from '../../../lib/logger.js';
 import { clearSession, getRooms, storeRooms } from '../state/session.js';
 
 interface ExistingRoomsResult {
@@ -101,7 +102,7 @@ export async function deleteRoom(
 	try {
 		await room.delete(reason);
 	} catch (error) {
-		console.error(`Failed to delete room ${room.name}:`, error);
+		logger.error({ err: error, room: room.name }, `Failed to delete room`);
 		throw error;
 	}
 }

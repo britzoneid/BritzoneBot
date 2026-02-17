@@ -1,4 +1,5 @@
 import type { VoiceChannel } from 'discord.js';
+import { logger } from '../../../lib/logger.js';
 import { getRooms } from '../state/session.js';
 
 interface BroadcastResult {
@@ -23,11 +24,11 @@ export async function broadcastToBreakoutRooms(
 	guildId: string,
 	message: string,
 ): Promise<BroadcastResult> {
-	console.log(`📢 Broadcasting message to breakout rooms in guild ${guildId}`);
+	logger.info({ guildId }, `📢 Broadcasting message to breakout rooms`);
 	const rooms = getRooms(guildId);
 
 	if (!rooms || rooms.length === 0) {
-		console.log('❌ No breakout rooms found for broadcasting');
+		logger.warn({ guildId }, '❌ No breakout rooms found for broadcasting');
 		return {
 			success: false,
 			sent: [],
@@ -47,14 +48,19 @@ export async function broadcastToBreakoutRooms(
 			if ('send' in room && typeof room.send === 'function') {
 				await room.send(message);
 				results.sent.push(room.name);
-				console.log(`✅ Message sent to ${room.name}`);
+				logger.debug({ room: room.name }, `✅ Message sent`);
 			} else {
-				console.log(`⚠️ Channel ${room.name} does not support sending messages`);
+				logger.warn(
+					{ room: room.name },
+					`⚠️ Channel does not support sending messages`,
+				);
 				results.failed.push(room.name);
 			}
-		} catch (error) {
-			const errorMsg = error instanceof Error ? error.message : String(error);
-			console.error(`❌ Failed to send message to ${room.name}:`, errorMsg);
+		} catch (error: unknown) {
+			logger.error(
+				{ err: error, room: room.name },
+				`❌ Failed to send message`,
+			);
 			results.failed.push(room.name);
 		}
 	}
@@ -77,20 +83,24 @@ export async function sendMessageToChannel(
 	channel: VoiceChannel,
 	message: string,
 ): Promise<ChannelMessageResult> {
-	console.log(`📨 Attempting to send message to channel ${channel.name}`);
+	logger.debug(
+		{ channel: channel.name },
+		`📨 Attempting to send message to channel`,
+	);
 
 	try {
 		// Type guard to check if channel supports sending messages
 		if ('send' in channel && typeof channel.send === 'function') {
 			await channel.send(message);
-			console.log(`✅ Message sent successfully to ${channel.name}`);
+			logger.info({ channel: channel.name }, `✅ Message sent successfully`);
 			return {
 				success: true,
 				message: `Message sent successfully to ${channel.name}`,
 			};
 		} else {
-			console.log(
-				`⚠️ Channel ${channel.name} does not support sending messages`,
+			logger.warn(
+				{ channel: channel.name },
+				`⚠️ Channel does not support sending messages`,
 			);
 			return {
 				success: false,
@@ -98,8 +108,11 @@ export async function sendMessageToChannel(
 			};
 		}
 	} catch (error: unknown) {
+		logger.error(
+			{ err: error, channel: channel.name },
+			`❌ Failed to send message`,
+		);
 		const errorMsg = error instanceof Error ? error.message : String(error);
-		console.error(`❌ Failed to send message to ${channel.name}:`, errorMsg);
 		return {
 			success: false,
 			message: `Failed to send message to ${channel.name}: ${errorMsg}`,

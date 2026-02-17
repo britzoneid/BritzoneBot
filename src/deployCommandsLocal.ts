@@ -6,6 +6,8 @@ import {
 	type RESTPostAPIChatInputApplicationCommandsJSONBody,
 	Routes,
 } from 'discord.js';
+import pino from 'pino';
+import { logger } from './lib/logger.js';
 import type { Command } from './types/index.js';
 
 const __dirname = import.meta.dirname;
@@ -27,7 +29,8 @@ interface GuildList {
 const guildListPath = path.join(__dirname, '..', 'guildList.json');
 
 if (!fs.existsSync(guildListPath)) {
-	console.error(
+	const finalLogger = (pino as any).final(logger);
+	finalLogger.fatal(
 		'Error: guildList.json not found. Please copy guildList.json.example to guildList.json and configure your guild IDs.',
 	);
 	process.exit(1);
@@ -48,8 +51,8 @@ for (const folder of commandFolders) {
 	const commandFiles = fs
 		.readdirSync(commandsPath)
 		.filter((file) => file.endsWith('.js'));
-	console.log(`loading commands from ${folder}/`);
-	console.log(commandFiles);
+	logger.info(`loading commands from ${folder}/`);
+	logger.debug({ commandFiles }, 'Found command files');
 
 	// Grab the SlashCommandBuilder#toJSON() output of each command's data for deployment
 	for (const file of commandFiles) {
@@ -62,8 +65,9 @@ for (const folder of commandFolders) {
 				command.data.toJSON() as RESTPostAPIChatInputApplicationCommandsJSONBody,
 			);
 		} else {
-			console.log(
-				`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`,
+			logger.warn(
+				{ filePath },
+				`[WARNING] Command is missing required "data" or "execute" property.`,
 			);
 		}
 	}
@@ -82,7 +86,7 @@ async function deployCommands(
 	guildId: string,
 ): Promise<void> {
 	try {
-		console.log(
+		logger.info(
 			`Started refreshing ${commands.length} application (/) commands on guild ${guildName} (${guildId}).`,
 		);
 
@@ -94,12 +98,12 @@ async function deployCommands(
 			},
 		)) as unknown[];
 
-		console.log(
+		logger.info(
 			`✅ Successfully reloaded ${data.length} application (/) commands on ${guildName} (${guildId}).`,
 		);
 	} catch (error) {
 		// And of course, make sure you catch and log any errors!
-		console.error(error);
+		logger.error({ err: error }, 'Failed to deploy commands');
 	}
 }
 

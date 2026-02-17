@@ -3,6 +3,7 @@ import type {
 	VoiceBasedChannel,
 	VoiceChannel,
 } from 'discord.js';
+import { logger } from '../../../lib/logger.js';
 import type { OperationResult } from '../../../types/index.js';
 import {
 	hasActiveDistribution,
@@ -33,6 +34,11 @@ export async function executeDistribute(
 	}
 
 	const operationType = 'distribute';
+	const log = logger.child({
+		operation: operationType,
+		guildId,
+		force,
+	});
 
 	// Check if we are resuming an interrupted operation
 	const currentOp = await getCurrentOperation(guildId);
@@ -42,7 +48,7 @@ export async function executeDistribute(
 	let activeDistribution = distribution;
 
 	if (isResuming) {
-		console.log(`🔄 Resuming distribute operation for guild ${guildId}`);
+		log.info(`🔄 Resuming distribute operation`);
 
 		// Reconstruct distribution from stored state
 		if (currentOp?.params?.distribution) {
@@ -52,7 +58,7 @@ export async function executeDistribute(
 					string[]
 				>;
 				const reconstructed: UserDistribution = {};
-				console.log(`📦 Reconstructing distribution plan from saved state...`);
+				log.debug(`📦 Reconstructing distribution plan from saved state`);
 
 				for (const [roomId, userIds] of Object.entries(storedPlan)) {
 					reconstructed[roomId] = [];
@@ -67,25 +73,27 @@ export async function executeDistribute(
 							if (member) {
 								reconstructed[roomId].push(member);
 							} else {
-								console.warn(
-									`⚠️ User ${userId} from stored plan not found in guild`,
+								log.warn(
+									{ userId },
+									`⚠️ User from stored plan not found in guild`,
 								);
 							}
 						} catch (err) {
-							console.warn(`⚠️ Failed to fetch user ${userId} for resume:`, err);
+							log.warn({ err, userId }, `⚠️ Failed to fetch user for resume`);
 						}
 					}
 				}
 				activeDistribution = reconstructed;
-				console.log(
-					`✅ Reconstructed plan for ${Object.keys(activeDistribution).length} rooms`,
+				log.info(
+					{ roomCount: Object.keys(activeDistribution).length },
+					`✅ Reconstructed plan`,
 				);
 			} catch (error) {
-				console.error(`❌ Failed to reconstruct distribution plan:`, error);
+				log.error({ err: error }, `❌ Failed to reconstruct distribution plan`);
 				// Fallback to provided distribution if reconstruction fails?
 				// Or fail? If we fail here, we might be in a bad state.
 				// Let's log and continue with provided distribution but warn.
-				console.warn(`⚠️ Falling back to fresh distribution plan due to error.`);
+				log.warn(`⚠️ Falling back to fresh distribution plan due to error.`);
 			}
 		}
 	} else {
@@ -103,7 +111,7 @@ export async function executeDistribute(
 		// But similar to CreateOperation, avoiding circular dependency for now.
 		// The original code called endBreakoutSession.
 		if (force && isDistributionActive) {
-			console.log(
+			log.info(
 				`🔄 Force flag enabled, proceeding with redistribution (previous session implicit end)`,
 			);
 			// We'll rely on the new distribution simply moving users, effectively "stealing" them from old rooms.
@@ -152,12 +160,13 @@ export async function executeDistribute(
 				| undefined;
 
 			if (!room) {
-				console.log(`⚠️ Room ${roomId} not found, skipping users`);
+				log.warn({ roomId }, `⚠️ Room not found, skipping users`);
 				continue;
 			}
 
-			console.log(
-				`🔄 Processing moves for room: ${room.name} (${users.length} users)`,
+			log.debug(
+				{ roomName: room.name, userCount: users.length },
+				`🔄 Processing moves for room`,
 			);
 
 			// Refetch steps inside loop? No, outside is fine if we don't await parallel moves that depend on it?
@@ -183,30 +192,25 @@ export async function executeDistribute(
 				// But if we resume, we fetch steps once.
 
 				if (steps[moveKey]) {
-					console.log(
-						`⏭️ User ${user.user.tag} was already moved to ${room.name}, skipping`,
+					log.debug(
+						{ user: user.user, room: room.name },
+						`⏭️ User was already moved, skipping`,
 					);
 					moveResults.success.push(`${user.user.tag} → ${room.name}`);
 					continue;
 				}
 
-				console.log(
-					`🚚 Attempting to move ${user.user.tag} to channel: ${room.name}`,
-				);
-
 				movePromises.push(
 					moveUserToRoom(user, room)
 						.then(async () => {
 							moveResults.success.push(`${user.user.tag} → ${room.name}`);
-							console.log(
-								`✅ Successfully moved ${user.user.tag} to ${room.name}`,
-							);
 							await updateProgress(guildId, moveKey);
 						})
 						.catch((error: any) => {
 							moveResults.failed.push(`${user.user.tag} (${error.message})`);
-							console.log(
-								`❌ Failed to move ${user.user.tag}: ${error.message}`,
+							log.error(
+								{ err: error, user: user.user },
+								`❌ Failed to move user`,
 							);
 						}),
 				);
@@ -214,8 +218,9 @@ export async function executeDistribute(
 		}
 
 		// Wait for all moves to complete
-		console.log(
-			`⏳ Waiting for all ${movePromises.length} move operations to complete`,
+		log.info(
+			{ count: movePromises.length },
+			`⏳ Waiting for move operations to complete`,
 		);
 		await Promise.all(movePromises);
 
@@ -234,7 +239,7 @@ export async function executeDistribute(
 			message: 'Distribution completed successfully',
 		};
 	} catch (error) {
-		console.error(`❌ Error in DistributeOperation:`, error);
+		log.error({ err: error }, `❌ Error in DistributeOperation`);
 		return {
 			success: false,
 			message:

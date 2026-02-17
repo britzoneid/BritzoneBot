@@ -1,4 +1,5 @@
 import type { VoiceBasedChannel, VoiceChannel } from 'discord.js';
+import { logger } from '../../../lib/logger.js';
 
 /**
  * Represents a breakout session for a guild
@@ -24,7 +25,7 @@ export function storeRooms(guildId: string, rooms: VoiceChannel[]): void {
 	const session = sessions.get(guildId) || {};
 	session.rooms = rooms;
 	sessions.set(guildId, session);
-	console.log(`📝 Stored ${rooms.length} breakout rooms for guild ${guildId}`);
+	logger.debug({ guildId, count: rooms.length }, `📝 Stored breakout rooms`);
 }
 
 /**
@@ -39,7 +40,10 @@ export function setMainRoom(
 	const session = sessions.get(guildId) || {};
 	session.mainRoom = mainRoom;
 	sessions.set(guildId, session);
-	console.log(`📝 Set main room to ${mainRoom.name} for guild ${guildId}`);
+	logger.debug(
+		{ guildId, mainRoom: mainRoom.name },
+		`📝 Set main room for breakout session`,
+	);
 }
 
 /**
@@ -68,5 +72,5 @@ export function getMainRoom(guildId: string): VoiceBasedChannel | undefined {
  */
 export function clearSession(guildId: string): void {
 	sessions.delete(guildId);
-	console.log(`🧹 Cleared breakout session for guild ${guildId}`);
+	logger.debug({ guildId }, `🧹 Cleared breakout session`);
 }

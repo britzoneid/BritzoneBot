@@ -1,5 +1,6 @@
 import { randomInt } from 'node:crypto';
 import type { GuildMember, StageChannel, VoiceChannel } from 'discord.js';
+import { logger } from '../../../lib/logger.js';
 
 /**
  * Result of user distribution
@@ -18,51 +19,53 @@ export function distributeUsers(
 	users: GuildMember[] | Map<string, GuildMember>,
 	breakoutRooms: Array<VoiceChannel | StageChannel>,
 ): UserDistribution {
-	console.log(
-		`🔄 Starting distribution of users among ${breakoutRooms.length} breakout rooms`,
-	);
+	const log = logger.child({
+		breakoutRoomsCount: breakoutRooms.length,
+		guildId: breakoutRooms[0]?.guild.id,
+	});
+
+	log.debug(`🔄 Starting distribution of users`);
 
 	if (breakoutRooms.length === 0) {
-		console.log(`❌ Distribution error: No breakout rooms provided`);
+		log.error(`❌ Distribution error: No breakout rooms provided`);
 		throw new Error('No breakout rooms provided.');
 	}
 
 	const distribution: UserDistribution = {};
 	breakoutRooms.forEach((room) => {
 		distribution[room.id] = [];
-		console.log(`🏗️ Created distribution bucket for room: ${room.name}`);
 	});
 
 	// Convert users collection to array if it's not already, and create a copy to avoid mutation
 	const userArray = Array.isArray(users)
 		? [...users]
 		: Array.from(users.values());
-	console.log(`👤 Total users to distribute: ${userArray.length}`);
+
+	log.debug({ usersCount: userArray.length }, `👤 Total users to distribute`);
 
 	// Shuffle users for randomness
-	console.log(`🔀 Shuffling users for random distribution`);
 	for (let i = userArray.length - 1; i > 0; i--) {
 		const j = randomInt(0, i + 1);
 		[userArray[i], userArray[j]] = [userArray[j], userArray[i]];
 	}
 
 	// Distribute users evenly
-	console.log(`📋 Beginning user assignment to rooms`);
 	userArray.forEach((user, index) => {
 		const roomIndex = index % breakoutRooms.length;
 		const roomId = breakoutRooms[roomIndex].id;
-		const roomName = breakoutRooms[roomIndex].name;
 		distribution[roomId].push(user);
-		console.log(`➡️ Assigned ${user.user.tag} to room: ${roomName}`);
 	});
 
 	// Log the distribution summary
+	const summary: Record<string, number> = {};
 	Object.keys(distribution).forEach((roomId) => {
 		const room = breakoutRooms.find((r) => r.id === roomId);
-		console.log(
-			`📊 Room ${room?.name} has ${distribution[roomId].length} users assigned`,
-		);
+		if (room) {
+			summary[room.name] = distribution[roomId].length;
+		}
 	});
+
+	log.info({ distribution: summary }, `📋 Distribution complete`);
 
 	return distribution;
 }

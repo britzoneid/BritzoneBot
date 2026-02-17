@@ -1,6 +1,7 @@
 import type { Interaction } from 'discord.js';
 import { Events } from 'discord.js';
 import { replyOrEdit } from '../lib/discord/response.js';
+import { logger } from '../lib/logger.js';
 import type { BritzoneClient, Event } from '../types/index.js';
 
 /**
@@ -24,7 +25,8 @@ const event: Event<typeof Events.InteractionCreate> = {
 		const command = client.commands.get(interaction.commandName);
 
 		if (!command) {
-			console.error(
+			logger.warn(
+				{ commandName: interaction.commandName, user: interaction.user },
 				`No command matching ${interaction.commandName} was found.`,
 			);
 			return;
@@ -40,9 +42,16 @@ const event: Event<typeof Events.InteractionCreate> = {
 			return `${opt.name}=${value}`;
 		});
 
-		console.log(
-			`🔵 Command executed: ${interaction.commandName} ${options.join(' ')} by ${interaction.user.tag}`,
-		);
+		// Create a child logger with context for this interaction
+		const commandLogger = logger.child({
+			interactionId: interaction.id,
+			guildId: interaction.guildId,
+			user: interaction.user,
+			command: interaction.commandName,
+			options: options,
+		});
+
+		commandLogger.info(`🔵 Command executed: ${interaction.commandName}`);
 
 		try {
 			// At this point, interaction is ChatInputCommandInteraction (narrowed by isChatInputCommand())
@@ -53,9 +62,9 @@ const event: Event<typeof Events.InteractionCreate> = {
 				await (command as any).execute(interaction);
 			}
 		} catch (error) {
-			console.error(
-				`❌ Error executing command ${interaction.commandName}:`,
-				error,
+			commandLogger.error(
+				{ err: error },
+				`❌ Error executing command ${interaction.commandName}`,
 			);
 
 			// Handle different interaction states (replied, deferred, or untouched)
@@ -67,7 +76,10 @@ const event: Event<typeof Events.InteractionCreate> = {
 			try {
 				await replyOrEdit(interaction, errorReply);
 			} catch (replyError) {
-				console.error('Failed to send error message:', replyError);
+				commandLogger.error(
+					{ err: replyError },
+					'Failed to send error message',
+				);
 			}
 		}
 	},

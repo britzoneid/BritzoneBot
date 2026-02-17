@@ -1,4 +1,5 @@
 import { Events } from 'discord.js';
+import { logger } from '../lib/logger.js';
 import type { Event } from '../types/index.js';
 
 /**
@@ -13,7 +14,10 @@ const event: Event<typeof Events.ClientReady> = {
 		// - client is of type Client
 		// - client.user is defined (not null)
 		// - client.user.tag is a string
-		console.log(`✅ Ready! Logged in as ${client.user?.tag}`);
+		logger.info(
+			{ user: client.user },
+			`✅ Ready! Logged in as ${client.user?.tag}`,
+		);
 	},
 };
 

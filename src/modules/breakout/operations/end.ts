@@ -4,6 +4,7 @@ import {
 	type VoiceBasedChannel,
 	type VoiceChannel,
 } from 'discord.js';
+import { logger } from '../../../lib/logger.js';
 import type { OperationResult } from '../../../types/index.js';
 import { moveUserToRoom } from '../services/distribution.js';
 import { deleteRoom } from '../services/room.js';
@@ -30,6 +31,12 @@ export async function executeEnd(
 	}
 
 	const operationType = 'end';
+	const log = logger.child({
+		operation: operationType,
+		guildId,
+		mainChannel: mainChannel.name,
+		force,
+	});
 
 	// Check if we are resuming an interrupted operation
 	const currentOp = await getCurrentOperation(guildId);
@@ -38,7 +45,7 @@ export async function executeEnd(
 	let breakoutRooms: VoiceChannel[] = [];
 
 	if (isResuming) {
-		console.log(`🔄 Resuming end operation for guild ${guildId}`);
+		log.info(`🔄 Resuming end operation`);
 		// If resuming, we need to reconstruct the list of rooms to process?
 		// Or we can just re-discover them.
 		// Re-discovery is safer as some might have been deleted already.
@@ -73,7 +80,7 @@ export async function executeEnd(
 		}
 
 		if (breakoutRooms.length === 0) {
-			console.log(`⚠️ No breakout rooms found to end.`);
+			log.warn(`⚠️ No breakout rooms found to end.`);
 			return {
 				success: false,
 				message: 'No breakout rooms found to end!',
@@ -109,8 +116,9 @@ export async function executeEnd(
 				roomIds: breakoutRooms.map((room) => room.id),
 			});
 
-			console.log(
-				`🔍 Found ${breakoutRooms.length} breakout room(s) to process with ${totalUsers} total users.`,
+			log.info(
+				{ roomsCount: breakoutRooms.length, totalUsers },
+				`🔍 Found breakout room(s) to process`,
 			);
 		}
 	}
@@ -124,14 +132,20 @@ export async function executeEnd(
 		for (const room of breakoutRooms) {
 			if (!room) continue;
 
-			console.log(`📌 Processing breakout room: ${room.name} (${room.id})`);
+			log.debug(
+				{ roomName: room.name, roomId: room.id },
+				`📌 Processing breakout room`,
+			);
 
 			// Check if we already processed this room
 			const steps = await getCompletedSteps(guildId);
 			const roomProcessedKey = `room_processed_${room.id}`;
 
 			if (steps[roomProcessedKey]) {
-				console.log(`⏭️ Room ${room.name} was already processed, skipping`);
+				log.debug(
+					{ roomName: room.name },
+					`⏭️ Room was already processed, skipping`,
+				);
 				deletedRooms++;
 
 				// Account for previously moved members from this room
@@ -150,8 +164,9 @@ export async function executeEnd(
 					| VoiceChannel
 					| undefined;
 				if (!guildRoom) {
-					console.log(
-						`⚠️ Room ${room.name} (${room.id}) no longer exists, skipping`,
+					log.warn(
+						{ roomName: room.name, roomId: room.id },
+						`⚠️ Room no longer exists, skipping`,
 					);
 					await updateProgress(guildId, roomProcessedKey, {
 						skipped: true,
@@ -167,8 +182,9 @@ export async function executeEnd(
 						const memberMovedKey = `member_moved_${memberId}_from_${room.id}`;
 
 						if (steps[memberMovedKey]) {
-							console.log(
-								`⏭️ Member ${member.user.tag} was already moved, skipping`,
+							log.debug(
+								{ user: member.user },
+								`⏭️ Member was already moved, skipping`,
 							);
 							totalMoved++;
 							roomMovedCount++;
@@ -177,16 +193,21 @@ export async function executeEnd(
 
 						try {
 							await moveUserToRoom(member, mainChannel);
-							console.log(
-								`✅ Moved ${member.user.tag} from ${room.name} to ${mainChannel.name}`,
+							log.debug(
+								{
+									user: member.user,
+									from: room.name,
+									to: mainChannel.name,
+								},
+								`✅ Moved member`,
 							);
 							await updateProgress(guildId, memberMovedKey);
 							totalMoved++;
 							roomMovedCount++;
 						} catch (error) {
-							console.error(
-								`❌ Failed to move ${member.user.tag} from ${room.name}:`,
-								error,
+							log.error(
+								{ err: error, user: member.user, from: room.name },
+								`❌ Failed to move member`,
 							);
 						}
 					}
@@ -200,17 +221,20 @@ export async function executeEnd(
 							guildRoom,
 							'Breakout room ended and members moved back to main room',
 						);
-						console.log(`🗑️ Deleted breakout room: ${room.name}`);
+						log.debug({ roomName: room.name }, `🗑️ Deleted breakout room`);
 						await updateProgress(guildId, roomDeletedKey);
 						deletedRooms++;
 					} catch (error) {
-						console.error(
-							`❌ Failed to delete breakout room ${room.name}:`,
-							error,
+						log.error(
+							{ err: error, roomName: room.name },
+							`❌ Failed to delete breakout room`,
 						);
 					}
 				} else {
-					console.log(`⏭️ Room ${room.name} was already deleted, skipping`);
+					log.debug(
+						{ roomName: room.name },
+						`⏭️ Room was already deleted, skipping`,
+					);
 					deletedRooms++;
 				}
 
@@ -219,7 +243,10 @@ export async function executeEnd(
 					movedCount: roomMovedCount,
 				});
 			} catch (error) {
-				console.error(`❌ Error processing room ${room.name}:`, error);
+				log.error(
+					{ err: error, roomName: room.name },
+					`❌ Error processing room`,
+				);
 				// Continue with other rooms even if one fails
 			}
 		}
@@ -231,8 +258,9 @@ export async function executeEnd(
 		// Complete operation
 		await completeOperation(guildId);
 
-		console.log(
-			`🎉 Successfully moved ${totalMoved} member(s) back to ${mainChannel.name} and deleted ${deletedRooms}/${totalRooms} breakout room(s).`,
+		log.info(
+			{ totalMoved, deletedSessions: deletedRooms, totalRooms },
+			`🎉 Successfully moved members and deleted breakout room(s).`,
 		);
 
 		return {
@@ -240,7 +268,7 @@ export async function executeEnd(
 			message: `Successfully moved ${totalMoved} member(s) back to ${mainChannel.name} and deleted ${deletedRooms}/${totalRooms} breakout room(s)!`,
 		};
 	} catch (error) {
-		console.error(`❌ Error in EndOperation:`, error);
+		log.error({ err: error }, `❌ Error in EndOperation`);
 		return {
 			success: false,
 			message:

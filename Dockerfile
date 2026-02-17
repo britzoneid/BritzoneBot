@@ -45,7 +45,7 @@ RUN bun install --frozen-lockfile --production && \
 COPY --from=builder /build/dist ./dist
 
 # Create data directory for persistent state
-RUN mkdir -p /app/data && \
+RUN mkdir -p /app/data /app/log && \
     chown -R bun:bun /app
 
 # Switch to non-root user (bun user from base image, UID 1000)
