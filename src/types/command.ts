@@ -41,6 +41,7 @@ export interface OperationResult {
 	success: boolean;
 	message: string;
 	moveResults?: {
+		success: string[];
 		failed: string[];
 	};
 	[key: string]: any;

@@ -1,10 +1,4 @@
-import type {
-	Collection,
-	GuildMember,
-	Role,
-	StageChannel,
-	VoiceChannel,
-} from 'discord.js';
+import type { GuildMember, StageChannel, VoiceChannel } from 'discord.js';
 
 /**
  * Move a user to a specified voice channel
@@ -39,16 +33,4 @@ export async function moveUser(
 		);
 		throw error;
 	}
-}
-
-/**
- * Get all roles for a user
- * @param member The guild member
- * @returns Collection of roles
- */
-export function getRoles(member: GuildMember): Collection<string, Role> {
-	console.log(`🏷️ Getting roles for user: ${member.user.tag}`);
-	const roles = member.roles.cache;
-	console.log(`🔖 Found ${roles.size} roles for ${member.user.tag}`);
-	return roles;
 }

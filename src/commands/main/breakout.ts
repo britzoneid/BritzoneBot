@@ -11,13 +11,20 @@ import {
 } from 'discord.js';
 import isAdmin from '../../lib/discord/permissions.js';
 import { replyOrEdit } from '../../lib/discord/response.js';
-import createOperation from '../../modules/breakout/operations/CreateOperation.js';
-import distributeOperation from '../../modules/breakout/operations/DistributeOperation.js';
-import endOperation from '../../modules/breakout/operations/EndOperation.js';
-import messageService from '../../modules/breakout/services/MessageService.js';
-import timerService from '../../modules/breakout/services/TimerService.js';
-import sessionManager from '../../modules/breakout/state/SessionManager.js';
-import stateManager from '../../modules/breakout/state/StateManager.js';
+import { executeCreate } from '../../modules/breakout/operations/create.js';
+import { executeDistribute } from '../../modules/breakout/operations/distribute.js';
+import { executeEnd } from '../../modules/breakout/operations/end.js';
+import {
+	broadcastToBreakoutRooms,
+	sendMessageToChannel,
+} from '../../modules/breakout/services/message.js';
+import { monitorBreakoutTimer } from '../../modules/breakout/services/timer.js';
+import { getMainRoom, getRooms } from '../../modules/breakout/state/session.js';
+import {
+	getCurrentOperation,
+	hasOperationInProgress,
+	setTimerData,
+} from '../../modules/breakout/state/state.js';
 import { distributeUsers } from '../../modules/breakout/utils/distribution.js';
 import type { Command } from '../../types/index.js';
 
@@ -179,13 +186,9 @@ const command: Command = {
 		const subcommand = interaction.options.getSubcommand();
 
 		// Check for interrupted operations
-		const inProgress = await stateManager.hasOperationInProgress(
-			interaction.guildId,
-		);
+		const inProgress = await hasOperationInProgress(interaction.guildId);
 		if (inProgress) {
-			const currentOp = await stateManager.getCurrentOperation(
-				interaction.guildId,
-			);
+			const currentOp = await getCurrentOperation(interaction.guildId);
 
 			if (currentOp && currentOp.type !== subcommand) {
 				// If a different operation is in progress, warn the user
@@ -235,7 +238,7 @@ async function handleCreateCommand(
 	);
 
 	try {
-		const result = await createOperation.execute(interaction, numRooms, force);
+		const result = await executeCreate(interaction, numRooms, force);
 
 		if (result.success) {
 			await replyOrEdit(interaction, result.message);
@@ -278,7 +281,7 @@ async function handleDistributeCommand(
 		console.log(`👥 Facilitators identified: ${facilitators.size}`);
 	}
 
-	const breakoutRooms = sessionManager.getRooms(interaction.guildId);
+	const breakoutRooms = getRooms(interaction.guildId);
 
 	if (breakoutRooms.length === 0) {
 		console.log(`❌ Error: No breakout rooms found`);
@@ -311,7 +314,7 @@ async function handleDistributeCommand(
 	// But we still need to pass something matching the type.
 	const distribution = distributeUsers(usersToDistribute, breakoutRooms);
 
-	const result = await distributeOperation.execute(
+	const result = await executeDistribute(
 		interaction,
 		mainRoom,
 		distribution,
@@ -350,20 +353,29 @@ async function handleDistributeCommand(
 
 	// Add fields for each breakout room
 	breakoutRooms.forEach((room) => {
-		// Note: distribution object here might not reflect actual moves if operation failed partially or we resumed.
-		// Ideally we should use result.moveResults to build the embed, or use the distribution plan.
-		// For now we use the planned distribution.
-		const usersInRoom =
-			distribution[room.id]?.map((u) => u.user.tag).join('\n') ||
-			'No users assigned';
+		// Use actual moveResults if available, otherwise fall back to planned distribution
+		let usersInRoom: string;
+
+		if (result.moveResults && result.moveResults.success) {
+			// Build actual user list from successful moves
+			const actualUsers = result.moveResults.success
+				.filter((entry: string) => entry.includes(`→ ${room.name}`))
+				.map((entry: string) => entry.split(' → ')[0]);
+			usersInRoom =
+				actualUsers.length > 0 ? actualUsers.join('\n') : 'No users assigned';
+		} else {
+			// Fallback to planned distribution
+			usersInRoom =
+				distribution[room.id]?.map((u) => u.user.tag).join('\n') ||
+				'No users assigned';
+		}
+
 		embed.addFields({
 			name: room.name,
 			value: usersInRoom,
 			inline: true,
 		});
-		console.log(
-			`📊 Added ${room.name} stats to embed: ${distribution[room.id]?.length || 0} users`,
-		);
+		console.log(`📊 Added ${room.name} stats to embed`);
 	});
 
 	// Add error field if any
@@ -402,7 +414,7 @@ async function handleEndCommand(
 
 	// If no main channel is specified, try to get it from the manager
 	if (!mainChannel) {
-		const storedMainChannel = sessionManager.getMainRoom(interaction.guildId);
+		const storedMainChannel = getMainRoom(interaction.guildId);
 		if (storedMainChannel) {
 			mainChannel = storedMainChannel;
 		} else {
@@ -418,7 +430,7 @@ async function handleEndCommand(
 		`🎯 Target main voice channel: ${mainChannel.name} (${mainChannel.id}) (force: ${force})`,
 	);
 
-	const result = await endOperation.execute(interaction, mainChannel, force);
+	const result = await executeEnd(interaction, mainChannel, force);
 
 	if (result.success) {
 		await replyOrEdit(interaction, result.message);
@@ -441,7 +453,7 @@ async function handleTimerCommand(
 	const minutes = interaction.options.getInteger('minutes', true);
 	console.log(`⏱️ Setting breakout timer for ${minutes} minutes`);
 
-	const breakoutRooms = sessionManager.getRooms(interaction.guildId);
+	const breakoutRooms = getRooms(interaction.guildId);
 
 	if (breakoutRooms.length === 0) {
 		console.log(`❌ Error: No breakout rooms found`);
@@ -464,9 +476,14 @@ async function handleTimerCommand(
 	};
 
 	// Store timer data in state manager
-	await stateManager.setTimerData(interaction.guildId, timerData);
+	await setTimerData(interaction.guildId, timerData);
 	// Start the timer monitoring process
-	timerService.monitorBreakoutTimer(timerData, interaction);
+	monitorBreakoutTimer(timerData, interaction).catch((error) => {
+		console.error(
+			`❌ Timer monitoring failed for guild ${interaction.guildId}:`,
+			error,
+		);
+	});
 
 	await replyOrEdit(
 		interaction,
@@ -485,10 +502,10 @@ async function handleBroadcastCommand(
 	const message = interaction.options.getString('message', true);
 	console.log(`📢 Broadcasting message: "${message}"`);
 
-	const result = await messageService.broadcastToBreakoutRooms(
-		interaction.guildId,
-		message,
-	);
+	// Defer reply to prevent timeout on async broadcast
+	await interaction.deferReply();
+
+	const result = await broadcastToBreakoutRooms(interaction.guildId, message);
 
 	if (result.success) {
 		const embed = new EmbedBuilder()
@@ -529,7 +546,7 @@ async function handleSendMessageCommand(
 
 	console.log(`📨 Sending message to ${channel.name}: "${message}"`);
 
-	const result = await messageService.sendMessageToChannel(channel, message);
+	const result = await sendMessageToChannel(channel, message);
 
 	await replyOrEdit(interaction, {
 		content: result.message,

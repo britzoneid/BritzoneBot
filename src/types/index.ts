@@ -6,8 +6,6 @@
 export type { BritzoneClient } from './client.js';
 export type {
 	Command,
-	ContextMenuCommand,
 	OperationResult,
-	SlashCommand,
 } from './command.js';
-export type { Awaitable, Event, EventName } from './event.js';
+export type { Event } from './event.js';
