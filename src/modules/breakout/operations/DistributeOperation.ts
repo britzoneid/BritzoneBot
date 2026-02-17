@@ -4,7 +4,10 @@ import type {
 	VoiceChannel,
 } from 'discord.js';
 import type { OperationResult } from '../../../types/index.js';
-import distributionService from '../services/DistributionService.js';
+import {
+	hasActiveDistribution,
+	moveUserToRoom,
+} from '../services/distribution.js';
 import sessionManager from '../state/SessionManager.js';
 import stateManager from '../state/StateManager.js';
 import type { UserDistribution } from '../utils/distribution.js';
@@ -89,8 +92,7 @@ export class DistributeOperation {
 			}
 		} else {
 			// Check if distribution is already active
-			const isDistributionActive =
-				await distributionService.hasActiveDistribution(guildId);
+			const isDistributionActive = await hasActiveDistribution(guildId);
 			if (isDistributionActive && !force) {
 				return {
 					success: false,
@@ -195,8 +197,7 @@ export class DistributeOperation {
 					);
 
 					movePromises.push(
-						distributionService
-							.moveUserToRoom(user, room)
+						moveUserToRoom(user, room)
 							.then(async () => {
 								moveResults.success.push(`${user.user.tag} → ${room.name}`);
 								console.log(

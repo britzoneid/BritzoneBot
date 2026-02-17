@@ -5,7 +5,7 @@ import {
 	type VoiceChannel,
 } from 'discord.js';
 import type { OperationResult } from '../../../types/index.js';
-import distributionService from '../services/DistributionService.js';
+import { moveUserToRoom } from '../services/distribution.js';
 import roomService from '../services/RoomService.js';
 import sessionManager from '../state/SessionManager.js';
 import stateManager from '../state/StateManager.js';
@@ -164,10 +164,7 @@ export class EndOperation {
 							}
 
 							try {
-								await distributionService.moveUserToRoom(
-									member,
-									mainChannel as VoiceChannel,
-								);
+								await moveUserToRoom(member, mainChannel as VoiceChannel);
 								console.log(
 									`✅ Moved ${member.user.tag} from ${room.name} to ${mainChannel.name}`,
 								);
