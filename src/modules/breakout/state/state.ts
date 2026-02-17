@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { logger } from '../../../lib/logger.js';
 
 /**
  * Single operation step data
@@ -67,9 +68,9 @@ async function initialize(): Promise<void> {
 		await fs.mkdir(statePath, { recursive: true });
 		await loadState();
 		initialized = true;
-		console.log('📂 StateManager initialized');
+		logger.info('📂 StateManager initialized');
 	} catch (error) {
-		console.error('❌ Failed to initialize StateManager:', error);
+		logger.error({ err: error }, '❌ Failed to initialize StateManager');
 	}
 }
 
@@ -80,15 +81,15 @@ async function loadState(): Promise<void> {
 	try {
 		const data = await fs.readFile(stateFile, 'utf8');
 		inMemoryState = JSON.parse(data);
-		console.log('📤 Loaded breakout state data');
+		logger.debug('📤 Loaded breakout state data');
 	} catch (error: any) {
 		if (error.code === 'ENOENT') {
 			// File doesn't exist yet, create new state
 			inMemoryState = {};
-			console.log('🆕 Created new breakout state data');
+			logger.info('🆕 Created new breakout state data');
 		} else {
 			// Other error (parse error, permission error, etc.)
-			console.error('❌ Error loading breakout state:', error);
+			logger.error({ err: error }, '❌ Error loading breakout state');
 			throw error;
 		}
 	}
@@ -103,9 +104,9 @@ async function saveState(): Promise<void> {
 		try {
 			await initialize();
 			await fs.writeFile(stateFile, JSON.stringify(inMemoryState, null, 2));
-			console.log('💾 Saved breakout state data');
+			logger.debug('💾 Saved breakout state data');
 		} catch (error) {
-			console.error('❌ Error saving breakout state:', error);
+			logger.error({ err: error }, '❌ Error saving breakout state');
 		}
 	});
 
@@ -140,9 +141,7 @@ export async function startOperation(
 		},
 	};
 
-	console.log(
-		`📝 Started tracking ${operationType} operation for guild ${guildId}`,
-	);
+	logger.info({ guildId, operationType }, `📝 Started tracking operation`);
 	await saveState();
 }
 
@@ -158,7 +157,7 @@ export async function updateProgress(
 	const guildState = inMemoryState[guildId] as GuildState | undefined;
 
 	if (!guildState?.currentOperation) {
-		console.log(`⚠️ No operation in progress for guild ${guildId}`);
+		logger.warn({ guildId }, `⚠️ No operation in progress`);
 		return false;
 	}
 
@@ -168,7 +167,7 @@ export async function updateProgress(
 		...data,
 	};
 
-	console.log(`✅ Updated progress for guild ${guildId}: ${step}`);
+	logger.debug({ guildId, step }, `✅ Updated progress`);
 	await saveState();
 	return true;
 }
@@ -201,7 +200,7 @@ export async function completeOperation(guildId: string): Promise<void> {
 	// Clear current operation
 	delete guildState.currentOperation;
 
-	console.log(`🏁 Completed operation for guild ${guildId}`);
+	logger.info({ guildId }, `🏁 Completed operation`);
 	await saveState();
 }
 
@@ -254,7 +253,7 @@ export async function setTimerData(
 	timerData: TimerData,
 ): Promise<void> {
 	await initialize();
-	console.log(`💾 Storing timer data for guild ${guildId}`);
+	logger.debug({ guildId }, `💾 Storing timer data`);
 	inMemoryState[`timer_${guildId}`] = timerData;
 	await saveState();
 }
@@ -276,7 +275,7 @@ export async function getTimerData(guildId: string): Promise<TimerData | null> {
  */
 export async function clearTimerData(guildId: string): Promise<void> {
 	await initialize();
-	console.log(`🗑️ Clearing timer data for guild ${guildId}`);
+	logger.debug({ guildId }, `🗑️ Clearing timer data`);
 	delete inMemoryState[`timer_${guildId}`];
 	await saveState();
 }

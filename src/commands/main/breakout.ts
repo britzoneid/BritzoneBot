@@ -11,6 +11,7 @@ import {
 } from 'discord.js';
 import isAdmin from '../../lib/discord/permissions.js';
 import { handleInteraction, replyOrEdit } from '../../lib/discord/response.js';
+import { logger } from '../../lib/logger.js';
 import { executeCreate } from '../../modules/breakout/operations/create.js';
 import { executeDistribute } from '../../modules/breakout/operations/distribute.js';
 import { executeEnd } from '../../modules/breakout/operations/end.js';
@@ -157,7 +158,14 @@ const command: Command = {
 		),
 
 	async execute(interaction: ChatInputCommandInteraction): Promise<void> {
-		console.log(`🚀 Breakout command initiated by ${interaction.user.tag}`);
+		const log = logger.child({
+			command: 'breakout',
+			interactionId: interaction.id,
+			guildId: interaction.guildId,
+			user: interaction.user.tag,
+		});
+
+		log.info('🚀 Breakout command initiated');
 
 		if (!interaction.guildId || !interaction.member) {
 			await replyOrEdit(interaction, {
@@ -173,9 +181,7 @@ const command: Command = {
 			!isAdmin(member) &&
 			!member.permissions.has(PermissionFlagsBits.MoveMembers)
 		) {
-			console.log(
-				`🔒 Permission denied to ${interaction.user.tag} for breakout command`,
-			);
+			log.warn('🔒 Permission denied for breakout command');
 			await replyOrEdit(interaction, {
 				content: 'You do not have permission to use this command.',
 				ephemeral: true,
@@ -192,8 +198,9 @@ const command: Command = {
 
 			if (currentOp && currentOp.type !== subcommand) {
 				// If a different operation is in progress, warn the user
-				console.log(
-					`⚠️ Found interrupted ${currentOp.type} operation, but user requested ${subcommand}`,
+				log.warn(
+					{ currentType: currentOp.type, requestedType: subcommand },
+					`⚠️ Found interrupted operation, but user requested different type`,
 				);
 				await replyOrEdit(interaction, {
 					content: `There is an interrupted '${currentOp.type}' operation in progress. Please finish it or clear it before starting a '${subcommand}' operation.`,
@@ -204,7 +211,7 @@ const command: Command = {
 				// For now, we block.
 				return;
 			} else if (currentOp && currentOp.type === subcommand) {
-				console.log(`Note: Resuming ${subcommand} operation.`);
+				log.info(`Note: Resuming ${subcommand} operation.`);
 				// We let it proceed to the handler, which will check stateManager and resume.
 			}
 		}
@@ -233,9 +240,14 @@ async function handleCreateCommand(
 ): Promise<void> {
 	const numRooms = interaction.options.getInteger('number', true);
 	const force = interaction.options.getBoolean('force') || false;
-	console.log(
-		`🔢 Number of breakout rooms to create: ${numRooms} (force: ${force})`,
-	);
+	const log = logger.child({
+		subcommand: 'create',
+		guildId: interaction.guildId,
+		numRooms,
+		force,
+	});
+
+	log.info(`🔢 Creating breakout rooms`);
 
 	await handleInteraction(
 		interaction,
@@ -245,7 +257,7 @@ async function handleCreateCommand(
 			if (result.success) {
 				await replyOrEdit(interaction, result.message);
 			} else {
-				console.error(`❌ Error creating breakout rooms:`, result);
+				log.error({ result }, `❌ Error creating breakout rooms`);
 				await replyOrEdit(interaction, result.message);
 			}
 		},
@@ -266,7 +278,14 @@ async function handleDistributeCommand(
 		| StageChannel;
 	const facilitatorsInput = interaction.options.getString('facilitators');
 	const force = interaction.options.getBoolean('force') || false;
-	console.log(`🎯 Main room selected: ${mainRoom.name} (force: ${force})`);
+
+	const log = logger.child({
+		subcommand: 'distribute',
+		guildId: interaction.guildId,
+		mainRoom: mainRoom.name,
+		force,
+	});
+	log.info(`🎯 Main room selected`);
 
 	// Process facilitators if provided
 	const facilitators = new Set<string>();
@@ -276,13 +295,13 @@ async function handleDistributeCommand(
 		for (const match of matches) {
 			facilitators.add(match[1]);
 		}
-		console.log(`👥 Facilitators identified: ${facilitators.size}`);
+		log.debug({ count: facilitators.size }, `👥 Facilitators identified`);
 	}
 
 	const breakoutRooms = getRooms(interaction.guildId);
 
 	if (breakoutRooms.length === 0) {
-		console.log(`❌ Error: No breakout rooms found`);
+		log.warn(`❌ Error: No breakout rooms found`);
 		await replyOrEdit(
 			interaction,
 			'No breakout rooms found! Please create breakout rooms first with `/breakout create`.',
@@ -293,7 +312,7 @@ async function handleDistributeCommand(
 	const usersInMainRoom = mainRoom.members;
 
 	if (usersInMainRoom.size === 0) {
-		console.log(`⚠️ No users found in ${mainRoom.name}`);
+		log.warn(`⚠️ No users found in ${mainRoom.name}`);
 		await replyOrEdit(interaction, `There are no users in ${mainRoom.name}.`);
 		return;
 	}
@@ -306,8 +325,12 @@ async function handleDistributeCommand(
 				(member) => !facilitators.has(member.user.id),
 			);
 
-			console.log(
-				`🧩 Distributing ${usersToDistribute.length} users among ${breakoutRooms.length} breakout rooms (excluding ${facilitators.size} facilitators)`,
+			log.info(
+				{
+					usersCount: usersToDistribute.length,
+					roomsCount: breakoutRooms.length,
+				},
+				`🧩 Distributing users`,
 			);
 
 			// Calculate distribution
@@ -328,7 +351,7 @@ async function handleDistributeCommand(
 			}
 
 			// Create embed for nice formatting
-			console.log(`📝 Creating response embed`);
+			log.debug(`📝 Creating response embed`);
 			const embed = new EmbedBuilder()
 				.setTitle('Breakout Room Assignment')
 				.setColor('#00FF00')
@@ -349,7 +372,10 @@ async function handleDistributeCommand(
 					value: facilitatorUsers || 'None',
 					inline: false,
 				});
-				console.log(`📊 Added ${facilitators.size} facilitators to embed`);
+				log.debug(
+					{ count: facilitators.size },
+					`📊 Added facilitators to embed`,
+				);
 			}
 
 			// Add fields for each breakout room
@@ -378,7 +404,7 @@ async function handleDistributeCommand(
 					value: usersInRoom,
 					inline: true,
 				});
-				console.log(`📊 Added ${room.name} stats to embed`);
+				// log.debug({ room: room.name }, `📊 Added room stats`); // Too verbose
 			});
 
 			// Add error field if any
@@ -388,12 +414,13 @@ async function handleDistributeCommand(
 					value: result.moveResults.failed.join('\n'),
 					inline: false,
 				});
-				console.log(
-					`⚠️ Added ${result.moveResults.failed.length} failed moves to embed`,
+				log.warn(
+					{ failedCount: result.moveResults.failed.length },
+					`⚠️ Added failed moves to embed`,
 				);
 			}
 
-			console.log(`📤 Sending breakout room results to Discord`);
+			log.info(`📤 Sending breakout room results`);
 			await replyOrEdit(interaction, { embeds: [embed] });
 		},
 		{ deferReply: true, ephemeral: true },
@@ -428,9 +455,14 @@ async function handleEndCommand(
 		}
 	}
 
-	console.log(
-		`🎯 Target main voice channel: ${mainChannel.name} (${mainChannel.id}) (force: ${force})`,
-	);
+	const log = logger.child({
+		subcommand: 'end',
+		guildId: interaction.guildId,
+		mainRoom: mainChannel.name,
+		force,
+	});
+
+	log.info(`🎯 Ending breakout session`);
 
 	await handleInteraction(
 		interaction,
@@ -459,12 +491,18 @@ async function handleTimerCommand(
 	if (!interaction.guildId) return;
 
 	const minutes = interaction.options.getInteger('minutes', true);
-	console.log(`⏱️ Setting breakout timer for ${minutes} minutes`);
+	const log = logger.child({
+		subcommand: 'timer',
+		guildId: interaction.guildId,
+		minutes,
+	});
+
+	log.info(`⏱️ Setting breakout timer`);
 
 	const breakoutRooms = getRooms(interaction.guildId);
 
 	if (breakoutRooms.length === 0) {
-		console.log(`❌ Error: No breakout rooms found`);
+		log.warn(`❌ Error: No breakout rooms found`);
 		await replyOrEdit(
 			interaction,
 			'No breakout rooms found! Please create breakout rooms first with `/breakout create`.',
@@ -487,10 +525,7 @@ async function handleTimerCommand(
 	await setTimerData(interaction.guildId, timerData);
 	// Start the timer monitoring process
 	monitorBreakoutTimer(timerData, interaction).catch((error) => {
-		console.error(
-			`❌ Timer monitoring failed for guild ${interaction.guildId}:`,
-			error,
-		);
+		log.error({ err: error }, `❌ Timer monitoring failed`);
 	});
 
 	await replyOrEdit(
@@ -508,7 +543,13 @@ async function handleBroadcastCommand(
 	if (!interaction.guildId) return;
 
 	const message = interaction.options.getString('message', true);
-	console.log(`📢 Broadcasting message: "${message}"`);
+	const log = logger.child({
+		subcommand: 'broadcast',
+		guildId: interaction.guildId,
+		message,
+	});
+
+	log.info(`📢 Broadcasting message`);
 
 	// Defer reply to prevent timeout on async broadcast
 	await interaction.deferReply();
@@ -552,7 +593,13 @@ async function handleSendMessageCommand(
 	) as VoiceChannel;
 	const message = interaction.options.getString('message', true);
 
-	console.log(`📨 Sending message to ${channel.name}: "${message}"`);
+	const log = logger.child({
+		subcommand: 'send-message',
+		guildId: interaction.guildId,
+		channel: channel.name,
+	});
+
+	log.info(`📨 Sending message`);
 
 	const result = await sendMessageToChannel(channel, message);
 

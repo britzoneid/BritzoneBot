@@ -8,20 +8,17 @@
 import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
-import consoleStamp from 'console-stamp';
 import { Client, Collection, GatewayIntentBits } from 'discord.js';
+import { logger } from './lib/logger.js';
 import type { BritzoneClient, Command, Event } from './types/index.js';
 
 const __dirname = import.meta.dirname;
-
-// Configure console-stamp for better log formatting
-consoleStamp(console, { format: ':date(HH:MM:ss)' });
 
 // ============================================================================
 // LOGGING SETUP
 // ============================================================================
 
-console.log('🚀 Starting the bot...');
+logger.info('🚀 Starting the bot...');
 
 // ============================================================================
 // BOT INITIALIZATION
@@ -46,7 +43,7 @@ client.commands = new Collection<string, Command>();
 // COMMAND LOADING
 // ============================================================================
 
-console.log('📂 Loading commands...');
+logger.info('📂 Loading commands...');
 
 const foldersPath = path.join(__dirname, 'commands');
 const commandFolders = fs.readdirSync(foldersPath);
@@ -68,14 +65,21 @@ for (const folder of commandFolders) {
 			// Type guard: ensure command has required properties
 			if ('data' in command && 'execute' in command) {
 				client.commands.set(command.data.name, command);
-				console.log(`✅ Command loaded: ${command.data.name}`);
+				logger.info(
+					{ command: command.data.name },
+					`✅ Command loaded: ${command.data.name}`,
+				);
 			} else {
-				console.log(
+				logger.warn(
+					{ filePath },
 					`⚠️ [WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`,
 				);
 			}
 		} catch (error) {
-			console.error(`❌ Error loading command from ${filePath}:`, error);
+			logger.error(
+				{ err: error, filePath },
+				`❌ Error loading command from ${filePath}`,
+			);
 		}
 	}
 }
@@ -84,7 +88,7 @@ for (const folder of commandFolders) {
 // EVENT LOADING
 // ============================================================================
 
-console.log('🎉 Loading events...');
+logger.info('🎉 Loading events...');
 
 const eventsPath = path.join(__dirname, 'events');
 const eventFiles = fs
@@ -102,13 +106,19 @@ for (const file of eventFiles) {
 		// Type guard: check if event has required properties
 		if (event.once) {
 			client.once(event.name, (...args) => event.execute(...args));
-			console.log(`🔄 One-time event loaded: ${event.name}`);
+			logger.info(
+				{ event: event.name },
+				`🔄 One-time event loaded: ${event.name}`,
+			);
 		} else {
 			client.on(event.name, (...args) => event.execute(...args));
-			console.log(`🔁 Event loaded: ${event.name}`);
+			logger.info({ event: event.name }, `🔁 Event loaded: ${event.name}`);
 		}
 	} catch (error) {
-		console.error(`❌ Error loading event from ${filePath}:`, error);
+		logger.error(
+			{ err: error, filePath },
+			`❌ Error loading event from ${filePath}:`,
+		);
 	}
 }
 
@@ -116,16 +126,14 @@ for (const file of eventFiles) {
 // BOT LOGIN
 // ============================================================================
 
-console.log('🔑 Logging in...');
+logger.info('🔑 Logging in...');
 client
 	.login(token)
 	.then(() => {
-		console.log('✅ Bot logged in successfully!');
+		logger.info('✅ Bot logged in successfully!');
 	})
 	.catch((err: Error) => {
-		console.error(`❌ Failed to log in: ${err.message}`);
-		console.error('Full error:', err);
-		console.error('Error stack:', err.stack);
+		logger.fatal({ err }, `❌ Failed to log in: ${err.message}`);
 		process.exit(1);
 	});
 
@@ -135,11 +143,11 @@ client
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (error: Error) => {
-	console.error('❌ Unhandled Promise Rejection:', error);
+	logger.error({ err: error }, '❌ Unhandled Promise Rejection:');
 });
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error: Error) => {
-	console.error('❌ Uncaught Exception:', error);
+	logger.fatal({ err: error }, '❌ Uncaught Exception:');
 	process.exit(1);
 });

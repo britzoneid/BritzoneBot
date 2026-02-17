@@ -3,6 +3,7 @@ import {
 	type CommandInteraction,
 	type VoiceChannel,
 } from 'discord.js';
+import { logger } from '../../../lib/logger.js';
 import type { OperationResult } from '../../../types/index.js';
 import {
 	createRoom,
@@ -35,13 +36,19 @@ export async function executeCreate(
 	}
 
 	const operationType = 'create';
+	const log = logger.child({
+		operation: operationType,
+		guildId,
+		numRooms,
+		force,
+	});
 
 	// Check if we are resuming an interrupted operation
 	const currentOp = await getCurrentOperation(guildId);
 	const isResuming = currentOp?.type === operationType;
 
 	if (isResuming) {
-		console.log(`🔄 Resuming create operation for guild ${guildId}`);
+		log.info(`🔄 Resuming create operation`);
 	} else {
 		// Check for existing breakout rooms
 		const existingRooms = await hasExistingBreakoutRooms(interaction.guild);
@@ -54,8 +61,9 @@ export async function executeCreate(
 
 		// If force is true and rooms exist, cleanup first
 		if (force && existingRooms.exists) {
-			console.log(
-				`🔄 Force flag enabled, cleaning up ${existingRooms.rooms.length} existing rooms`,
+			log.info(
+				{ existingCount: existingRooms.rooms.length },
+				`🔄 Force flag enabled, cleaning up existing rooms`,
 			);
 			// Simple cleanup: delete rooms.
 			// Note: Ideally we would move users back to main room if known, but for simplicity/force we just delete.
@@ -82,7 +90,7 @@ export async function executeCreate(
 
 			// Check if this step was already completed in a previous attempt
 			if (steps[stepKey]) {
-				console.log(`⏭️ Room ${roomName} was already created, skipping`);
+				log.debug({ roomName }, `⏭️ Room was already created, skipping`);
 
 				// Try to find the existing channel to add to our list
 				// We can use the ID stored in the step if available
@@ -119,7 +127,7 @@ export async function executeCreate(
 					channelId: createdChannel.id,
 				});
 			} catch (error) {
-				console.error(`❌ Failed to create ${roomName}:`, error);
+				log.error({ err: error, roomName }, `❌ Failed to create room`);
 				throw error;
 			}
 		}
@@ -144,7 +152,8 @@ export async function executeCreate(
 			}!`,
 		};
 	} catch (error) {
-		console.error(`❌ Error in CreateOperation:`, error);
+		// Log using the main logger if log isn't available or just to be safe
+		logger.error({ err: error, guildId }, `❌ Error in CreateOperation`);
 		return {
 			success: false,
 			message:

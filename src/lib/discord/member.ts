@@ -1,4 +1,5 @@
 import type { GuildMember, StageChannel, VoiceChannel } from 'discord.js';
+import { logger } from '../logger.js';
 
 /**
  * Move a user to a specified voice channel
@@ -11,25 +12,30 @@ export async function moveUser(
 	channel: VoiceChannel | StageChannel,
 ): Promise<GuildMember> {
 	try {
-		console.log(
-			`🚚 Attempting to move ${member.user.tag} to channel: ${channel.name}`,
+		logger.debug(
+			{ user: member.user.tag, channel: channel.name },
+			`🚚 Attempting to move user`,
 		);
 
 		// Check if member is currently in a voice channel
 		if (!member.voice.channel) {
-			console.log(
-				`❌ Failed move: ${member.user.tag} is not in a voice channel`,
+			logger.warn(
+				{ user: member.user.tag },
+				`❌ Failed move: member is not in a voice channel`,
 			);
 			throw new Error(`${member.user.tag} is not in a voice channel.`);
 		}
 
 		const movedMember = await member.voice.setChannel(channel);
-		console.log(`✅ Successfully moved ${member.user.tag} to ${channel.name}`);
+		logger.info(
+			{ user: member.user.tag, channel: channel.name },
+			`✅ Successfully moved user`,
+		);
 		return movedMember;
 	} catch (error) {
-		console.error(
-			`❌ Failed to move ${member.user.tag} to ${channel.name}:`,
-			error,
+		logger.error(
+			{ err: error, user: member.user.tag, channel: channel.name },
+			`❌ Failed to move user`,
 		);
 		throw error;
 	}
