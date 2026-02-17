@@ -2,14 +2,12 @@ import {
 	ChannelType,
 	type ChatInputCommandInteraction,
 	EmbedBuilder,
-	type GuildMember,
 	PermissionFlagsBits,
 	SlashCommandBuilder,
 	type StageChannel,
 	type VoiceBasedChannel,
 	type VoiceChannel,
 } from 'discord.js';
-import isAdmin from '../../lib/discord/permissions.js';
 import { handleInteraction, replyOrEdit } from '../../lib/discord/response.js';
 import { logger } from '../../lib/logger.js';
 import { executeCreate } from '../../modules/breakout/operations/create.js';
@@ -170,20 +168,6 @@ const command: Command = {
 		if (!interaction.guildId || !interaction.member) {
 			await replyOrEdit(interaction, {
 				content: 'This command can only be used in a server.',
-				ephemeral: true,
-			});
-			return;
-		}
-
-		// Check if user has permission to use this command
-		const member = interaction.member as GuildMember;
-		if (
-			!isAdmin(member) &&
-			!member.permissions.has(PermissionFlagsBits.MoveMembers)
-		) {
-			log.warn('🔒 Permission denied for breakout command');
-			await replyOrEdit(interaction, {
-				content: 'You do not have permission to use this command.',
 				ephemeral: true,
 			});
 			return;
