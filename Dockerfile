@@ -51,11 +51,6 @@ RUN mkdir -p /app/data && \
 # Switch to non-root user (bun user from base image, UID 1000)
 USER bun
 
-# Health check (optional - checks if process is running)
-# Discord bots don't have HTTP endpoints, so we just check process
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD pgrep -f "bun.*index.js" || exit 1
-
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
 
