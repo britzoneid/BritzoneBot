@@ -162,7 +162,7 @@ const command: Command = {
 			command: 'breakout',
 			interactionId: interaction.id,
 			guildId: interaction.guildId,
-			user: interaction.user.tag,
+			user: interaction.user,
 		});
 
 		log.info('🚀 Breakout command initiated');

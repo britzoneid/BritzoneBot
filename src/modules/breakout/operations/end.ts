@@ -183,7 +183,7 @@ export async function executeEnd(
 
 						if (steps[memberMovedKey]) {
 							log.debug(
-								{ user: member.user.tag },
+								{ user: member.user },
 								`⏭️ Member was already moved, skipping`,
 							);
 							totalMoved++;
@@ -195,7 +195,7 @@ export async function executeEnd(
 							await moveUserToRoom(member, mainChannel);
 							log.debug(
 								{
-									user: member.user.tag,
+									user: member.user,
 									from: room.name,
 									to: mainChannel.name,
 								},
@@ -206,7 +206,7 @@ export async function executeEnd(
 							roomMovedCount++;
 						} catch (error) {
 							log.error(
-								{ err: error, user: member.user.tag, from: room.name },
+								{ err: error, user: member.user, from: room.name },
 								`❌ Failed to move member`,
 							);
 						}

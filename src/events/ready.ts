@@ -15,7 +15,7 @@ const event: Event<typeof Events.ClientReady> = {
 		// - client.user is defined (not null)
 		// - client.user.tag is a string
 		logger.info(
-			{ user: client.user?.tag },
+			{ user: client.user },
 			`✅ Ready! Logged in as ${client.user?.tag}`,
 		);
 	},

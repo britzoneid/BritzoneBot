@@ -193,7 +193,7 @@ export async function executeDistribute(
 
 				if (steps[moveKey]) {
 					log.debug(
-						{ user: user.user.tag, room: room.name },
+						{ user: user.user, room: room.name },
 						`⏭️ User was already moved, skipping`,
 					);
 					moveResults.success.push(`${user.user.tag} → ${room.name}`);
@@ -201,7 +201,7 @@ export async function executeDistribute(
 				}
 
 				log.debug(
-					{ user: user.user.tag, room: room.name },
+					{ user: user.user, room: room.name },
 					`🚚 Attempting to move user`,
 				);
 
@@ -210,7 +210,7 @@ export async function executeDistribute(
 						.then(async () => {
 							moveResults.success.push(`${user.user.tag} → ${room.name}`);
 							log.debug(
-								{ user: user.user.tag, room: room.name },
+								{ user: user.user, room: room.name },
 								`✅ Successfully moved user`,
 							);
 							await updateProgress(guildId, moveKey);
@@ -218,7 +218,7 @@ export async function executeDistribute(
 						.catch((error: any) => {
 							moveResults.failed.push(`${user.user.tag} (${error.message})`);
 							log.error(
-								{ err: error, user: user.user.tag },
+								{ err: error, user: user.user },
 								`❌ Failed to move user`,
 							);
 						}),
