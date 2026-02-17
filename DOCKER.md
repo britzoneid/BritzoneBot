@@ -6,7 +6,7 @@ This guide covers building and running BritzoneBot using Docker with a secure, r
 
 The Docker setup uses:
 - **Multi-stage build**: Separate builder and production stages for minimal final image size
-- **Non-root user**: Runs as `botuser` (UID/GID 1000) for security
+- **Non-root user**: Runs as `bun` user (UID 1000) for security
 - **Alpine Linux**: Minimal base image (~40MB compressed)
 - **Production dependencies only**: Reduced attack surface and image size
 - **Read-only root filesystem**: Enhanced security
@@ -168,7 +168,7 @@ docker compose up -d --build
 ### Access container shell (debugging)
 
 ```bash
-# Open shell as botuser
+# Open shell as bun user
 docker compose exec britzone-bot sh
 
 # Open shell as root (troubleshooting only)
