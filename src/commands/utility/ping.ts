@@ -19,7 +19,6 @@ const command: Command = {
 		// TypeScript knows interaction type and all available methods
 		await interaction.reply({
 			content: `🏓 Pong! Bot latency is ${Math.round(interaction.client.ws.ping)}ms.`,
-			ephemeral: true,
 		});
 	},
 };
