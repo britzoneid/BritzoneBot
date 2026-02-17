@@ -21,25 +21,7 @@ consoleStamp(console, { format: ':date(HH:MM:ss)' });
 // LOGGING SETUP
 // ============================================================================
 
-const logDir = path.join(__dirname, 'log');
-if (!fs.existsSync(logDir)) {
-  fs.mkdirSync(logDir);
-}
-const logFile = path.join(logDir, `${new Date().toISOString().split('T')[0]}.log`);
 
-const originalConsoleLog = console.log;
-
-/**
- * Logs messages to both console and file
- * @param message The message to log
- * @param optionalParams Additional parameters
- */
-console.log = function(message: string, ...optionalParams: any[]): void {
-  const timestamp = new Date().toISOString();
-  const logMessage = `${timestamp} ${message}\n`;
-  fs.appendFileSync(logFile, logMessage);
-  originalConsoleLog.apply(console, [message, ...optionalParams]);
-};
 
 console.log('🚀 Starting the bot...');
 
@@ -138,6 +120,8 @@ client
   })
   .catch((err: Error) => {
     console.error(`❌ Failed to log in: ${err.message}`);
+    console.error('Full error:', err);
+    console.error('Error stack:', err.stack);
     process.exit(1);
   });
 
