@@ -4,7 +4,12 @@ import {
 	type Client,
 	type GuildBasedChannel,
 } from 'discord.js';
-import stateManager, { type TimerData } from '../state/StateManager.js';
+import {
+	clearTimerData,
+	getTimerData,
+	setTimerData,
+	type TimerData,
+} from '../state/state.js';
 
 /**
  * Monitors a breakout timer and sends reminders at defined intervals.
@@ -20,7 +25,7 @@ export async function monitorBreakoutTimer(
 	const endTime = startTime + totalMinutes * 60 * 1000;
 
 	// Initial check
-	let timerState = await stateManager.getTimerData(guildId);
+	let timerState = await getTimerData(guildId);
 
 	console.log(
 		`⏱️ Started breakout timer monitoring for ${totalMinutes} minutes in guild ${guildId}`,
@@ -28,7 +33,7 @@ export async function monitorBreakoutTimer(
 
 	const intervalId = setInterval(async () => {
 		try {
-			timerState = await stateManager.getTimerData(guildId);
+			timerState = await getTimerData(guildId);
 			if (!timerState) {
 				console.log(`⏱️ Timer for guild ${guildId} was cancelled or removed`);
 				clearInterval(intervalId);
@@ -51,7 +56,7 @@ export async function monitorBreakoutTimer(
 				);
 
 				timerState.fiveMinSent = true;
-				await stateManager.setTimerData(guildId, timerState);
+				await setTimerData(guildId, timerState);
 			}
 
 			if (now >= endTime) {
@@ -63,7 +68,7 @@ export async function monitorBreakoutTimer(
 					interaction.client,
 				);
 
-				await stateManager.clearTimerData(guildId);
+				await clearTimerData(guildId);
 				clearInterval(intervalId);
 			}
 		} catch (error) {

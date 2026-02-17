@@ -7,8 +7,14 @@ import {
 import type { OperationResult } from '../../../types/index.js';
 import { moveUserToRoom } from '../services/distribution.js';
 import { deleteRoom } from '../services/room.js';
-import stateManager from '../state/StateManager.js';
 import { clearSession, getRooms } from '../state/session.js';
+import {
+	completeOperation,
+	getCompletedSteps,
+	getCurrentOperation,
+	startOperation,
+	updateProgress,
+} from '../state/state.js';
 
 export async function executeEnd(
 	interaction: CommandInteraction,
@@ -26,7 +32,7 @@ export async function executeEnd(
 	const operationType = 'end';
 
 	// Check if we are resuming an interrupted operation
-	const currentOp = await stateManager.getCurrentOperation(guildId);
+	const currentOp = await getCurrentOperation(guildId);
 	const isResuming = currentOp?.type === operationType;
 
 	let breakoutRooms: VoiceChannel[] = [];
@@ -98,7 +104,7 @@ export async function executeEnd(
 
 		// Start new operation
 		if (!isResuming) {
-			await stateManager.startOperation(guildId, operationType, {
+			await startOperation(guildId, operationType, {
 				mainRoomId: mainChannel.id,
 				roomIds: breakoutRooms.map((room) => room.id),
 			});
@@ -121,7 +127,7 @@ export async function executeEnd(
 			console.log(`📌 Processing breakout room: ${room.name} (${room.id})`);
 
 			// Check if we already processed this room
-			const steps = await stateManager.getCompletedSteps(guildId);
+			const steps = await getCompletedSteps(guildId);
 			const roomProcessedKey = `room_processed_${room.id}`;
 
 			if (steps[roomProcessedKey]) {
@@ -140,7 +146,7 @@ export async function executeEnd(
 					console.log(
 						`⚠️ Room ${room.name} (${room.id}) no longer exists, skipping`,
 					);
-					await stateManager.updateProgress(guildId, roomProcessedKey, {
+					await updateProgress(guildId, roomProcessedKey, {
 						skipped: true,
 					});
 					deletedRooms++; // Count as deleted since it doesn't exist anymore
@@ -165,7 +171,7 @@ export async function executeEnd(
 							console.log(
 								`✅ Moved ${member.user.tag} from ${room.name} to ${mainChannel.name}`,
 							);
-							await stateManager.updateProgress(guildId, memberMovedKey);
+							await updateProgress(guildId, memberMovedKey);
 							totalMoved++;
 						} catch (error) {
 							console.error(
@@ -185,7 +191,7 @@ export async function executeEnd(
 							'Breakout room ended and members moved back to main room',
 						);
 						console.log(`🗑️ Deleted breakout room: ${room.name}`);
-						await stateManager.updateProgress(guildId, roomDeletedKey);
+						await updateProgress(guildId, roomDeletedKey);
 						deletedRooms++;
 					} catch (error) {
 						console.error(
@@ -199,7 +205,7 @@ export async function executeEnd(
 				}
 
 				// Mark this room as fully processed
-				await stateManager.updateProgress(guildId, roomProcessedKey);
+				await updateProgress(guildId, roomProcessedKey);
 			} catch (error) {
 				console.error(`❌ Error processing room ${room.name}:`, error);
 				// Continue with other rooms even if one fails
@@ -207,11 +213,11 @@ export async function executeEnd(
 		}
 
 		// Clear the stored session data
-		await stateManager.updateProgress(guildId, 'clear_session');
+		await updateProgress(guildId, 'clear_session');
 		clearSession(guildId);
 
 		// Complete operation
-		await stateManager.completeOperation(guildId);
+		await completeOperation(guildId);
 
 		console.log(
 			`🎉 Successfully moved ${totalMoved} member(s) back to ${mainChannel.name} and deleted ${deletedRooms}/${totalRooms} breakout room(s).`,

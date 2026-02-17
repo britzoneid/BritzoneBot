@@ -9,8 +9,14 @@ import {
 	deleteRoom,
 	hasExistingBreakoutRooms,
 } from '../services/room.js';
-import stateManager from '../state/StateManager.js';
 import { clearSession, storeRooms } from '../state/session.js';
+import {
+	completeOperation,
+	getCompletedSteps,
+	getCurrentOperation,
+	startOperation,
+	updateProgress,
+} from '../state/state.js';
 
 /**
  * Executes the create breakout rooms operation
@@ -31,7 +37,7 @@ export async function executeCreate(
 	const operationType = 'create';
 
 	// Check if we are resuming an interrupted operation
-	const currentOp = await stateManager.getCurrentOperation(guildId);
+	const currentOp = await getCurrentOperation(guildId);
 	const isResuming = currentOp?.type === operationType;
 
 	if (isResuming) {
@@ -60,7 +66,7 @@ export async function executeCreate(
 		}
 
 		// Start new operation
-		await stateManager.startOperation(guildId, operationType, { numRooms });
+		await startOperation(guildId, operationType, { numRooms });
 	}
 
 	try {
@@ -72,7 +78,7 @@ export async function executeCreate(
 			const stepKey = `create_room_${i}`;
 
 			// Check if this step was already completed in a previous attempt
-			const steps = await stateManager.getCompletedSteps(guildId);
+			const steps = await getCompletedSteps(guildId);
 			if (steps[stepKey]) {
 				console.log(`⏭️ Room ${roomName} was already created, skipping`);
 
@@ -103,7 +109,7 @@ export async function executeCreate(
 			try {
 				const createdChannel = await createRoom(interaction, roomName);
 				createdChannels.push(createdChannel);
-				await stateManager.updateProgress(guildId, stepKey, {
+				await updateProgress(guildId, stepKey, {
 					channelId: createdChannel.id,
 				});
 			} catch (error) {
@@ -113,13 +119,13 @@ export async function executeCreate(
 		}
 
 		// Store the created breakout rooms
-		await stateManager.updateProgress(guildId, 'store_rooms', {
+		await updateProgress(guildId, 'store_rooms', {
 			roomIds: createdChannels.map((c) => c.id),
 		});
 		storeRooms(guildId, createdChannels);
 
 		// Complete operation
-		await stateManager.completeOperation(guildId);
+		await completeOperation(guildId);
 
 		const cmdChannel = interaction.channel;
 		const hasParent = Boolean(

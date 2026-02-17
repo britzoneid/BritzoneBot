@@ -19,8 +19,12 @@ import {
 	sendMessageToChannel,
 } from '../../modules/breakout/services/message.js';
 import { monitorBreakoutTimer } from '../../modules/breakout/services/timer.js';
-import stateManager from '../../modules/breakout/state/StateManager.js';
 import { getMainRoom, getRooms } from '../../modules/breakout/state/session.js';
+import {
+	getCurrentOperation,
+	hasOperationInProgress,
+	setTimerData,
+} from '../../modules/breakout/state/state.js';
 import { distributeUsers } from '../../modules/breakout/utils/distribution.js';
 import type { Command } from '../../types/index.js';
 
@@ -182,13 +186,9 @@ const command: Command = {
 		const subcommand = interaction.options.getSubcommand();
 
 		// Check for interrupted operations
-		const inProgress = await stateManager.hasOperationInProgress(
-			interaction.guildId,
-		);
+		const inProgress = await hasOperationInProgress(interaction.guildId);
 		if (inProgress) {
-			const currentOp = await stateManager.getCurrentOperation(
-				interaction.guildId,
-			);
+			const currentOp = await getCurrentOperation(interaction.guildId);
 
 			if (currentOp && currentOp.type !== subcommand) {
 				// If a different operation is in progress, warn the user
@@ -467,7 +467,7 @@ async function handleTimerCommand(
 	};
 
 	// Store timer data in state manager
-	await stateManager.setTimerData(interaction.guildId, timerData);
+	await setTimerData(interaction.guildId, timerData);
 	// Start the timer monitoring process
 	monitorBreakoutTimer(timerData, interaction);
 

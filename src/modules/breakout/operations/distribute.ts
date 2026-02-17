@@ -8,8 +8,14 @@ import {
 	hasActiveDistribution,
 	moveUserToRoom,
 } from '../services/distribution.js';
-import stateManager from '../state/StateManager.js';
 import { setMainRoom } from '../state/session.js';
+import {
+	completeOperation,
+	getCompletedSteps,
+	getCurrentOperation,
+	startOperation,
+	updateProgress,
+} from '../state/state.js';
 import type { UserDistribution } from '../utils/distribution.js';
 
 export async function executeDistribute(
@@ -29,7 +35,7 @@ export async function executeDistribute(
 	const operationType = 'distribute';
 
 	// Check if we are resuming an interrupted operation
-	const currentOp = await stateManager.getCurrentOperation(guildId);
+	const currentOp = await getCurrentOperation(guildId);
 	const isResuming = currentOp?.type === operationType;
 
 	// Use a local variable for distribution to allow overriding from state
@@ -112,7 +118,7 @@ export async function executeDistribute(
 		}
 
 		// Start new operation
-		await stateManager.startOperation(guildId, operationType, {
+		await startOperation(guildId, operationType, {
 			mainRoomId: mainRoom.id,
 			distribution: distributionPlan,
 		});
@@ -123,11 +129,11 @@ export async function executeDistribute(
 		// We do this every time just in case, or only if not resuming?
 		// Safe to do every time as it updates in-memory map.
 		// But we should update progress step 'set_main_room'
-		const steps = await stateManager.getCompletedSteps(guildId);
+		const steps = await getCompletedSteps(guildId);
 
 		if (!steps['set_main_room']) {
 			setMainRoom(guildId, mainRoom);
-			await stateManager.updateProgress(guildId, 'set_main_room');
+			await updateProgress(guildId, 'set_main_room');
 		} else {
 			// Ensure session manager is in sync if we restarted the bot
 			setMainRoom(guildId, mainRoom);
@@ -195,7 +201,7 @@ export async function executeDistribute(
 							console.log(
 								`✅ Successfully moved ${user.user.tag} to ${room.name}`,
 							);
-							await stateManager.updateProgress(guildId, moveKey);
+							await updateProgress(guildId, moveKey);
 						})
 						.catch((error: any) => {
 							moveResults.failed.push(`${user.user.tag} (${error.message})`);
@@ -214,13 +220,13 @@ export async function executeDistribute(
 		await Promise.all(movePromises);
 
 		// Mark distribution as complete
-		await stateManager.updateProgress(guildId, 'distribution_complete', {
+		await updateProgress(guildId, 'distribution_complete', {
 			successful: moveResults.success.length,
 			failed: moveResults.failed.length,
 		});
 
 		// Complete operation
-		await stateManager.completeOperation(guildId);
+		await completeOperation(guildId);
 
 		return {
 			success: true,
