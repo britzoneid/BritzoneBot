@@ -3,7 +3,7 @@ import {
 	type GuildMember,
 	SlashCommandBuilder,
 } from 'discord.js';
-import safeReply, { replyOrEdit } from '../../lib/discord/response.js';
+import handleInteraction, { replyOrEdit } from '../../lib/discord/response.js';
 import type { Command } from '../../types/index.js';
 
 const command: Command = {
@@ -11,7 +11,7 @@ const command: Command = {
 		.setName('user')
 		.setDescription('Provides information about the user.'),
 	async execute(interaction: CommandInteraction): Promise<void> {
-		await safeReply(interaction, async () => {
+		await handleInteraction(interaction, async () => {
 			const member = interaction.member as GuildMember | null;
 			if (!member) {
 				await replyOrEdit(

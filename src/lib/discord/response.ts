@@ -2,9 +2,9 @@ import type { CommandInteraction, RepliableInteraction } from 'discord.js';
 import { MessageFlags } from 'discord.js';
 
 /**
- * Options for safeReply function
+ * Options for handleInteraction function
  */
-interface SafeReplyOptions {
+interface InteractionHandlerOptions {
 	deferReply?: boolean;
 	ephemeral?: boolean;
 }
@@ -20,9 +20,9 @@ function getErrorCode(error: Error): string | number | undefined {
 }
 
 /**
- * Safely handles Discord interactions with built-in error handling for expired interactions
+ * Handles Discord interactions with built-in error handling for expired interactions
  *
- * This is a fully typed version of your safeReply helper.
+ * Wraps interaction handlers with deferReply support, timeout protection, and error handling.
  * It demonstrates proper TypeScript patterns for your codebase.
  *
  * @param interaction The Discord interaction to handle
@@ -32,7 +32,7 @@ function getErrorCode(error: Error): string | number | undefined {
  *
  * @example
  * ```typescript
- * await safeReply(
+ * await handleInteraction(
  *   interaction,
  *   async () => {
  *     await interaction.reply('Pong!');
@@ -41,10 +41,10 @@ function getErrorCode(error: Error): string | number | undefined {
  * );
  * ```
  */
-async function safeReply(
+async function handleInteraction(
 	interaction: RepliableInteraction | CommandInteraction,
 	handler: () => Promise<void>,
-	options: SafeReplyOptions = {},
+	options: InteractionHandlerOptions = {},
 ): Promise<boolean> {
 	const { deferReply = false, ephemeral = false } = options;
 
@@ -116,7 +116,7 @@ async function safeReply(
 		}
 	} catch (error) {
 		console.log(
-			`❌ Unexpected error in safeReply for interaction ${interaction.id}`,
+			`❌ Unexpected error in handleInteraction for interaction ${interaction.id}`,
 		);
 		return false;
 	}
@@ -137,4 +137,4 @@ export function replyOrEdit(
 		: interaction.reply(content);
 }
 
-export default safeReply;
+export default handleInteraction;

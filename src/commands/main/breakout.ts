@@ -10,7 +10,7 @@ import {
 	type VoiceChannel,
 } from 'discord.js';
 import isAdmin from '../../lib/discord/permissions.js';
-import safeReply, { replyOrEdit } from '../../lib/discord/response.js';
+import handleInteraction, { replyOrEdit } from '../../lib/discord/response.js';
 import { executeCreate } from '../../modules/breakout/operations/create.js';
 import { executeDistribute } from '../../modules/breakout/operations/distribute.js';
 import { executeEnd } from '../../modules/breakout/operations/end.js';
@@ -298,7 +298,7 @@ async function handleDistributeCommand(
 		return;
 	}
 
-	await safeReply(
+	await handleInteraction(
 		interaction,
 		async () => {
 			// Filter out facilitators before distribution

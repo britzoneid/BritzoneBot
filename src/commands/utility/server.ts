@@ -1,5 +1,5 @@
 import { type CommandInteraction, SlashCommandBuilder } from 'discord.js';
-import safeReply, { replyOrEdit } from '../../lib/discord/response.js';
+import handleInteraction, { replyOrEdit } from '../../lib/discord/response.js';
 import type { Command } from '../../types/index.js';
 
 const command: Command = {
@@ -7,7 +7,7 @@ const command: Command = {
 		.setName('server')
 		.setDescription('Provides information about the server.'),
 	async execute(interaction: CommandInteraction): Promise<void> {
-		await safeReply(interaction, async () => {
+		await handleInteraction(interaction, async () => {
 			if (!interaction.guild) {
 				await replyOrEdit(
 					interaction,
