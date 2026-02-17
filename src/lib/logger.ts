@@ -50,6 +50,7 @@ export const logger = pino({
 		targets: [
 			{
 				target: 'pino-pretty',
+				level: process.env.LOG_LEVEL || 'info',
 				options: {
 					colorize: true,
 					translateTime: 'yyyy-mm-dd HH:MM:ss',
@@ -59,6 +60,7 @@ export const logger = pino({
 			},
 			{
 				target: 'pino-roll',
+				level: process.env.LOG_LEVEL || 'info',
 				options: {
 					file: './log/app.log',
 					frequency: 'daily',
