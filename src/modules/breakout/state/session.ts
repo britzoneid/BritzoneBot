@@ -70,10 +70,3 @@ export function clearSession(guildId: string): void {
 	sessions.delete(guildId);
 	console.log(`🧹 Cleared breakout session for guild ${guildId}`);
 }
-
-/**
- * Clears all sessions (useful for testing)
- */
-function clearAllSessions(): void {
-	sessions.clear();
-}

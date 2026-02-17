@@ -222,20 +222,6 @@ export async function getCurrentOperation(
 }
 
 /**
- * Clear the current operation without marking as completed
- * Used when resuming an operation to prevent infinite recursion
- */
-async function clearCurrentOperation(guildId: string): Promise<void> {
-	await initialize();
-	const guildState = inMemoryState[guildId] as GuildState | undefined;
-
-	if (guildState?.currentOperation) {
-		delete guildState.currentOperation;
-		await saveState();
-	}
-}
-
-/**
  * Get completed steps for the current operation
  */
 export async function getCompletedSteps(
@@ -246,16 +232,6 @@ export async function getCompletedSteps(
 
 	if (!guildState?.currentOperation) return {};
 	return guildState.currentOperation.progress.steps;
-}
-
-/**
- * Clear state for a guild
- */
-async function clearGuildState(guildId: string): Promise<void> {
-	await initialize();
-	delete inMemoryState[guildId];
-	await saveState();
-	console.log(`🧹 Cleared state data for guild ${guildId}`);
 }
 
 /**
