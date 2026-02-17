@@ -1,0 +1,11 @@
+{
+	"$schema": "https://unpkg.com/knip@5/schema.json",
+	"tags": ["-lintignore"],
+	"entry": [
+		"src/index.ts",
+		"src/deployCommandsLocal.ts",
+		"src/commands/**/*.ts",
+		"src/events/**/*.ts"
+	],
+	"project": ["src/**/*.ts"]
+}
