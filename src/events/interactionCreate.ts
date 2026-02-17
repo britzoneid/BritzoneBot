@@ -1,5 +1,6 @@
 import type { Interaction } from 'discord.js';
 import { Events } from 'discord.js';
+import { replyOrEdit } from '../lib/discord/response.js';
 import type { BritzoneClient, Event } from '../types/index.js';
 
 /**
@@ -64,18 +65,7 @@ const event: Event<typeof Events.InteractionCreate> = {
 			};
 
 			try {
-				if (interaction.replied) {
-					// Already replied, send a followup
-					await interaction.followUp(errorReply);
-				} else if (interaction.deferred) {
-					// Already deferred, edit the reply
-					await interaction.editReply({
-						content: errorReply.content,
-					});
-				} else {
-					// No interaction yet, send a new reply
-					await interaction.reply(errorReply);
-				}
+				await replyOrEdit(interaction, errorReply);
 			} catch (replyError) {
 				console.error('Failed to send error message:', replyError);
 			}
