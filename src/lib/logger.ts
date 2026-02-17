@@ -47,13 +47,28 @@ export const logger = pino({
 	// and pipe to pino-pretty externally, but the built-in transport uses a worker thread
 	// so it doesn't block the main event loop.
 	transport: {
-		target: 'pino-pretty',
-		options: {
-			colorize: true,
-			translateTime: 'yyyy-mm-dd HH:MM:ss',
-			ignore: 'pid,hostname', // Remove pid/hostname for cleaner console output
-			messageFormat: '{msg}', // Just show the message, let metadata be shown as object fields
-		},
+		targets: [
+			{
+				target: 'pino-pretty',
+				options: {
+					colorize: true,
+					translateTime: 'yyyy-mm-dd HH:MM:ss',
+					ignore: 'pid,hostname', // Remove pid/hostname for cleaner console output
+					messageFormat: '{msg}', // Just show the message, let metadata be shown as object fields
+				},
+			},
+			{
+				target: 'pino-roll',
+				options: {
+					file: './log/app.log',
+					frequency: 'daily',
+					mkdir: true,
+					limit: {
+						count: 7,
+					},
+				},
+			},
+		],
 	},
 });
 
