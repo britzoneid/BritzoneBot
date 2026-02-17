@@ -62,6 +62,7 @@ export const logger = pino({
 				options: {
 					file: './log/app.log',
 					frequency: 'daily',
+					dateFormat: 'yyyy-MM-dd',
 					mkdir: true,
 					limit: {
 						count: 7,
