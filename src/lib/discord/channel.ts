@@ -1,4 +1,12 @@
-import { ChannelType, type Guild, type CategoryChannel, type VoiceChannel, type StageChannel, type Collection, type GuildMember } from 'discord.js';
+import {
+	type CategoryChannel,
+	ChannelType,
+	type Collection,
+	type Guild,
+	type GuildMember,
+	type StageChannel,
+	type VoiceChannel,
+} from 'discord.js';
 
 /**
  * Creates a new voice channel
@@ -7,33 +15,35 @@ import { ChannelType, type Guild, type CategoryChannel, type VoiceChannel, type 
  * @returns The created channel
  */
 export async function createChannel(
-  parent: Guild | CategoryChannel,
-  name: string,
+	parent: Guild | CategoryChannel,
+	name: string,
 ): Promise<VoiceChannel> {
-  try {
-    console.log(`📂 Creating voice channel: ${name}`);
+	try {
+		console.log(`📂 Creating voice channel: ${name}`);
 
-    // If parent is a category, use its children.create method
-    if ('children' in parent) {
-      const channel = await parent.children.create({
-        name,
-        type: ChannelType.GuildVoice,
-      });
-      console.log(`✅ Created channel in category ${parent.name}: ${channel.name}`);
-      return channel as VoiceChannel;
-    }
+		// If parent is a category, use its children.create method
+		if ('children' in parent) {
+			const channel = await parent.children.create({
+				name,
+				type: ChannelType.GuildVoice,
+			});
+			console.log(
+				`✅ Created channel in category ${parent.name}: ${channel.name}`,
+			);
+			return channel as VoiceChannel;
+		}
 
-    // Otherwise, create in guild
-    const channel = await parent.channels.create({
-      name,
-      type: ChannelType.GuildVoice,
-    });
-    console.log(`✅ Created channel in guild: ${channel.name}`);
-    return channel as VoiceChannel;
-  } catch (error) {
-    console.error(`❌ Failed to create channel ${name}:`, error);
-    throw error;
-  }
+		// Otherwise, create in guild
+		const channel = await parent.channels.create({
+			name,
+			type: ChannelType.GuildVoice,
+		});
+		console.log(`✅ Created channel in guild: ${channel.name}`);
+		return channel as VoiceChannel;
+	} catch (error) {
+		console.error(`❌ Failed to create channel ${name}:`, error);
+		throw error;
+	}
 }
 
 /**
@@ -41,15 +51,18 @@ export async function createChannel(
  * @param channel The channel to delete
  * @param reason Reason for deletion
  */
-export async function deleteChannel(channel: VoiceChannel, reason: string = 'Channel cleanup'): Promise<void> {
-  try {
-    console.log(`🗑️ Attempting to delete channel: ${channel.name}`);
-    await channel.delete(reason);
-    console.log(`✅ Successfully deleted channel: ${channel.name}`);
-  } catch (error) {
-    console.error(`❌ Failed to delete channel ${channel.name}:`, error);
-    throw error;
-  }
+export async function deleteChannel(
+	channel: VoiceChannel,
+	reason: string = 'Channel cleanup',
+): Promise<void> {
+	try {
+		console.log(`🗑️ Attempting to delete channel: ${channel.name}`);
+		await channel.delete(reason);
+		console.log(`✅ Successfully deleted channel: ${channel.name}`);
+	} catch (error) {
+		console.error(`❌ Failed to delete channel ${channel.name}:`, error);
+		throw error;
+	}
 }
 
 /**
@@ -57,9 +70,11 @@ export async function deleteChannel(channel: VoiceChannel, reason: string = 'Cha
  * @param voiceChannel The voice channel
  * @returns Collection of members in the voice channel
  */
-export function getUsers(voiceChannel: VoiceChannel | StageChannel): Collection<string, GuildMember> {
-  console.log(`👥 Getting users from voice channel: ${voiceChannel.name}`);
-  const users = voiceChannel.members;
-  console.log(`📊 Found ${users.size} users in ${voiceChannel.name}`);
-  return users;
+export function getUsers(
+	voiceChannel: VoiceChannel | StageChannel,
+): Collection<string, GuildMember> {
+	console.log(`👥 Getting users from voice channel: ${voiceChannel.name}`);
+	const users = voiceChannel.members;
+	console.log(`📊 Found ${users.size} users in ${voiceChannel.name}`);
+	return users;
 }

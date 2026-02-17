@@ -1,11 +1,11 @@
-import type { RepliableInteraction, CommandInteraction } from 'discord.js';
+import type { CommandInteraction, RepliableInteraction } from 'discord.js';
 
 /**
  * Options for safeReply function
  */
 export interface SafeReplyOptions {
-  deferReply?: boolean;
-  ephemeral?: boolean;
+	deferReply?: boolean;
+	ephemeral?: boolean;
 }
 
 /**
@@ -14,8 +14,8 @@ export interface SafeReplyOptions {
  * @returns The error code if present, otherwise undefined
  */
 function getErrorCode(error: Error): string | number | undefined {
-  const errorObj = error as any; // Errors from different sources have code properties
-  return errorObj.code;
+	const errorObj = error as any; // Errors from different sources have code properties
+	return errorObj.code;
 }
 
 /**
@@ -41,65 +41,82 @@ function getErrorCode(error: Error): string | number | undefined {
  * ```
  */
 export async function safeReply(
-  interaction: RepliableInteraction | CommandInteraction,
-  handler: () => Promise<void>,
-  options: SafeReplyOptions = {},
+	interaction: RepliableInteraction | CommandInteraction,
+	handler: () => Promise<void>,
+	options: SafeReplyOptions = {},
 ): Promise<boolean> {
-  const { deferReply = false, ephemeral = false } = options;
+	const { deferReply = false, ephemeral = false } = options;
 
-  try {
-    // If deferReply is true, try to defer the reply first
-    if (deferReply && !interaction.replied && !interaction.deferred) {
-      try {
-        // Set a timeout to avoid getting stuck on network issues
-        const deferPromise = interaction.deferReply({ ephemeral });
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Defer reply timeout')), 2500),
-        );
+	try {
+		// If deferReply is true, try to defer the reply first
+		if (deferReply && !interaction.replied && !interaction.deferred) {
+			try {
+				// Set a timeout to avoid getting stuck on network issues
+				const deferPromise = interaction.deferReply({ ephemeral });
+				const timeoutPromise = new Promise<never>((_, reject) =>
+					setTimeout(() => reject(new Error('Defer reply timeout')), 2500),
+				);
 
-        await Promise.race([deferPromise, timeoutPromise]);
-        console.log(`🔄 Successfully deferred interaction ${interaction.id}`);
-      } catch (deferError) {
-        const error = deferError instanceof Error ? deferError : new Error(String(deferError));
-        const errorCode = getErrorCode(error);
+				await Promise.race([deferPromise, timeoutPromise]);
+				console.log(`🔄 Successfully deferred interaction ${interaction.id}`);
+			} catch (deferError) {
+				const error =
+					deferError instanceof Error
+						? deferError
+						: new Error(String(deferError));
+				const errorCode = getErrorCode(error);
 
-        // If we can't defer, the interaction likely expired
-        if (errorCode === 10062) {
-          console.log(`⏱️ Interaction ${interaction.id} expired before deferring`);
-          return false;
-        }
+				// If we can't defer, the interaction likely expired
+				if (errorCode === 10062) {
+					console.log(
+						`⏱️ Interaction ${interaction.id} expired before deferring`,
+					);
+					return false;
+				}
 
-        // Handle network errors gracefully
-        if (errorCode === 'EAI_AGAIN' || error.message === 'Defer reply timeout') {
-          console.log(
-            `🌐 Network issue while deferring interaction ${interaction.id}: ${error.message}`,
-          );
-          return false;
-        }
+				// Handle network errors gracefully
+				if (
+					errorCode === 'EAI_AGAIN' ||
+					error.message === 'Defer reply timeout'
+				) {
+					console.log(
+						`🌐 Network issue while deferring interaction ${interaction.id}: ${error.message}`,
+					);
+					return false;
+				}
 
-        console.log(`❓ Unknown error while deferring interaction: ${error.message}`);
-        return false;
-      }
-    }
+				console.log(
+					`❓ Unknown error while deferring interaction: ${error.message}`,
+				);
+				return false;
+			}
+		}
 
-    // Execute the handler function with timeout protection
-    try {
-      const handlerPromise = handler();
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Handler execution timeout')), 8000),
-      );
+		// Execute the handler function with timeout protection
+		try {
+			const handlerPromise = handler();
+			const timeoutPromise = new Promise<never>((_, reject) =>
+				setTimeout(() => reject(new Error('Handler execution timeout')), 8000),
+			);
 
-      await Promise.race([handlerPromise, timeoutPromise]);
-      return true;
-    } catch (handlerError) {
-      const error = handlerError instanceof Error ? handlerError : new Error(String(handlerError));
-      console.log(`❌ Handler error for interaction ${interaction.id}: ${error.message}`);
-      return false;
-    }
-  } catch (error) {
-    console.log(`❌ Unexpected error in safeReply for interaction ${interaction.id}`);
-    return false;
-  }
+			await Promise.race([handlerPromise, timeoutPromise]);
+			return true;
+		} catch (handlerError) {
+			const error =
+				handlerError instanceof Error
+					? handlerError
+					: new Error(String(handlerError));
+			console.log(
+				`❌ Handler error for interaction ${interaction.id}: ${error.message}`,
+			);
+			return false;
+		}
+	} catch (error) {
+		console.log(
+			`❌ Unexpected error in safeReply for interaction ${interaction.id}`,
+		);
+		return false;
+	}
 }
 
 /**
@@ -109,12 +126,12 @@ export async function safeReply(
  * @returns Promise resolving to the message or interaction response
  */
 export function replyOrEdit(
-  interaction: RepliableInteraction | CommandInteraction,
-  content: string | any,
+	interaction: RepliableInteraction | CommandInteraction,
+	content: string | any,
 ): Promise<any> {
-  return interaction.replied || interaction.deferred
-    ? interaction.editReply(content)
-    : interaction.reply(content);
+	return interaction.replied || interaction.deferred
+		? interaction.editReply(content)
+		: interaction.reply(content);
 }
 
 export default safeReply;

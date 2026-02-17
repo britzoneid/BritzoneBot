@@ -1,4 +1,4 @@
-import type { Collection, Client } from 'discord.js';
+import type { Client, Collection } from 'discord.js';
 import type { Command } from './command.js';
 
 /**
@@ -6,13 +6,13 @@ import type { Command } from './command.js';
  * Extend NodeJS.ProcessEnv to add custom variables
  */
 declare global {
-  namespace NodeJS {
-    interface ProcessEnv {
-      TOKEN: string;
-      NODE_ENV?: 'development' | 'production';
-      LOG_LEVEL?: 'debug' | 'info' | 'warn' | 'error';
-    }
-  }
+	namespace NodeJS {
+		interface ProcessEnv {
+			TOKEN: string;
+			NODE_ENV?: 'development' | 'production';
+			LOG_LEVEL?: 'debug' | 'info' | 'warn' | 'error';
+		}
+	}
 }
 
 /**
@@ -20,5 +20,5 @@ declare global {
  * This is the type you'll use throughout your bot (cast as BritzoneClient)
  */
 export interface BritzoneClient extends Client {
-  commands: Collection<string, Command>;
+	commands: Collection<string, Command>;
 }

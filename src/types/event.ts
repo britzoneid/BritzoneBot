@@ -10,9 +10,9 @@ export type EventName = keyof ClientEvents;
  * Auto-types the execute arguments based on the event name
  */
 export interface Event<T extends EventName = EventName> {
-  name: T;
-  once?: boolean;
-  execute(...args: ClientEvents[T]): Awaitable<void>;
+	name: T;
+	once?: boolean;
+	execute(...args: ClientEvents[T]): Awaitable<void>;
 }
 
 /**

@@ -1,25 +1,25 @@
 {
-  "type": "module",
-  "name": "britzone-bot",
-  "version": "2.0.0",
-  "description": "Discord bot designed to manage breakout rooms for voice channels",
-  "main": "dist/index.js",
-  "scripts": {
-    "build": "tsc",
-    "start": "bun dist/index.js",
-    "deploy": "bun dist/deployCommandsLocal.js",
-    "dev": "bun --watch src/index.ts",
-    "type-check": "tsc --noEmit"
-  },
-  "dependencies": {
-    "console-stamp": "^3.1.2",
-    "discord.js": "^14.25.1",
-    "dotenv": "^16.6.1"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "2.4.2",
-    "@types/node": "^22.0.0",
-    "lefthook": "^2.1.1",
-    "typescript": "^5.9.0"
-  }
+	"type": "module",
+	"name": "britzone-bot",
+	"version": "2.0.0",
+	"description": "Discord bot designed to manage breakout rooms for voice channels",
+	"main": "dist/index.js",
+	"scripts": {
+		"build": "tsc",
+		"start": "bun dist/index.js",
+		"deploy": "bun dist/deployCommandsLocal.js",
+		"dev": "bun --watch src/index.ts",
+		"type-check": "tsc --noEmit"
+	},
+	"dependencies": {
+		"console-stamp": "^3.1.2",
+		"discord.js": "^14.25.1",
+		"dotenv": "^16.6.1"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.4.2",
+		"@types/node": "^22.0.0",
+		"lefthook": "^2.1.1",
+		"typescript": "^5.9.0"
+	}
 }
