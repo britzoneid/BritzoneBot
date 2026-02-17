@@ -12,7 +12,7 @@ import {
 import isAdmin from '../../lib/discord/permissions.js';
 import { replyOrEdit } from '../../lib/discord/response.js';
 import { executeCreate } from '../../modules/breakout/operations/create.js';
-import distributeOperation from '../../modules/breakout/operations/DistributeOperation.js';
+import { executeDistribute } from '../../modules/breakout/operations/distribute.js';
 import endOperation from '../../modules/breakout/operations/EndOperation.js';
 import {
 	broadcastToBreakoutRooms,
@@ -314,7 +314,7 @@ async function handleDistributeCommand(
 	// But we still need to pass something matching the type.
 	const distribution = distributeUsers(usersToDistribute, breakoutRooms);
 
-	const result = await distributeOperation.execute(
+	const result = await executeDistribute(
 		interaction,
 		mainRoom,
 		distribution,
