@@ -10,7 +10,14 @@ declare global {
 		interface ProcessEnv {
 			TOKEN: string;
 			NODE_ENV?: 'development' | 'production';
-			LOG_LEVEL?: 'debug' | 'info' | 'warn' | 'error';
+			LOG_LEVEL?:
+				| 'trace'
+				| 'debug'
+				| 'info'
+				| 'warn'
+				| 'error'
+				| 'fatal'
+				| 'silent';
 		}
 	}
 }

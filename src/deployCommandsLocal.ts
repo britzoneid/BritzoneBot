@@ -6,6 +6,7 @@ import {
 	type RESTPostAPIChatInputApplicationCommandsJSONBody,
 	Routes,
 } from 'discord.js';
+import pino from 'pino';
 import { logger } from './lib/logger.js';
 import type { Command } from './types/index.js';
 
@@ -28,7 +29,8 @@ interface GuildList {
 const guildListPath = path.join(__dirname, '..', 'guildList.json');
 
 if (!fs.existsSync(guildListPath)) {
-	logger.error(
+	const finalLogger = (pino as any).final(logger);
+	finalLogger.fatal(
 		'Error: guildList.json not found. Please copy guildList.json.example to guildList.json and configure your guild IDs.',
 	);
 	process.exit(1);
@@ -65,7 +67,7 @@ for (const folder of commandFolders) {
 		} else {
 			logger.warn(
 				{ filePath },
-				`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`,
+				`[WARNING] Command is missing required "data" or "execute" property.`,
 			);
 		}
 	}

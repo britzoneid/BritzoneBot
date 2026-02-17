@@ -404,7 +404,6 @@ async function handleDistributeCommand(
 					value: usersInRoom,
 					inline: true,
 				});
-				// log.debug({ room: room.name }, `📊 Added room stats`); // Too verbose
 			});
 
 			// Add error field if any
@@ -546,10 +545,9 @@ async function handleBroadcastCommand(
 	const log = logger.child({
 		subcommand: 'broadcast',
 		guildId: interaction.guildId,
-		message,
 	});
 
-	log.info(`📢 Broadcasting message`);
+	log.info({ message }, `📢 Broadcasting message`);
 
 	// Defer reply to prevent timeout on async broadcast
 	await interaction.deferReply();

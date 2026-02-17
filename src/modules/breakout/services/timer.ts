@@ -4,6 +4,7 @@ import {
 	type Client,
 	type GuildBasedChannel,
 } from 'discord.js';
+import type { Logger } from 'pino';
 import { logger } from '../../../lib/logger.js';
 import {
 	clearTimerData,
@@ -24,15 +25,16 @@ export async function monitorBreakoutTimer(
 ): Promise<void> {
 	const { totalMinutes, startTime, guildId, breakoutRooms } = timerData;
 	const endTime = startTime + totalMinutes * 60 * 1000;
+	const log = logger.child({ guildId });
 
-	logger.info({ totalMinutes, guildId }, `⏱️ Started breakout timer monitoring`);
+	log.info({ totalMinutes }, `⏱️ Started breakout timer monitoring`);
 
 	// Use recursive setTimeout to prevent overlapping async executions
 	async function monitorTick(): Promise<void> {
 		try {
 			const timerState = await getTimerData(guildId);
 			if (!timerState) {
-				logger.debug({ guildId }, `⏱️ Timer was cancelled or removed`);
+				log.debug(`⏱️ Timer was cancelled or removed`);
 				return; // Stop monitoring
 			}
 
@@ -40,11 +42,12 @@ export async function monitorBreakoutTimer(
 			const minutesLeft = Math.ceil((endTime - now) / (60 * 1000));
 
 			if (minutesLeft <= 5 && !timerState.fiveMinSent) {
-				logger.info(
+				log.info(
 					{ roomCount: breakoutRooms.length },
 					`⏱️ Sending 5-minute warning`,
 				);
 				await sendReminderWithRetry(
+					log,
 					guildId,
 					breakoutRooms,
 					'⏱️ **5 minutes remaining** in this breakout session.',
@@ -56,8 +59,9 @@ export async function monitorBreakoutTimer(
 			}
 
 			if (now >= endTime) {
-				logger.info({ guildId }, `⏱️ Breakout timer ended`);
+				log.info(`⏱️ Breakout timer ended`);
 				await sendReminderWithRetry(
+					log,
 					guildId,
 					breakoutRooms,
 					"⏰ **Time's up!** This breakout session has ended.",
@@ -71,7 +75,7 @@ export async function monitorBreakoutTimer(
 			// Schedule next check after all async work completes
 			setTimeout(() => monitorTick(), 20000);
 		} catch (error) {
-			logger.error({ err: error }, `❌ Error in timer monitoring`);
+			log.error({ err: error }, `❌ Error in timer monitoring`);
 			// Continue monitoring despite errors
 			setTimeout(() => monitorTick(), 20000);
 		}
@@ -90,6 +94,7 @@ export async function monitorBreakoutTimer(
  * @param client The Discord.js client instance
  */
 async function sendReminderWithRetry(
+	log: Logger,
 	guildId: string,
 	roomIds: string[],
 	message: string,
@@ -102,12 +107,11 @@ async function sendReminderWithRetry(
 	}
 
 	const maxRetries = 5;
-	const retryDelay = 5000;
 
 	for (const roomId of roomIds) {
 		const voiceChannel = guild.channels.cache.get(roomId);
 		if (!voiceChannel) {
-			logger.warn({ roomId }, `⚠️ Could not find voice channel`);
+			log.warn({ roomId }, `⚠️ Could not find voice channel`);
 			continue;
 		}
 
@@ -122,7 +126,7 @@ async function sendReminderWithRetry(
 		);
 
 		if (!textChannel) {
-			logger.warn(
+			log.warn(
 				{ voiceChannel: voiceChannel.name },
 				`⚠️ Could not find matching text channel`,
 			);
@@ -131,7 +135,7 @@ async function sendReminderWithRetry(
 
 		// Type guard: ensure it's a text channel before sending
 		if (!textChannel.isTextBased()) {
-			logger.warn({ channelId: textChannel.id }, `⚠️ Channel is not text-based`);
+			log.warn({ channelId: textChannel.id }, `⚠️ Channel is not text-based`);
 			continue;
 		}
 
@@ -142,10 +146,10 @@ async function sendReminderWithRetry(
 			try {
 				await textChannel.send(message);
 				success = true;
-				logger.info({ channel: textChannel.name }, `✅ Reminder sent`);
+				log.info({ channel: textChannel.name }, `✅ Reminder sent`);
 			} catch (error) {
 				attempts++;
-				logger.error(
+				log.error(
 					{
 						err: error,
 						attempt: attempts,
@@ -156,17 +160,16 @@ async function sendReminderWithRetry(
 				);
 
 				if (attempts < maxRetries) {
-					logger.debug(
-						{ delay: retryDelay / 1000 },
-						`🔄 Retrying reminder send`,
-					);
-					await new Promise((resolve) => setTimeout(resolve, retryDelay));
+					// Exponential backoff
+					const delay = Math.min(1000 * 2 ** attempts, 10000);
+					log.debug({ delay: delay / 1000 }, `🔄 Retrying reminder send`);
+					await new Promise((resolve) => setTimeout(resolve, delay));
 				}
 			}
 		}
 
 		if (!success) {
-			logger.error(
+			log.error(
 				{ channel: textChannel.name, maxRetries },
 				`❌ Failed to send reminder after max attempts`,
 			);

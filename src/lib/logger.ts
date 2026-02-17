@@ -40,7 +40,15 @@ export const logger = pino({
 	},
 	serializers,
 	redact: {
-		paths: ['token', 'password', 'secret', 'key', '*.token', '*.password'],
+		paths: [
+			'token',
+			'password',
+			'secret',
+			'*.token',
+			'*.password',
+			'apiKey',
+			'*.apiKey',
+		],
 		remove: true,
 	},
 	// Use pino-pretty transport. In high-load production, you might want to log JSON directly
@@ -74,8 +82,3 @@ export const logger = pino({
 		],
 	},
 });
-
-// Create a child logger for a specific context
-export const createChildLogger = (bindings: pino.Bindings) => {
-	return logger.child(bindings);
-};

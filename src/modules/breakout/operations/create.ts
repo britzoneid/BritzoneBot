@@ -152,8 +152,8 @@ export async function executeCreate(
 			}!`,
 		};
 	} catch (error) {
-		// Log using the main logger if log isn't available or just to be safe
-		logger.error({ err: error, guildId }, `❌ Error in CreateOperation`);
+		// Log using the scoped logger to preserve context
+		log.error({ err: error }, `❌ Error in CreateOperation`);
 		return {
 			success: false,
 			message:

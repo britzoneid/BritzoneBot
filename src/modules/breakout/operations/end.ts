@@ -268,7 +268,7 @@ export async function executeEnd(
 			message: `Successfully moved ${totalMoved} member(s) back to ${mainChannel.name} and deleted ${deletedRooms}/${totalRooms} breakout room(s)!`,
 		};
 	} catch (error) {
-		logger.error({ err: error, guildId }, `❌ Error in EndOperation`);
+		log.error({ err: error }, `❌ Error in EndOperation`);
 		return {
 			success: false,
 			message:

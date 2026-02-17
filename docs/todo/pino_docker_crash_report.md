@@ -33,7 +33,7 @@ The issue likely stems from an incompatibility between **Bun's implementation of
 2.  **Absolute Paths:** Switched from `./log` to `/app/log`.
 3.  **Disable `read_only`:** Temporarily disabled `read_only: true` in `docker-compose.yml`.
 4.  **Remove `mkdir: true`:** Tried disabling the directory creation logic in transports.
-5.  **Switch Transport:** Switched from `pino-roll` (3rd party) to `pino/file` (built-in). Both failed identicaly.
+5.  **Switch Transport:** Switched from `pino-roll` (3rd party) to `pino/file` (built-in). Both failed identically.
 
 ## Recommended Next Steps (For Future Fix)
 
@@ -41,7 +41,7 @@ To resolve this without giving up on file logging:
 
 1.  **Move to Main Thread:** Stop using `transport: { targets: [...] }` which forces worker threads. Instead, use `pino.multistream()` to run `pino-pretty` and a file stream on the **main thread**. This avoids the worker thread instability entirely.
 2.  **Use Docker Standard Logging:** Abandon app-level file writing in Docker. Log only to stdout (`pino-pretty` or just JSON), and let Docker/AWS/CloudWatch handle log collection and rotation. This is the container-native best practice.
-3.  **Upgrade/Change Base Image:** Test with a `debian` or `ubuntu` based Bun image instead of `alpine` to see if it's a musl/libc compatibility issue with Bun workers.
+3.  **Upgrade/Change Base Image:** Test with a `debian` or `ubuntu-based` Bun image instead of `alpine` to see if it's a musl/libc compatibility issue with Bun workers.
 
 ## Conclusion for this PR
 

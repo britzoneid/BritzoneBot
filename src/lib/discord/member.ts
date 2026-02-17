@@ -11,20 +11,20 @@ export async function moveUser(
 	member: GuildMember,
 	channel: VoiceChannel | StageChannel,
 ): Promise<GuildMember> {
+	// Check if member is currently in a voice channel
+	if (!member.voice.channel) {
+		logger.warn(
+			{ user: member.user },
+			`❌ Failed move: member is not in a voice channel`,
+		);
+		throw new Error(`${member.user.tag} is not in a voice channel.`);
+	}
+
 	try {
 		logger.debug(
 			{ user: member.user, channel: channel.name },
 			`🚚 Attempting to move user`,
 		);
-
-		// Check if member is currently in a voice channel
-		if (!member.voice.channel) {
-			logger.warn(
-				{ user: member.user },
-				`❌ Failed move: member is not in a voice channel`,
-			);
-			throw new Error(`${member.user.tag} is not in a voice channel.`);
-		}
 
 		const movedMember = await member.voice.setChannel(channel);
 		logger.info(

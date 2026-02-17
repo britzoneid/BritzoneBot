@@ -65,21 +65,15 @@ for (const folder of commandFolders) {
 			// Type guard: ensure command has required properties
 			if ('data' in command && 'execute' in command) {
 				client.commands.set(command.data.name, command);
-				logger.info(
-					{ command: command.data.name },
-					`✅ Command loaded: ${command.data.name}`,
-				);
+				logger.info({ command: command.data.name }, `✅ Command loaded`);
 			} else {
 				logger.warn(
 					{ filePath },
-					`⚠️ [WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`,
+					`⚠️ [WARNING] Command is missing required "data" or "execute" property.`,
 				);
 			}
 		} catch (error) {
-			logger.error(
-				{ err: error, filePath },
-				`❌ Error loading command from ${filePath}`,
-			);
+			logger.error({ err: error, filePath }, `❌ Error loading command`);
 		}
 	}
 }
@@ -142,9 +136,12 @@ client
 // ============================================================================
 
 // Handle unhandled promise rejections
-process.on('unhandledRejection', (error: Error) => {
-	logger.error({ err: error }, '❌ Unhandled Promise Rejection:');
-});
+process.on(
+	'unhandledRejection',
+	(reason: unknown, _promise: Promise<unknown>) => {
+		logger.error({ err: reason }, '❌ Unhandled Promise Rejection:');
+	},
+);
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error: Error) => {

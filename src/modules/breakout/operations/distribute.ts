@@ -239,7 +239,7 @@ export async function executeDistribute(
 			message: 'Distribution completed successfully',
 		};
 	} catch (error) {
-		logger.error({ err: error, guildId }, `❌ Error in DistributeOperation`);
+		log.error({ err: error }, `❌ Error in DistributeOperation`);
 		return {
 			success: false,
 			message:
