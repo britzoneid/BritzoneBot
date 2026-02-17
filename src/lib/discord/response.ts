@@ -1,4 +1,5 @@
 import type { CommandInteraction, RepliableInteraction } from 'discord.js';
+import { MessageFlags } from 'discord.js';
 
 /**
  * Options for safeReply function
@@ -52,7 +53,9 @@ async function safeReply(
 		if (deferReply && !interaction.replied && !interaction.deferred) {
 			try {
 				// Set a timeout to avoid getting stuck on network issues
-				const deferPromise = interaction.deferReply({ ephemeral });
+				const deferPromise = interaction.deferReply(
+					ephemeral ? { flags: MessageFlags.Ephemeral } : undefined,
+				);
 				const timeoutPromise = new Promise<never>((_, reject) =>
 					setTimeout(() => reject(new Error('Defer reply timeout')), 2500),
 				);
