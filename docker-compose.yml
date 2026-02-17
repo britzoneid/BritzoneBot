@@ -41,9 +41,8 @@ services:
         max-file: "3"
     
     # Read-only root filesystem for extra security
-    # (except for /app/data which is mounted as writable)
-    # Temporarily disabled - causing network connectivity issues
-    # read_only: true
+    # Writable areas: /app/data (volume mount) and /tmp (tmpfs)
+    read_only: true
     
     # Temporary filesystem mounts for writable areas
     tmpfs:
