@@ -49,12 +49,12 @@ export async function hasExistingBreakoutRooms(
 	const patternRooms = Array.from(
 		guild.channels.cache
 			.filter(
-				(channel) =>
+				(channel): channel is VoiceChannel =>
 					channel.type === ChannelType.GuildVoice &&
 					channel.name.startsWith('breakout-room-'),
 			)
 			.values(),
-	) as VoiceChannel[];
+	);
 
 	if (patternRooms.length > 0) {
 		return {

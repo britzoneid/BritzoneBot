@@ -53,7 +53,8 @@ export async function broadcastToBreakoutRooms(
 				results.failed.push(room.name);
 			}
 		} catch (error) {
-			console.error(`❌ Failed to send message to ${room.name}:`, error);
+			const errorMsg = error instanceof Error ? error.message : String(error);
+			console.error(`❌ Failed to send message to ${room.name}:`, errorMsg);
 			results.failed.push(room.name);
 		}
 	}
@@ -96,11 +97,12 @@ export async function sendMessageToChannel(
 				message: `Channel ${channel.name} does not support sending messages`,
 			};
 		}
-	} catch (error: any) {
-		console.error(`❌ Failed to send message to ${channel.name}:`, error);
+	} catch (error: unknown) {
+		const errorMsg = error instanceof Error ? error.message : String(error);
+		console.error(`❌ Failed to send message to ${channel.name}:`, errorMsg);
 		return {
 			success: false,
-			message: `Failed to send message to ${channel.name}: ${error.message}`,
+			message: `Failed to send message to ${channel.name}: ${errorMsg}`,
 		};
 	}
 }

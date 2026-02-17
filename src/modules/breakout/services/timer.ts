@@ -24,20 +24,17 @@ export async function monitorBreakoutTimer(
 	const { totalMinutes, startTime, guildId, breakoutRooms } = timerData;
 	const endTime = startTime + totalMinutes * 60 * 1000;
 
-	// Initial check
-	let timerState = await getTimerData(guildId);
-
 	console.log(
 		`⏱️ Started breakout timer monitoring for ${totalMinutes} minutes in guild ${guildId}`,
 	);
 
-	const intervalId = setInterval(async () => {
+	// Use recursive setTimeout to prevent overlapping async executions
+	async function monitorTick(): Promise<void> {
 		try {
-			timerState = await getTimerData(guildId);
+			const timerState = await getTimerData(guildId);
 			if (!timerState) {
 				console.log(`⏱️ Timer for guild ${guildId} was cancelled or removed`);
-				clearInterval(intervalId);
-				return;
+				return; // Stop monitoring
 			}
 
 			const now = Date.now();
@@ -47,7 +44,6 @@ export async function monitorBreakoutTimer(
 				console.log(
 					`⏱️ Sending 5-minute warning to ${breakoutRooms.length} breakout rooms`,
 				);
-				// Call the helper function
 				await sendReminderWithRetry(
 					guildId,
 					breakoutRooms,
@@ -69,12 +65,20 @@ export async function monitorBreakoutTimer(
 				);
 
 				await clearTimerData(guildId);
-				clearInterval(intervalId);
+				return; // Stop monitoring
 			}
+
+			// Schedule next check after all async work completes
+			setTimeout(() => monitorTick(), 20000);
 		} catch (error) {
 			console.error(`❌ Error in timer monitoring:`, error);
+			// Continue monitoring despite errors
+			setTimeout(() => monitorTick(), 20000);
 		}
-	}, 20000);
+	}
+
+	// Start the monitoring loop
+	await monitorTick();
 }
 
 /**

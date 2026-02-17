@@ -353,20 +353,29 @@ async function handleDistributeCommand(
 
 	// Add fields for each breakout room
 	breakoutRooms.forEach((room) => {
-		// Note: distribution object here might not reflect actual moves if operation failed partially or we resumed.
-		// Ideally we should use result.moveResults to build the embed, or use the distribution plan.
-		// For now we use the planned distribution.
-		const usersInRoom =
-			distribution[room.id]?.map((u) => u.user.tag).join('\n') ||
-			'No users assigned';
+		// Use actual moveResults if available, otherwise fall back to planned distribution
+		let usersInRoom: string;
+
+		if (result.moveResults && result.moveResults.success) {
+			// Build actual user list from successful moves
+			const actualUsers = result.moveResults.success
+				.filter((entry: string) => entry.includes(`→ ${room.name}`))
+				.map((entry: string) => entry.split(' → ')[0]);
+			usersInRoom =
+				actualUsers.length > 0 ? actualUsers.join('\n') : 'No users assigned';
+		} else {
+			// Fallback to planned distribution
+			usersInRoom =
+				distribution[room.id]?.map((u) => u.user.tag).join('\n') ||
+				'No users assigned';
+		}
+
 		embed.addFields({
 			name: room.name,
 			value: usersInRoom,
 			inline: true,
 		});
-		console.log(
-			`📊 Added ${room.name} stats to embed: ${distribution[room.id]?.length || 0} users`,
-		);
+		console.log(`📊 Added ${room.name} stats to embed`);
 	});
 
 	// Add error field if any
@@ -469,7 +478,12 @@ async function handleTimerCommand(
 	// Store timer data in state manager
 	await setTimerData(interaction.guildId, timerData);
 	// Start the timer monitoring process
-	monitorBreakoutTimer(timerData, interaction);
+	monitorBreakoutTimer(timerData, interaction).catch((error) => {
+		console.error(
+			`❌ Timer monitoring failed for guild ${interaction.guildId}:`,
+			error,
+		);
+	});
 
 	await replyOrEdit(
 		interaction,
@@ -487,6 +501,9 @@ async function handleBroadcastCommand(
 
 	const message = interaction.options.getString('message', true);
 	console.log(`📢 Broadcasting message: "${message}"`);
+
+	// Defer reply to prevent timeout on async broadcast
+	await interaction.deferReply();
 
 	const result = await broadcastToBreakoutRooms(interaction.guildId, message);
 

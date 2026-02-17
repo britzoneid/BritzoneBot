@@ -1,5 +1,5 @@
-import fs from 'fs/promises';
-import path from 'path';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 
 /**
  * Single operation step data
@@ -82,11 +82,15 @@ async function loadState(): Promise<void> {
 		inMemoryState = JSON.parse(data);
 		console.log('📤 Loaded breakout state data');
 	} catch (error: any) {
-		if (error.code !== 'ENOENT') {
+		if (error.code === 'ENOENT') {
+			// File doesn't exist yet, create new state
+			inMemoryState = {};
+			console.log('🆕 Created new breakout state data');
+		} else {
+			// Other error (parse error, permission error, etc.)
 			console.error('❌ Error loading breakout state:', error);
+			throw error;
 		}
-		inMemoryState = {};
-		console.log('🆕 Created new breakout state data');
 	}
 }
 
@@ -181,12 +185,18 @@ export async function completeOperation(guildId: string): Promise<void> {
 	guildState.currentOperation.progress.completed = true;
 	guildState.currentOperation.progress.completedTime = Date.now();
 
-	// Move current operation to history
+	// Move current operation to history with capping to prevent unbounded growth
 	if (!guildState.history) {
 		guildState.history = [];
 	}
 
 	guildState.history.push(guildState.currentOperation);
+
+	// Cap history to last 50 entries to prevent memory/disk bloat
+	const HISTORY_MAX = 50;
+	if (guildState.history.length > HISTORY_MAX) {
+		guildState.history = guildState.history.slice(-HISTORY_MAX);
+	}
 
 	// Clear current operation
 	delete guildState.currentOperation;
@@ -243,6 +253,7 @@ export async function setTimerData(
 	guildId: string,
 	timerData: TimerData,
 ): Promise<void> {
+	await initialize();
 	console.log(`💾 Storing timer data for guild ${guildId}`);
 	inMemoryState[`timer_${guildId}`] = timerData;
 	await saveState();
@@ -264,6 +275,7 @@ export async function getTimerData(guildId: string): Promise<TimerData | null> {
  * @param guildId The guild ID
  */
 export async function clearTimerData(guildId: string): Promise<void> {
+	await initialize();
 	console.log(`🗑️ Clearing timer data for guild ${guildId}`);
 	delete inMemoryState[`timer_${guildId}`];
 	await saveState();

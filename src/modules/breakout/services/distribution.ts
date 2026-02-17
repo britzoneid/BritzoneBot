@@ -1,4 +1,4 @@
-import type { GuildMember, VoiceChannel } from 'discord.js';
+import type { GuildMember, StageChannel, VoiceChannel } from 'discord.js';
 import { moveUser } from '../../../lib/discord/member.js';
 import { getMainRoom, getRooms } from '../state/session.js';
 
@@ -21,7 +21,7 @@ export async function hasActiveDistribution(guildId: string): Promise<boolean> {
  */
 export async function moveUserToRoom(
 	user: GuildMember,
-	room: VoiceChannel,
+	room: VoiceChannel | StageChannel,
 ): Promise<void> {
 	await moveUser(user, room);
 }

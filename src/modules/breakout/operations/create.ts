@@ -72,35 +72,42 @@ export async function executeCreate(
 	try {
 		const createdChannels: VoiceChannel[] = [];
 
+		// Fetch completed steps once before the loop for efficiency
+		const steps = await getCompletedSteps(guildId);
+
 		// Create each breakout room with checkpointing
 		for (let i = 1; i <= numRooms; i++) {
 			const roomName = `breakout-room-${i}`;
 			const stepKey = `create_room_${i}`;
 
 			// Check if this step was already completed in a previous attempt
-			const steps = await getCompletedSteps(guildId);
 			if (steps[stepKey]) {
 				console.log(`⏭️ Room ${roomName} was already created, skipping`);
 
 				// Try to find the existing channel to add to our list
 				// We can use the ID stored in the step if available
 				const storedChannelId = steps[stepKey].channelId;
-				let existingChannel: any;
+				let existingChannel: VoiceChannel | undefined;
 
 				if (storedChannelId) {
-					existingChannel =
-						interaction.guild.channels.cache.get(storedChannelId);
+					const cached = interaction.guild.channels.cache.get(storedChannelId);
+					if (cached?.type === ChannelType.GuildVoice) {
+						existingChannel = cached as VoiceChannel;
+					}
 				}
 
 				if (!existingChannel) {
 					// Fallback to name search
-					existingChannel = interaction.guild.channels.cache.find(
+					const found = interaction.guild.channels.cache.find(
 						(c) => c.name === roomName && c.type === ChannelType.GuildVoice,
 					);
+					if (found && found.type === ChannelType.GuildVoice) {
+						existingChannel = found as VoiceChannel;
+					}
 				}
 
 				if (existingChannel) {
-					createdChannels.push(existingChannel as VoiceChannel);
+					createdChannels.push(existingChannel);
 					continue;
 				}
 			}

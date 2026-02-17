@@ -133,10 +133,17 @@ export async function executeEnd(
 			if (steps[roomProcessedKey]) {
 				console.log(`⏭️ Room ${room.name} was already processed, skipping`);
 				deletedRooms++;
+
+				// Account for previously moved members from this room
+				const processedData = steps[roomProcessedKey];
+				if (processedData && typeof processedData.movedCount === 'number') {
+					totalMoved += processedData.movedCount;
+				}
 				continue;
 			}
 
 			// Move members first
+			let roomMovedCount = 0;
 			try {
 				// Check if the room still exists in the guild
 				const guildRoom = interaction.guild.channels.cache.get(room.id) as
@@ -148,6 +155,7 @@ export async function executeEnd(
 					);
 					await updateProgress(guildId, roomProcessedKey, {
 						skipped: true,
+						movedCount: 0,
 					});
 					deletedRooms++; // Count as deleted since it doesn't exist anymore
 					continue;
@@ -163,16 +171,18 @@ export async function executeEnd(
 								`⏭️ Member ${member.user.tag} was already moved, skipping`,
 							);
 							totalMoved++;
+							roomMovedCount++;
 							continue;
 						}
 
 						try {
-							await moveUserToRoom(member, mainChannel as VoiceChannel);
+							await moveUserToRoom(member, mainChannel);
 							console.log(
 								`✅ Moved ${member.user.tag} from ${room.name} to ${mainChannel.name}`,
 							);
 							await updateProgress(guildId, memberMovedKey);
 							totalMoved++;
+							roomMovedCount++;
 						} catch (error) {
 							console.error(
 								`❌ Failed to move ${member.user.tag} from ${room.name}:`,
@@ -204,8 +214,10 @@ export async function executeEnd(
 					deletedRooms++;
 				}
 
-				// Mark this room as fully processed
-				await updateProgress(guildId, roomProcessedKey);
+				// Mark this room as fully processed with the moved count
+				await updateProgress(guildId, roomProcessedKey, {
+					movedCount: roomMovedCount,
+				});
 			} catch (error) {
 				console.error(`❌ Error processing room ${room.name}:`, error);
 				// Continue with other rooms even if one fails
