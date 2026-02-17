@@ -200,19 +200,10 @@ export async function executeDistribute(
 					continue;
 				}
 
-				log.debug(
-					{ user: user.user, room: room.name },
-					`🚚 Attempting to move user`,
-				);
-
 				movePromises.push(
 					moveUserToRoom(user, room)
 						.then(async () => {
 							moveResults.success.push(`${user.user.tag} → ${room.name}`);
-							log.debug(
-								{ user: user.user, room: room.name },
-								`✅ Successfully moved user`,
-							);
 							await updateProgress(guildId, moveKey);
 						})
 						.catch((error: any) => {
