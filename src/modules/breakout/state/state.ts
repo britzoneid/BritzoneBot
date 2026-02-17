@@ -104,7 +104,7 @@ async function saveState(): Promise<void> {
 		try {
 			await initialize();
 			await fs.writeFile(stateFile, JSON.stringify(inMemoryState, null, 2));
-			logger.debug('💾 Saved breakout state data');
+			logger.trace('💾 Saved breakout state data');
 		} catch (error) {
 			logger.error({ err: error }, '❌ Error saving breakout state');
 		}
