@@ -10,7 +10,7 @@ import {
 	type VoiceChannel,
 } from 'discord.js';
 import isAdmin from '../../lib/discord/permissions.js';
-import { replyOrEdit } from '../../lib/discord/response.js';
+import safeReply, { replyOrEdit } from '../../lib/discord/response.js';
 import { executeCreate } from '../../modules/breakout/operations/create.js';
 import { executeDistribute } from '../../modules/breakout/operations/distribute.js';
 import { executeEnd } from '../../modules/breakout/operations/end.js';
@@ -237,29 +237,20 @@ async function handleCreateCommand(
 		`🔢 Number of breakout rooms to create: ${numRooms} (force: ${force})`,
 	);
 
-	try {
-		// Defer the reply immediately to prevent interaction timeout
-		// This gives us up to 15 minutes to complete the operation
-		await interaction.deferReply({ ephemeral: true });
+	await safeReply(
+		interaction,
+		async () => {
+			const result = await executeCreate(interaction, numRooms, force);
 
-		const result = await executeCreate(interaction, numRooms, force);
-
-		if (result.success) {
-			await interaction.editReply(result.message);
-		} else {
-			console.error(`❌ Error creating breakout rooms:`, result);
-			await interaction.editReply(result.message);
-		}
-	} catch (error) {
-		console.error(`❌ Error in handleCreateCommand:`, error);
-		try {
-			await interaction.editReply(
-				'An unexpected error occurred while creating breakout rooms. Please try again later.',
-			);
-		} catch (replyError) {
-			console.error('❌ Failed to send final error message:', replyError);
-		}
-	}
+			if (result.success) {
+				await replyOrEdit(interaction, result.message);
+			} else {
+				console.error(`❌ Error creating breakout rooms:`, result);
+				await replyOrEdit(interaction, result.message);
+			}
+		},
+		{ deferReply: true, ephemeral: true },
+	);
 }
 
 /**
@@ -292,11 +283,10 @@ async function handleDistributeCommand(
 
 	if (breakoutRooms.length === 0) {
 		console.log(`❌ Error: No breakout rooms found`);
-		await interaction.reply({
-			content:
-				'No breakout rooms found! Please create breakout rooms first with `/breakout create`.',
-			ephemeral: true,
-		});
+		await replyOrEdit(
+			interaction,
+			'No breakout rooms found! Please create breakout rooms first with `/breakout create`.',
+		);
 		return;
 	}
 
@@ -304,112 +294,110 @@ async function handleDistributeCommand(
 
 	if (usersInMainRoom.size === 0) {
 		console.log(`⚠️ No users found in ${mainRoom.name}`);
-		await interaction.reply({
-			content: `There are no users in ${mainRoom.name}.`,
-			ephemeral: true,
-		});
+		await replyOrEdit(interaction, `There are no users in ${mainRoom.name}.`);
 		return;
 	}
 
-	// Defer the reply before starting the long-running operation
-	await interaction.deferReply({ ephemeral: true });
-
-	// Filter out facilitators before distribution
-	const usersToDistribute = Array.from(usersInMainRoom.values()).filter(
-		(member) => !facilitators.has(member.user.id),
-	);
-
-	console.log(
-		`🧩 Distributing ${usersToDistribute.length} users among ${breakoutRooms.length} breakout rooms (excluding ${facilitators.size} facilitators)`,
-	);
-
-	// Calculate distribution
-	// Note: if resuming, DistributeOperation will ignore this distribution plan and use stored one.
-	// But we still need to pass something matching the type.
-	const distribution = distributeUsers(usersToDistribute, breakoutRooms);
-
-	const result = await executeDistribute(
+	await safeReply(
 		interaction,
-		mainRoom,
-		distribution,
-		force,
+		async () => {
+			// Filter out facilitators before distribution
+			const usersToDistribute = Array.from(usersInMainRoom.values()).filter(
+				(member) => !facilitators.has(member.user.id),
+			);
+
+			console.log(
+				`🧩 Distributing ${usersToDistribute.length} users among ${breakoutRooms.length} breakout rooms (excluding ${facilitators.size} facilitators)`,
+			);
+
+			// Calculate distribution
+			// Note: if resuming, DistributeOperation will ignore this distribution plan and use stored one.
+			// But we still need to pass something matching the type.
+			const distribution = distributeUsers(usersToDistribute, breakoutRooms);
+
+			const result = await executeDistribute(
+				interaction,
+				mainRoom,
+				distribution,
+				force,
+			);
+
+			if (!result.success) {
+				await replyOrEdit(interaction, result.message);
+				return;
+			}
+
+			// Create embed for nice formatting
+			console.log(`📝 Creating response embed`);
+			const embed = new EmbedBuilder()
+				.setTitle('Breakout Room Assignment')
+				.setColor('#00FF00')
+				.setDescription(
+					`Split users from ${mainRoom.name} into ${breakoutRooms.length} breakout rooms.`,
+				)
+				.setTimestamp();
+
+			// Add facilitators field if any exist
+			if (facilitators.size > 0) {
+				const facilitatorUsers = Array.from(usersInMainRoom.values())
+					.filter((member) => facilitators.has(member.user.id))
+					.map((member) => member.user.tag)
+					.join('\n');
+
+				embed.addFields({
+					name: '👥 Facilitators',
+					value: facilitatorUsers || 'None',
+					inline: false,
+				});
+				console.log(`📊 Added ${facilitators.size} facilitators to embed`);
+			}
+
+			// Add fields for each breakout room
+			breakoutRooms.forEach((room) => {
+				// Use actual moveResults if available, otherwise fall back to planned distribution
+				let usersInRoom: string;
+
+				if (result.moveResults?.success) {
+					// Build actual user list from successful moves
+					const actualUsers = result.moveResults.success
+						.filter((entry: string) => entry.includes(`→ ${room.name}`))
+						.map((entry: string) => entry.split(' → ')[0]);
+					usersInRoom =
+						actualUsers.length > 0
+							? actualUsers.join('\n')
+							: 'No users assigned';
+				} else {
+					// Fallback to planned distribution
+					usersInRoom =
+						distribution[room.id]?.map((u) => u.user.tag).join('\n') ||
+						'No users assigned';
+				}
+
+				embed.addFields({
+					name: room.name,
+					value: usersInRoom,
+					inline: true,
+				});
+				console.log(`📊 Added ${room.name} stats to embed`);
+			});
+
+			// Add error field if any
+			if (result.moveResults?.failed && result.moveResults.failed.length > 0) {
+				embed.addFields({
+					name: 'Failed Moves',
+					value: result.moveResults.failed.join('\n'),
+					inline: false,
+				});
+				console.log(
+					`⚠️ Added ${result.moveResults.failed.length} failed moves to embed`,
+				);
+			}
+
+			console.log(`📤 Sending breakout room results to Discord`);
+			await replyOrEdit(interaction, { embeds: [embed] });
+		},
+		{ deferReply: true, ephemeral: true },
 	);
-
-	if (!result.success) {
-		await interaction.editReply(result.message);
-		return;
-	}
-
-	// Create embed for nice formatting
-	console.log(`📝 Creating response embed`);
-	const embed = new EmbedBuilder()
-		.setTitle('Breakout Room Assignment')
-		.setColor('#00FF00')
-		.setDescription(
-			`Split users from ${mainRoom.name} into ${breakoutRooms.length} breakout rooms.`,
-		)
-		.setTimestamp();
-
-	// Add facilitators field if any exist
-	if (facilitators.size > 0) {
-		const facilitatorUsers = Array.from(usersInMainRoom.values())
-			.filter((member) => facilitators.has(member.user.id))
-			.map((member) => member.user.tag)
-			.join('\n');
-
-		embed.addFields({
-			name: '👥 Facilitators',
-			value: facilitatorUsers || 'None',
-			inline: false,
-		});
-		console.log(`📊 Added ${facilitators.size} facilitators to embed`);
-	}
-
-	// Add fields for each breakout room
-	breakoutRooms.forEach((room) => {
-		// Use actual moveResults if available, otherwise fall back to planned distribution
-		let usersInRoom: string;
-
-		if (result.moveResults && result.moveResults.success) {
-			// Build actual user list from successful moves
-			const actualUsers = result.moveResults.success
-				.filter((entry: string) => entry.includes(`→ ${room.name}`))
-				.map((entry: string) => entry.split(' → ')[0]);
-			usersInRoom =
-				actualUsers.length > 0 ? actualUsers.join('\n') : 'No users assigned';
-		} else {
-			// Fallback to planned distribution
-			usersInRoom =
-				distribution[room.id]?.map((u) => u.user.tag).join('\n') ||
-				'No users assigned';
-		}
-
-		embed.addFields({
-			name: room.name,
-			value: usersInRoom,
-			inline: true,
-		});
-		console.log(`📊 Added ${room.name} stats to embed`);
-	});
-
-	// Add error field if any
-	if (
-		result.moveResults &&
-		result.moveResults.failed &&
-		result.moveResults.failed.length > 0
-	) {
-		embed.addFields({
-			name: 'Failed Moves',
-			value: result.moveResults.failed.join('\n'),
-			inline: false,
-		});
-		console.log(
-			`⚠️ Added ${result.moveResults.failed.length} failed moves to embed`,
-		);
-	}
-
-	console.log(`📤 Sending breakout room results to Discord`);
-	await interaction.editReply({ embeds: [embed] });
 }
 
 /**
@@ -432,11 +420,10 @@ async function handleEndCommand(
 		if (storedMainChannel) {
 			mainChannel = storedMainChannel;
 		} else {
-			await interaction.reply({
-				content:
-					'Please specify a main voice channel where users should be moved back.',
-				ephemeral: true,
-			});
+			await replyOrEdit(
+				interaction,
+				'Please specify a main voice channel where users should be moved back.',
+			);
 			return;
 		}
 	}
@@ -445,18 +432,22 @@ async function handleEndCommand(
 		`🎯 Target main voice channel: ${mainChannel.name} (${mainChannel.id}) (force: ${force})`,
 	);
 
-	// Defer the reply before starting the long-running operation
-	await interaction.deferReply({ ephemeral: true });
+	await safeReply(
+		interaction,
+		async () => {
+			const result = await executeEnd(interaction, mainChannel, force);
 
-	const result = await executeEnd(interaction, mainChannel, force);
-
-	if (result.success) {
-		await interaction.editReply(result.message);
-	} else {
-		await interaction.editReply(
-			result.message || 'Failed to end breakout session.',
-		);
-	}
+			if (result.success) {
+				await replyOrEdit(interaction, result.message);
+			} else {
+				await replyOrEdit(
+					interaction,
+					result.message || 'Failed to end breakout session.',
+				);
+			}
+		},
+		{ deferReply: true, ephemeral: true },
+	);
 }
 
 /**
