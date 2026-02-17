@@ -11,7 +11,7 @@ import {
 } from 'discord.js';
 import isAdmin from '../../lib/discord/permissions.js';
 import { replyOrEdit } from '../../lib/discord/response.js';
-import createOperation from '../../modules/breakout/operations/CreateOperation.js';
+import { executeCreate } from '../../modules/breakout/operations/create.js';
 import distributeOperation from '../../modules/breakout/operations/DistributeOperation.js';
 import endOperation from '../../modules/breakout/operations/EndOperation.js';
 import {
@@ -238,7 +238,7 @@ async function handleCreateCommand(
 	);
 
 	try {
-		const result = await createOperation.execute(interaction, numRooms, force);
+		const result = await executeCreate(interaction, numRooms, force);
 
 		if (result.success) {
 			await replyOrEdit(interaction, result.message);
