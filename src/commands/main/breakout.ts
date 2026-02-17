@@ -237,7 +237,7 @@ async function handleCreateCommand(
 		`🔢 Number of breakout rooms to create: ${numRooms} (force: ${force})`,
 	);
 
-	await safeReply(
+	await handleInteraction(
 		interaction,
 		async () => {
 			const result = await executeCreate(interaction, numRooms, force);
@@ -432,7 +432,7 @@ async function handleEndCommand(
 		`🎯 Target main voice channel: ${mainChannel.name} (${mainChannel.id}) (force: ${force})`,
 	);
 
-	await safeReply(
+	await handleInteraction(
 		interaction,
 		async () => {
 			const result = await executeEnd(interaction, mainChannel, force);
