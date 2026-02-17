@@ -160,7 +160,7 @@ const command: Command = {
 		console.log(`🚀 Breakout command initiated by ${interaction.user.tag}`);
 
 		if (!interaction.guildId || !interaction.member) {
-			await interaction.reply({
+			await replyOrEdit(interaction, {
 				content: 'This command can only be used in a server.',
 				ephemeral: true,
 			});
