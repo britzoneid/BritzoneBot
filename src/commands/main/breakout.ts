@@ -13,7 +13,7 @@ import isAdmin from '../../lib/discord/permissions.js';
 import { replyOrEdit } from '../../lib/discord/response.js';
 import { executeCreate } from '../../modules/breakout/operations/create.js';
 import { executeDistribute } from '../../modules/breakout/operations/distribute.js';
-import endOperation from '../../modules/breakout/operations/EndOperation.js';
+import { executeEnd } from '../../modules/breakout/operations/end.js';
 import {
 	broadcastToBreakoutRooms,
 	sendMessageToChannel,
@@ -421,7 +421,7 @@ async function handleEndCommand(
 		`🎯 Target main voice channel: ${mainChannel.name} (${mainChannel.id}) (force: ${force})`,
 	);
 
-	const result = await endOperation.execute(interaction, mainChannel, force);
+	const result = await executeEnd(interaction, mainChannel, force);
 
 	if (result.success) {
 		await replyOrEdit(interaction, result.message);
