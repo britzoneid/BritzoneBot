@@ -41,7 +41,7 @@ function getErrorCode(error: Error): string | number | undefined {
  * );
  * ```
  */
-async function handleInteraction(
+export async function handleInteraction(
 	interaction: RepliableInteraction | CommandInteraction,
 	handler: () => Promise<void>,
 	options: InteractionHandlerOptions = {},
@@ -136,5 +136,3 @@ export function replyOrEdit(
 		? interaction.editReply(content)
 		: interaction.reply(content);
 }
-
-export default handleInteraction;
