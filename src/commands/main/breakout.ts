@@ -14,7 +14,10 @@ import { replyOrEdit } from '../../lib/discord/response.js';
 import createOperation from '../../modules/breakout/operations/CreateOperation.js';
 import distributeOperation from '../../modules/breakout/operations/DistributeOperation.js';
 import endOperation from '../../modules/breakout/operations/EndOperation.js';
-import messageService from '../../modules/breakout/services/MessageService.js';
+import {
+	broadcastToBreakoutRooms,
+	sendMessageToChannel,
+} from '../../modules/breakout/services/message.js';
 import timerService from '../../modules/breakout/services/TimerService.js';
 import sessionManager from '../../modules/breakout/state/SessionManager.js';
 import stateManager from '../../modules/breakout/state/StateManager.js';
@@ -485,10 +488,7 @@ async function handleBroadcastCommand(
 	const message = interaction.options.getString('message', true);
 	console.log(`📢 Broadcasting message: "${message}"`);
 
-	const result = await messageService.broadcastToBreakoutRooms(
-		interaction.guildId,
-		message,
-	);
+	const result = await broadcastToBreakoutRooms(interaction.guildId, message);
 
 	if (result.success) {
 		const embed = new EmbedBuilder()
@@ -529,7 +529,7 @@ async function handleSendMessageCommand(
 
 	console.log(`📨 Sending message to ${channel.name}: "${message}"`);
 
-	const result = await messageService.sendMessageToChannel(channel, message);
+	const result = await sendMessageToChannel(channel, message);
 
 	await replyOrEdit(interaction, {
 		content: result.message,
