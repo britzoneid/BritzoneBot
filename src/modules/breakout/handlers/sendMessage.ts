@@ -3,7 +3,10 @@ import {
 	MessageFlags,
 	type VoiceChannel,
 } from 'discord.js';
-import { replyOrEdit } from '../../../lib/discord/response.js';
+import {
+	handleInteraction,
+	replyOrEdit,
+} from '../../../lib/discord/response.js';
 import { logger } from '../../../lib/logger.js';
 import { sendMessageToChannel } from '../services/message.js';
 
@@ -27,10 +30,16 @@ export async function handleSendMessageCommand(
 
 	log.info('📨 Sending message');
 
-	const result = await sendMessageToChannel(channel, message);
+	await handleInteraction(
+		interaction,
+		async () => {
+			const result = await sendMessageToChannel(channel, message);
 
-	await replyOrEdit(interaction, {
-		content: result.message,
-		flags: !result.success ? MessageFlags.Ephemeral : undefined,
-	});
+			await replyOrEdit(interaction, {
+				content: result.message,
+				flags: !result.success ? MessageFlags.Ephemeral : undefined,
+			});
+		},
+		{ deferReply: true, ephemeral: true },
+	);
 }

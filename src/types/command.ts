@@ -60,7 +60,7 @@ export interface OperationResult {
 	success: boolean;
 	message: string;
 	moveResults?: {
-		success: (MoveResult | string)[];
-		failed: (MoveFailure | string)[];
+		success: MoveResult[];
+		failed: MoveFailure[];
 	};
 }

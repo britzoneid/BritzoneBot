@@ -15,13 +15,14 @@ import {
 	handleTimerCommand,
 } from '../../modules/breakout/handlers/index.js';
 import {
+	type BreakoutSubcommand,
 	getCurrentOperation,
 	hasOperationInProgress,
 } from '../../modules/breakout/state/state.js';
 import type { Command } from '../../types/index.js';
 
 const subcommandHandlers: Record<
-	string,
+	BreakoutSubcommand,
 	(interaction: ChatInputCommandInteraction) => Promise<void>
 > = {
 	create: handleCreateCommand,
@@ -201,7 +202,7 @@ const command: Command = {
 			}
 		}
 
-		const handler = subcommandHandlers[subcommand];
+		const handler = subcommandHandlers[subcommand as BreakoutSubcommand];
 		if (!handler) {
 			log.error({ subcommand }, '❌ No handler registered for subcommand');
 			await replyOrEdit(interaction, {

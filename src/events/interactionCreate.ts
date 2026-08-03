@@ -2,15 +2,26 @@ import type { Interaction } from 'discord.js';
 import { Events } from 'discord.js';
 import { replyOrEdit } from '../lib/discord/response.js';
 import { logger } from '../lib/logger.js';
-import type { BritzoneClient, Event, SlashCommand } from '../types/index.js';
+import type {
+	BritzoneClient,
+	Command,
+	Event,
+	SlashCommand,
+} from '../types/index.js';
+
+/**
+ * Type guard for slash commands
+ */
+function isSlashCommand(cmd: Command): cmd is SlashCommand {
+	return (
+		'execute' in cmd &&
+		typeof cmd.execute === 'function' &&
+		cmd.type !== 'context-menu'
+	);
+}
 
 /**
  * InteractionCreate event - handles all interactions (commands, buttons, etc.)
- *
- * This is a fully typed version showing:
- * - Proper event typing
- * - Type guards for interactions
- * - Error handling for command execution
  */
 const event: Event<typeof Events.InteractionCreate> = {
 	name: Events.InteractionCreate,
@@ -54,8 +65,8 @@ const event: Event<typeof Events.InteractionCreate> = {
 		commandLogger.info(`🔵 Command executed: ${interaction.commandName}`);
 
 		try {
-			if ('execute' in command && typeof command.execute === 'function') {
-				await (command as SlashCommand).execute(interaction);
+			if (isSlashCommand(command)) {
+				await command.execute(interaction);
 			} else {
 				commandLogger.error(
 					{ commandName: interaction.commandName },

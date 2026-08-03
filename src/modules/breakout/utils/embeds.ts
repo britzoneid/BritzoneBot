@@ -4,6 +4,7 @@ import {
 	type VoiceBasedChannel,
 	type VoiceChannel,
 } from 'discord.js';
+import { logger } from '../../../lib/logger.js';
 import type { MoveFailure, MoveResult } from '../../../types/index.js';
 import type { UserDistribution } from './distribution.js';
 
@@ -13,8 +14,8 @@ interface DistributionEmbedParams {
 	facilitators?: Set<string>;
 	usersInMainRoom?: Map<string, GuildMember>;
 	moveResults?: {
-		success: (MoveResult | string)[];
-		failed: (MoveFailure | string)[];
+		success: MoveResult[];
+		failed: MoveFailure[];
 	};
 	distribution?: UserDistribution;
 }
@@ -80,7 +81,7 @@ export function buildDistributionEmbed(
 	const movesByRoom = new Map<string, string[]>();
 	if (moveResults?.success) {
 		for (const move of moveResults.success) {
-			if (typeof move === 'object' && move.roomId) {
+			if (move.roomId) {
 				const list = movesByRoom.get(move.roomId) || [];
 				list.push(move.userTag);
 				movesByRoom.set(move.roomId, list);
@@ -131,10 +132,9 @@ export function buildDistributionEmbed(
 		moveResults.failed.length > 0 &&
 		fieldCount < MAX_FIELDS
 	) {
-		const failedMessages = moveResults.failed.map((f) => {
-			if (typeof f === 'string') return f;
-			return f.userTag ? `${f.userTag} (${f.reason})` : f.reason;
-		});
+		const failedMessages = moveResults.failed.map((f) =>
+			f.userTag ? `${f.userTag} (${f.reason})` : f.reason,
+		);
 		embed.addFields({
 			name: 'Failed Moves',
 			value: truncateValue(failedMessages.join('\n')),
@@ -145,6 +145,9 @@ export function buildDistributionEmbed(
 	return embed;
 }
 
-function logTruncationNotice(_excessCount: number): void {
-	// Truncation handled safely within maximum embed field constraints
+function logTruncationNotice(excessCount: number): void {
+	logger.warn(
+		{ excessCount },
+		'⚠️ Embed breakout room fields truncated due to Discord limit',
+	);
 }
