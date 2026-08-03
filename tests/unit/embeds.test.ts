@@ -144,6 +144,31 @@ describe('buildDistributionEmbed', () => {
 		expect(failedField?.value).toContain('Bob#0002 (User left voice)');
 	});
 
+	it('reserves 1 field slot for Failed Moves at 25-field boundary', () => {
+		const rooms = Array.from({ length: 30 }, (_, i) =>
+			fakeRoom(`r${i}`, `Breakout Room ${i + 1}`),
+		);
+		const moveResults = {
+			success: [],
+			failed: [
+				{ userId: 'u99', userTag: 'FailedUser#0001', reason: 'Disconnected' },
+			],
+		};
+
+		const embed = buildDistributionEmbed({
+			mainRoom: fakeMainRoom,
+			breakoutRooms: rooms,
+			moveResults,
+		});
+
+		const json = embed.toJSON();
+		expect(json.fields).toHaveLength(25);
+		const failedField = json.fields?.find((f) => f.name === 'Failed Moves');
+		expect(failedField).toBeDefined();
+		const roomFields = json.fields?.filter((f) => f.name !== 'Failed Moves');
+		expect(roomFields).toHaveLength(24);
+	});
+
 	it('truncates room member field values that exceed 1000 characters', () => {
 		const rooms = [fakeRoom('r1', 'Room 1')];
 

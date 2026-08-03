@@ -32,7 +32,7 @@ describe('Discord Member Utilities (member.ts)', () => {
 		const result = await moveUser(fakeMember, fakeChannel);
 
 		expect(setChannelMock).toHaveBeenCalledWith(fakeChannel);
-		expect(result).toBeDefined();
+		expect(result).toEqual({ id: 'moved-member' });
 	});
 
 	it('re-throws error if setChannel API operation fails', async () => {

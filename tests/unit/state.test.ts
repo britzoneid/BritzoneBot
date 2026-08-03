@@ -20,8 +20,12 @@ import {
 
 describe('StateManager (state.ts)', () => {
 	let tempDir: string;
+	let originalStateDir: string | undefined;
+	let originalStateFile: string | undefined;
 
 	beforeEach(async () => {
+		originalStateDir = process.env.STATE_DIR;
+		originalStateFile = process.env.STATE_FILE;
 		tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'britzone-state-test-'));
 		process.env.STATE_DIR = tempDir;
 		process.env.STATE_FILE = path.join(tempDir, 'breakoutState.json');
@@ -32,6 +36,16 @@ describe('StateManager (state.ts)', () => {
 		resetStateForTest();
 		if (tempDir) {
 			await fs.rm(tempDir, { recursive: true, force: true });
+		}
+		if (originalStateDir !== undefined) {
+			process.env.STATE_DIR = originalStateDir;
+		} else {
+			delete process.env.STATE_DIR;
+		}
+		if (originalStateFile !== undefined) {
+			process.env.STATE_FILE = originalStateFile;
+		} else {
+			delete process.env.STATE_FILE;
 		}
 	});
 

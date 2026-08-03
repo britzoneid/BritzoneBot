@@ -27,10 +27,12 @@ describe('distributeUsers', () => {
 		expect(result.r1).toHaveLength(3);
 		expect(result.r2).toHaveLength(3);
 
-		// Total distributed should equal input count
-		const totalDistributed =
-			(result.r1?.length ?? 0) + (result.r2?.length ?? 0);
-		expect(totalDistributed).toBe(6);
+		// Assert that every input member is included exactly once
+		const allDistributedIds = Object.values(result)
+			.flat()
+			.map((u) => u.id)
+			.sort();
+		expect(allDistributedIds).toEqual(['u0', 'u1', 'u2', 'u3', 'u4', 'u5']);
 	});
 
 	it('places facilitators first round-robin in each room', () => {
@@ -70,9 +72,20 @@ describe('distributeUsers', () => {
 		const originalUsers = [...users];
 		const rooms = [fakeRoom('r1', 'room-1')];
 
+		const userMap = new Map([
+			['u1', fakeMember('u1')],
+			['u2', fakeMember('u2')],
+		]);
+		const facilMap = new Map([['f1', fakeMember('f1')]]);
+		const originalUserMapKeys = Array.from(userMap.keys());
+		const originalFacilMapKeys = Array.from(facilMap.keys());
+
 		distributeUsers(users, rooms);
+		distributeUsers(userMap, rooms, facilMap);
 
 		expect(users).toEqual(originalUsers);
+		expect(Array.from(userMap.keys())).toEqual(originalUserMapKeys);
+		expect(Array.from(facilMap.keys())).toEqual(originalFacilMapKeys);
 	});
 
 	it('throws an error when no breakout rooms are provided', () => {
@@ -100,5 +113,11 @@ describe('distributeUsers', () => {
 
 		const counts = [result.r1?.length ?? 0, result.r2?.length ?? 0].sort();
 		expect(counts).toEqual([2, 3]);
+
+		const allDistributedIds = Object.values(result)
+			.flat()
+			.map((u) => u.id)
+			.sort();
+		expect(allDistributedIds).toEqual(['u0', 'u1', 'u2', 'u3', 'u4']);
 	});
 });
