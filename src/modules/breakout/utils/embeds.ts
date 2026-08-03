@@ -11,7 +11,7 @@ import type { UserDistribution } from './distribution.js';
 interface DistributionEmbedParams {
 	mainRoom: VoiceBasedChannel;
 	breakoutRooms: VoiceChannel[];
-	facilitators?: Set<string>;
+	excludedUsers?: Set<string>;
 	usersInMainRoom?: Map<string, GuildMember>;
 	moveResults?: {
 		success: MoveResult[];
@@ -38,7 +38,7 @@ export function buildDistributionEmbed(
 	const {
 		mainRoom,
 		breakoutRooms,
-		facilitators,
+		excludedUsers,
 		usersInMainRoom,
 		moveResults,
 		distribution,
@@ -62,21 +62,21 @@ export function buildDistributionEmbed(
 	let fieldCount = 0;
 	const MAX_FIELDS = 25;
 
-	// Add facilitators field if any exist
+	// Add excluded users field if any exist
 	if (
-		facilitators &&
-		facilitators.size > 0 &&
+		excludedUsers &&
+		excludedUsers.size > 0 &&
 		usersInMainRoom &&
 		fieldCount < MAX_FIELDS
 	) {
-		const facilitatorUsers = Array.from(usersInMainRoom.values())
-			.filter((member) => facilitators.has(member.user.id))
+		const excludedUserTags = Array.from(usersInMainRoom.values())
+			.filter((member) => excludedUsers.has(member.user.id))
 			.map((member) => member.user.tag)
 			.join('\n');
 
 		embed.addFields({
-			name: '👥 Facilitators',
-			value: truncateValue(facilitatorUsers || 'None'),
+			name: '🚫 Excluded Users',
+			value: truncateValue(excludedUserTags || 'None'),
 			inline: false,
 		});
 		fieldCount++;

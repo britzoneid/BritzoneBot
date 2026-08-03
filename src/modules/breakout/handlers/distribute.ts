@@ -37,7 +37,7 @@ export async function handleDistributeCommand(
 		return;
 	}
 
-	const facilitatorsInput = interaction.options.getString('facilitators');
+	const excludeInput = interaction.options.getString('exclude');
 	const force = interaction.options.getBoolean('force') || false;
 
 	const log = logger.child({
@@ -48,15 +48,15 @@ export async function handleDistributeCommand(
 	});
 	log.info('🎯 Main room selected');
 
-	// Process facilitators if provided
-	const facilitators = new Set<string>();
-	if (facilitatorsInput) {
+	// Process excluded users if provided
+	const excludedUsers = new Set<string>();
+	if (excludeInput) {
 		const mentionPattern = /<@!?(\d+)>/g;
-		const matches = facilitatorsInput.matchAll(mentionPattern);
+		const matches = excludeInput.matchAll(mentionPattern);
 		for (const match of matches) {
-			facilitators.add(match[1]);
+			excludedUsers.add(match[1]);
 		}
-		log.debug({ count: facilitators.size }, '👥 Facilitators identified');
+		log.debug({ count: excludedUsers.size }, '🚫 Excluded users identified');
 	}
 
 	const breakoutRooms = getRooms(interaction.guild);
@@ -82,7 +82,7 @@ export async function handleDistributeCommand(
 		interaction,
 		async () => {
 			const usersToDistribute = Array.from(usersInMainRoom.values()).filter(
-				(member) => !facilitators.has(member.user.id),
+				(member) => !excludedUsers.has(member.user.id),
 			);
 
 			log.info(
@@ -99,7 +99,7 @@ export async function handleDistributeCommand(
 			const previewEmbed = buildDistributionEmbed({
 				mainRoom,
 				breakoutRooms,
-				facilitators,
+				excludedUsers,
 				usersInMainRoom,
 				distribution,
 				isPreview: true,
@@ -183,7 +183,7 @@ export async function handleDistributeCommand(
 					const finalEmbed = buildDistributionEmbed({
 						mainRoom,
 						breakoutRooms,
-						facilitators,
+						excludedUsers,
 						usersInMainRoom,
 						moveResults: result.moveResults,
 						distribution,

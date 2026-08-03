@@ -76,7 +76,7 @@ const command: Command = {
 				)
 				.addStringOption((option) =>
 					option
-						.setName('facilitators')
+						.setName('exclude')
 						.setDescription(
 							'Users to keep in the main room (mention them with @)',
 						)
