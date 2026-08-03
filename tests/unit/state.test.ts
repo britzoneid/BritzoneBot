@@ -1,0 +1,155 @@
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+	clearSession,
+	clearTimerData,
+	completeOperation,
+	getCompletedSteps,
+	getCurrentOperation,
+	getTimerData,
+	hasOperationInProgress,
+	resetStateForTest,
+	setMainRoomId,
+	setTimerData,
+	startOperation,
+	storeRoomIds,
+	updateProgress,
+} from '@/modules/breakout/state/state.js';
+
+describe('StateManager (state.ts)', () => {
+	let tempDir: string;
+
+	beforeEach(async () => {
+		tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'britzone-state-test-'));
+		process.env.STATE_DIR = tempDir;
+		process.env.STATE_FILE = path.join(tempDir, 'breakoutState.json');
+		resetStateForTest();
+	});
+
+	afterEach(async () => {
+		resetStateForTest();
+		if (tempDir) {
+			await fs.rm(tempDir, { recursive: true, force: true });
+		}
+	});
+
+	describe('Operation tracking lifecycle', () => {
+		it('startOperation creates a new active operation entry', async () => {
+			const guildId = 'guild-123';
+			await startOperation(guildId, 'create', { numRooms: 3 });
+
+			const op = await getCurrentOperation(guildId);
+			expect(op).toBeDefined();
+			expect(op?.type).toBe('create');
+			expect(op?.params).toEqual({ numRooms: 3 });
+			expect(op?.progress.started).toBe(true);
+			expect(op?.progress.completed).toBe(false);
+		});
+
+		it('hasOperationInProgress correctly returns active operation status', async () => {
+			const guildId = 'guild-123';
+
+			expect(await hasOperationInProgress(guildId)).toBe(false);
+
+			await startOperation(guildId, 'distribute', { mainRoomId: 'main-1' });
+			expect(await hasOperationInProgress(guildId)).toBe(true);
+
+			await completeOperation(guildId);
+			expect(await hasOperationInProgress(guildId)).toBe(false);
+		});
+
+		it('updateProgress marks individual step as completed with metadata', async () => {
+			const guildId = 'guild-123';
+			await startOperation(guildId, 'create', { numRooms: 2 });
+
+			const updated = await updateProgress(guildId, 'create_room_1', {
+				channelId: 'ch-1',
+			});
+			expect(updated).toBe(true);
+
+			const steps = await getCompletedSteps(guildId);
+			expect(steps.create_room_1).toBeDefined();
+			expect(steps.create_room_1?.completed).toBe(true);
+			expect(steps.create_room_1?.channelId).toBe('ch-1');
+		});
+
+		it('updateProgress returns false when no active operation exists', async () => {
+			const updated = await updateProgress('non-existent-guild', 'step_1');
+			expect(updated).toBe(false);
+		});
+
+		it('completeOperation moves active operation to history and clears current', async () => {
+			const guildId = 'guild-123';
+			await startOperation(guildId, 'recall', {});
+			await completeOperation(guildId);
+
+			const op = await getCurrentOperation(guildId);
+			expect(op).toBeUndefined();
+
+			// Read file directly to verify history was saved
+			const fileContent = await fs.readFile(
+				process.env.STATE_FILE as string,
+				'utf8',
+			);
+			const state = JSON.parse(fileContent);
+			expect(state[guildId].history).toHaveLength(1);
+			expect(state[guildId].history[0].type).toBe('recall');
+			expect(state[guildId].history[0].progress.completed).toBe(true);
+		});
+	});
+
+	describe('Session data management', () => {
+		it('storeRoomIds and setMainRoomId persist session information', async () => {
+			const guildId = 'guild-123';
+			await storeRoomIds(guildId, ['r1', 'r2']);
+			await setMainRoomId(guildId, 'main-1');
+
+			const fileContent = await fs.readFile(
+				process.env.STATE_FILE as string,
+				'utf8',
+			);
+			const state = JSON.parse(fileContent);
+			expect(state[guildId].session.roomIds).toEqual(['r1', 'r2']);
+			expect(state[guildId].session.mainRoomId).toBe('main-1');
+		});
+
+		it('clearSession removes session object from guild state', async () => {
+			const guildId = 'guild-123';
+			await storeRoomIds(guildId, ['r1', 'r2']);
+			await clearSession(guildId);
+
+			const fileContent = await fs.readFile(
+				process.env.STATE_FILE as string,
+				'utf8',
+			);
+			const state = JSON.parse(fileContent);
+			expect(state[guildId].session).toBeUndefined();
+		});
+	});
+
+	describe('Timer data management', () => {
+		it('stores, retrieves, and clears timer data correctly', async () => {
+			const guildId = 'guild-123';
+			const timerData = {
+				timerId: 't-1',
+				totalMinutes: 10,
+				startTime: Date.now(),
+				guildId,
+				breakoutRooms: ['r1', 'r2'],
+				fiveMinSent: false,
+			};
+
+			await setTimerData(guildId, timerData);
+
+			const retrieved = await getTimerData(guildId);
+			expect(retrieved).toEqual(timerData);
+
+			await clearTimerData(guildId);
+
+			const afterClear = await getTimerData(guildId);
+			expect(afterClear).toBeNull();
+		});
+	});
+});

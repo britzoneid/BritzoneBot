@@ -76,12 +76,29 @@ interface GuildState {
 	timerData?: TimerData;
 }
 
-const statePath: string = path.join(process.cwd(), 'data');
-const stateFile: string = path.join(statePath, 'breakoutState.json');
+function getStatePath(): string {
+	return process.env.STATE_DIR || path.join(process.cwd(), 'data');
+}
+
+function getStateFile(): string {
+	return (
+		process.env.STATE_FILE || path.join(getStatePath(), 'breakoutState.json')
+	);
+}
+
 const MAX_HISTORY = 20;
 let inMemoryState: Record<string, GuildState> = {};
 let initialized: boolean = false;
 let saveQueue: Promise<void> = Promise.resolve();
+
+/**
+ * Resets the in-memory state and initialized flag for testing
+ */
+export function resetStateForTest(): void {
+	inMemoryState = {};
+	initialized = false;
+	saveQueue = Promise.resolve();
+}
 
 /**
  * Initialize the state manager, ensuring the data directory exists
@@ -91,7 +108,7 @@ export async function initializeState(): Promise<void> {
 	if (initialized) return;
 
 	try {
-		await fs.mkdir(statePath, { recursive: true });
+		await fs.mkdir(getStatePath(), { recursive: true });
 		await loadState();
 		initialized = true;
 		logger.info('📂 StateManager initialized');
@@ -115,7 +132,7 @@ function getGuildState(guildId: string): GuildState {
  */
 async function loadState(): Promise<void> {
 	try {
-		const data = await fs.readFile(stateFile, 'utf8');
+		const data = await fs.readFile(getStateFile(), 'utf8');
 		inMemoryState = JSON.parse(data);
 		logger.debug('📤 Loaded breakout state data');
 	} catch (error: unknown) {
@@ -134,7 +151,10 @@ async function saveState(): Promise<void> {
 	const nextSave = saveQueue.then(async () => {
 		try {
 			await initializeState();
-			await fs.writeFile(stateFile, JSON.stringify(inMemoryState, null, 2));
+			await fs.writeFile(
+				getStateFile(),
+				JSON.stringify(inMemoryState, null, 2),
+			);
 			logger.trace('💾 Saved breakout state data');
 		} catch (error) {
 			logger.error({ err: error }, '❌ Error saving breakout state');
