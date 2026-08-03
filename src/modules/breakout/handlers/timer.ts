@@ -42,7 +42,7 @@ export async function handleTimerCommand(
 	};
 
 	await setTimerData(interaction.guildId, timerData);
-	monitorBreakoutTimer(timerData, interaction).catch((error) => {
+	monitorBreakoutTimer(timerData, interaction.client).catch((error) => {
 		log.error({ err: error }, '❌ Timer monitoring failed');
 	});
 

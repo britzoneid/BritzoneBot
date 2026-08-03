@@ -15,6 +15,8 @@ import { logger } from '../logger.js';
 interface InteractionHandlerOptions {
 	deferReply?: boolean;
 	ephemeral?: boolean;
+	deferTimeoutMs?: number;
+	handlerTimeoutMs?: number;
 }
 
 /**
@@ -55,7 +57,12 @@ export async function handleInteraction(
 	handler: () => Promise<void>,
 	options: InteractionHandlerOptions = {},
 ): Promise<boolean> {
-	const { deferReply = false, ephemeral = false } = options;
+	const {
+		deferReply = false,
+		ephemeral = false,
+		deferTimeoutMs = 2500,
+		handlerTimeoutMs = 15000,
+	} = options;
 
 	try {
 		// If deferReply is true, try to defer the reply first
@@ -66,13 +73,16 @@ export async function handleInteraction(
 					ephemeral ? { flags: MessageFlags.Ephemeral } : undefined,
 				);
 				const timeoutPromise = new Promise<never>((_, reject) =>
-					setTimeout(() => reject(new Error('Defer reply timeout')), 2500),
+					setTimeout(
+						() => reject(new Error('Defer reply timeout')),
+						deferTimeoutMs,
+					),
 				);
 
 				await Promise.race([deferPromise, timeoutPromise]);
 				logger.debug(
 					{ interactionId: interaction.id },
-					`🔄 Successfully deferred interaction`,
+					'🔄 Successfully deferred interaction',
 				);
 			} catch (deferError) {
 				const error =
@@ -85,7 +95,7 @@ export async function handleInteraction(
 				if (errorCode === 10062) {
 					logger.warn(
 						{ interactionId: interaction.id },
-						`⏱️ Interaction expired before deferring`,
+						'⏱️ Interaction expired before deferring',
 					);
 					return false;
 				}
@@ -97,14 +107,14 @@ export async function handleInteraction(
 				) {
 					logger.warn(
 						{ interactionId: interaction.id, err: error },
-						`🌐 Network issue while deferring interaction`,
+						'🌐 Network issue while deferring interaction',
 					);
 					return false;
 				}
 
 				logger.error(
 					{ interactionId: interaction.id, err: error },
-					`❓ Unknown error while deferring interaction`,
+					'❓ Unknown error while deferring interaction',
 				);
 				return false;
 			}
@@ -114,7 +124,10 @@ export async function handleInteraction(
 		try {
 			const handlerPromise = handler();
 			const timeoutPromise = new Promise<never>((_, reject) =>
-				setTimeout(() => reject(new Error('Handler execution timeout')), 8000),
+				setTimeout(
+					() => reject(new Error('Handler execution timeout')),
+					handlerTimeoutMs,
+				),
 			);
 
 			await Promise.race([handlerPromise, timeoutPromise]);

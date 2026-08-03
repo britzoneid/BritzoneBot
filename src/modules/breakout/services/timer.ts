@@ -1,9 +1,4 @@
-import {
-	ChannelType,
-	type ChatInputCommandInteraction,
-	type Client,
-	type GuildBasedChannel,
-} from 'discord.js';
+import { ChannelType, type Client, type GuildBasedChannel } from 'discord.js';
 import type { Logger } from 'pino';
 import { logger } from '../../../lib/logger.js';
 import {
@@ -17,11 +12,11 @@ import {
  * Monitors a breakout timer and sends reminders at defined intervals.
  *
  * @param timerData Timer configuration data
- * @param interaction The Discord command interaction
+ * @param client The Discord client instance
  */
 export async function monitorBreakoutTimer(
 	timerData: TimerData,
-	interaction: ChatInputCommandInteraction,
+	client: Client,
 ): Promise<void> {
 	const { totalMinutes, startTime, guildId, breakoutRooms } = timerData;
 	const endTime = startTime + totalMinutes * 60 * 1000;
@@ -51,7 +46,7 @@ export async function monitorBreakoutTimer(
 					guildId,
 					breakoutRooms,
 					'⏱️ **5 minutes remaining** in this breakout session.',
-					interaction.client,
+					client,
 				);
 
 				timerState.fiveMinSent = true;
@@ -65,7 +60,7 @@ export async function monitorBreakoutTimer(
 					guildId,
 					breakoutRooms,
 					"⏰ **Time's up!** This breakout session has ended.",
-					interaction.client,
+					client,
 				);
 
 				await clearTimerData(guildId);
