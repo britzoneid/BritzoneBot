@@ -5,130 +5,170 @@
 [![License](https://img.shields.io/badge/License-AGPLv3-blue.svg)](https://opensource.org/licenses/MIT)
 [![Bun Version](https://img.shields.io/badge/Bun-%3E=v1.3.0-FBF0DF?logo=bun)](https://bun.sh)
 
-BritzoneBot is a Discord bot designed to manage breakout rooms for voice channels in a Discord server. It provides commands to create, distribute users among, and end breakout sessions with robust error handling and state management.
+
+BritzoneBot is a Discord bot designed to manage breakout rooms for voice channels in a Discord server. It provides commands to create, distribute users among, recall members from, and delete breakout sessions with robust error handling, operation checkpointing, and persistent state management.
 
 ## ✨ Features
 
-- **Create Breakout Rooms**: Create multiple breakout voice channels.
-- **Distribute Users**: Distribute users from a main voice channel into breakout rooms.
-- **End Breakout Sessions**: Move users back to the main voice channel and delete breakout rooms.
-- **Set Timer**: Set a timer for breakout sessions with reminders.
-- **Broadcast Message**: Broadcast a message to all breakout rooms.
-- **Send Message**: Send a message to a specific voice channel.
-- **Safe Interaction Handling**: Built-in error handling for expired interactions and network issues.
-- **State Management**: Persistent state management to recover from interruptions.
+- **Create Breakout Rooms**: Create multiple breakout voice channels in the same category as the invoking channel.
+- **Distribute Users**: Preview and confirm distribution of users from a main voice channel into breakout rooms, with support for facilitators and excluded users.
+- **Recall Members**: Move all users back to the main voice channel while keeping breakout rooms intact.
+- **Delete Breakout Rooms**: Safely delete all breakout room channels (with member-presence protection).
+- **Set Timer**: Set a countdown timer for breakout sessions with a 5-minute warning and end notification.
+- **Broadcast Message**: Broadcast a message to all active breakout rooms.
+- **Send Message**: Send a message to a specific voice channel's text chat.
+- **Safe Interaction Handling**: Built-in error handling for expired interactions, network issues, and timeouts.
+- **Persistent State & Checkpointing**: File-based state management (`data/breakoutState.json`) enables resuming interrupted operations.
+- **Structured Logging**: Pino-powered logging with pretty console output and daily-rotating file logs.
+
+## 🏗️ Architecture
+
+The project is written in **TypeScript** and follows a modular architecture:
+
+```
+src/
+├── commands/          # Slash command definitions (main + utility)
+├── events/            # Discord event handlers (interactionCreate, ready)
+├── lib/               # Shared utilities (Discord helpers, logger)
+├── modules/
+│   └── breakout/
+│       ├── handlers/  # Interaction-level handlers for each subcommand
+│       ├── operations/# Orchestrated multi-step operations with checkpointing
+│       ├── services/  # Domain logic (distribution, messaging, rooms, timer)
+│       ├── state/     # Persistent state manager (file-backed)
+│       └── utils/     # Distribution algorithm, embed builders
+├── types/             # Shared TypeScript interfaces and type definitions
+└── index.ts           # Entry point: client init, command/event loading, login
+```
 
 ## 🛠️ Installation Guide
 
-Follow these straightforward steps to deploy and configure BritzoneBot on your Discord server:
+Follow these steps to deploy and configure BritzoneBot on your Discord server:
 
-1.  **Clone the Repository**:
+### 1. Clone the Repository
 
-    ```sh
-    git clone 'https://github.com/britzoneid/BritzoneBot.git'
-    cd BritzoneBot
-    ```
+```sh
+git clone https://github.com/britzoneid/BritzoneBot.git
+cd BritzoneBot
+```
 
-2.  **Install Dependencies**:
+### 2. Install Dependencies
 
-    Ensure you have [Bun](https://bun.sh) installed. Navigate to the cloned repository directory in your terminal and run:
+Ensure you have [Bun](https://bun.sh) (≥ 1.3.0) installed, then run:
 
-    ```sh
-    bun install
-    ```
+```sh
+bun install
+```
 
-3.  **Configuration**:
+### 3. Configuration
 
-    *   **Environment Variables**: Copy `.env.example` to `.env` in the root directory.
+#### Environment Variables
 
-        ```sh
-        cp .env.example .env
-        ```
+Copy `.env.example` to `.env` in the root directory:
 
-        Fill in your bot credentials obtained from the [Discord Developer Portal](https://discord.com/developers/applications):
+```sh
+cp .env.example .env
+```
 
-        ```env
-        BOT_ID=your-bot-id
-        TOKEN=your-bot-token
-        ```
+Fill in your bot credentials obtained from the [Discord Developer Portal](https://discord.com/developers/applications):
 
-    *   **Guild List Configuration**: Create a `guildList.json` file in the root directory. This is **required** for the deployment script to know where to register commands. You can copy the example file:
+```env
+BOT_ID=your-bot-id
+TOKEN=your-bot-token
 
-        ```sh
-        cp guildList.json.example guildList.json
-        ```
+# Optional
+NODE_ENV=production
+LOG_LEVEL=info   # trace | debug | info | warn | error | fatal | silent
+```
 
-        Then edit `guildList.json` to map your Discord server names to their respective IDs:
+#### Guild List Configuration
 
-        ```json
-        {
-           "YourServerName1": "YourServerID1",
-           "YourServerName2": "YourServerID2"
-        }
-        ```
+Create a `guildList.json` file in the root directory. This is **required** for the deployment script to know where to register slash commands:
 
-4.  **Build and Deploy**:
+```sh
+cp guildList.json.example guildList.json
+```
 
-    *   **Build the Project**: Compile the TypeScript source code to JavaScript.
+Edit `guildList.json` to map your Discord server names to their IDs:
 
-        ```sh
-        bun run build
-        ```
+```json
+{
+  "YourServerName1": "YourServerID1",
+  "YourServerName2": "YourServerID2"
+}
+```
 
-    *   **Local Command Deployment**: To register the bot's commands within your specified Discord servers, run:
+### 4. Build and Deploy
 
-        ```sh
-        bun run deploy
-        ```
-        This script will deploy the commands to the guilds listed in your `guildList.json`.
+```sh
+# Compile TypeScript → JavaScript
+bun run build
 
-5.  **Run the Bot**:
+# Register slash commands to all guilds in guildList.json
+bun run deploy
+```
 
-    *   **Production**: Start the bot using the compiled output:
+### 5. Run the Bot
 
-        ```sh
-        bun start
-        ```
-        Ensure your terminal remains running to keep the bot online. For production deployments, consider using process managers like `pm2` or `systemd`.
-
-    *   **Development**: Run the bot in development mode with live reloading:
-
-        ```sh
-        bun dev
-        ```
+| Mode        | Command      | Notes                                        |
+|-------------|--------------|----------------------------------------------|
+| Production  | `bun start`  | Runs the compiled output. Use a process manager (`pm2`, `systemd`) for uptime. |
+| Development | `bun dev`    | Live-reload via Bun's watch mode.            |
 
 ---
 
-## ⚙️ Command Reference  
+## ⚙️ Command Reference
 
-BritzoneBot offers a suite of intuitive slash commands to manage breakout rooms effectively. Below is a detailed command reference.  
+BritzoneBot offers a suite of slash commands to manage breakout rooms. All breakout commands require the **Move Members** permission.
 
-### 🏠 Breakout Commands  
+### 🏠 Breakout Commands
 
-These commands manage breakout voice channels and require the **Move Members** permission.  
+| Command      | Subcommand     | Description                                                        | Options |
+|--------------|----------------|--------------------------------------------------------------------|---------|
+| `/breakout`  | `create`       | Creates multiple breakout voice channels.                          | `number` *(Integer, Required)* – Number of rooms to create (≥ 1). |
+|              |                |                                                                    | `force` *(Boolean, Optional)* – Force creation even if rooms already exist (deletes existing rooms first). |
+| `/breakout`  | `distribute`   | Previews and distributes users from a main room into breakout rooms. Shows a confirmation prompt before moving. | `mainroom` *(Voice/Stage Channel, Required)* – The source voice channel. |
+|              |                |                                                                    | `exclude` *(String, Optional)* – User mentions to keep in the main room. |
+|              |                |                                                                    | `facilitators` *(String, Optional)* – User mentions to assign into breakout rooms first (one per room when possible). |
+|              |                |                                                                    | `force` *(Boolean, Optional)* – Force redistribution even if users are already distributed. |
+| `/breakout`  | `recall`       | Moves all members from breakout rooms back to the main voice channel. Breakout rooms remain intact. | `mainroom` *(Voice/Stage Channel, Required)* – The destination channel. |
+| `/breakout`  | `delete`       | Deletes all breakout room channels.                                | `force` *(Boolean, Optional)* – Force deletion even if members are still inside. |
+| `/breakout`  | `timer`        | Sets a countdown timer for the breakout session. Sends a 5-minute warning and a "time's up" message. | `minutes` *(Integer, Required)* – Duration in minutes (≥ 1). |
+| `/breakout`  | `broadcast`    | Broadcasts a message to all active breakout rooms.                 | `message` *(String, Required)* – The message content. |
+| `/breakout`  | `send-message` | Sends a message to a specific voice channel's text chat.           | `channel` *(Voice Channel, Required)* – Target channel. |
+|              |                |                                                                    | `message` *(String, Required)* – The message content. |
 
-| Command      | Subcommand     | Description                                                              | Options                                                                                                               |
-|-------------|--------------|------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------|
-| `/breakout` | `create`       | Creates multiple breakout voice channels.                                  | `number`: *(Integer, Required)* - The number of breakout rooms to create. Must be a positive integer.              |
-| `/breakout` | `distribute`   | Distributes users from a main voice channel into breakout rooms.           | `mainroom`: *(Voice/Stage Channel, Required)* - The main voice channel to distribute users from.                     |
-|             |              |                                                                      | `facilitators`: *(String, Optional)* - User mentions to exclude from distribution (facilitators to remain in the main room). |
-| `/breakout` | `end`          | Ends the breakout session, moves users back, and deletes breakout rooms.  | `main_room`: *(Voice Channel, Optional)* - The main voice channel to move users back to. If omitted, uses the previously set main room. |
-| `/breakout` | `timer`        | Sets a timer for the breakout session.                                    | `minutes`: *(Integer, Required)* - Duration of the breakout session in minutes. Must be a positive integer.          |
-| `/breakout` | `broadcast`    | Broadcasts a message to all active breakout rooms.                       | `message`: *(String, Required)* - The message content to broadcast.                                                 |
-| `/breakout` | `send-message` | Sends a direct message to a specific voice channel.                      | `channel`: *(Voice Channel, Required)* - The target voice channel to send the message to.                             |
-|             |              |                                                                      | `message`: *(String, Required)* - The message content to send.                                                        |
+### 🛠️ Utility Commands
+
+| Command   | Description                                              | Permissions |
+|-----------|----------------------------------------------------------|-------------|
+| `/ping`   | Replies with "Pong!" and the bot's WebSocket latency.    | Send Messages |
+| `/server` | Displays the server name and member count.               | None        |
+| `/user`   | Displays the invoking user's name and join date.         | None        |
 
 ---
 
-### 🛠️ Utility Commands  
+## 🔄 Operation Lifecycle & Recovery
 
-These standalone commands provide general information and do not require special permissions.  
+Every breakout operation (`create`, `distribute`, `recall`, `delete`) is tracked with **checkpoint-based progress** persisted to `data/breakoutState.json`. If the bot restarts or an operation is interrupted:
 
-| Command      | Description                                        | Options       |
-|-------------|------------------------------------------------|--------------|
-| `/user`   | Provides information about the user executing the command.  | *No options.* |
-| `/server` | Provides information about the Discord server.              | *No options.* |
-| `/ping`   | Tests the bot's responsiveness. Replies with "Pong!".       | *No options.* |
+1. The state file records which steps have already completed.
+2. Re-running the same subcommand **resumes** from the last checkpoint.
+3. Running a *different* breakout subcommand while one is in progress is blocked with an explanatory message.
+4. Completed operations are moved to an in-memory history and the active operation slot is cleared.
+
+This ensures no duplicate channels are created, no users are moved twice, and no rooms are double-deleted.
+
+## 📋 Distribution Preview
+
+When you run `/breakout distribute`, the bot:
+
+1. Calculates a randomized round-robin assignment (facilitators first, then regular members).
+2. Displays a **preview embed** showing exactly who will go to which room.
+3. Presents **Confirm** / **Cancel** buttons (60-second timeout).
+4. Only after confirmation does it begin moving members.
+
+This prevents accidental mass-moves and gives moderators a chance to review the plan.
 
 ## 🤝 Contributing
 
