@@ -110,7 +110,7 @@ export async function executeDistribute(
 			return {
 				success: false,
 				message:
-					"Users are already distributed to breakout rooms. Use '/breakout distribute' with the force flag set to true to redistribute, or use '/breakout end' first to end the current session.",
+					"Users are already distributed to breakout rooms. Use '/breakout distribute' with the force flag set to true to redistribute, or use '/breakout recall' to move users back.",
 			};
 		}
 

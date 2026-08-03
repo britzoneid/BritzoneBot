@@ -7,13 +7,13 @@ import {
 	replyOrEdit,
 } from '../../../lib/discord/response.js';
 import { logger } from '../../../lib/logger.js';
-import { executeEnd } from '../operations/end.js';
+import { executeRecall } from '../operations/recall.js';
 import { getMainRoom } from '../state/state.js';
 
 /**
- * Handles the end subcommand for breakout rooms
+ * Handles the recall subcommand for breakout rooms
  */
-export async function handleEndCommand(
+export async function handleRecallCommand(
 	interaction: ChatInputCommandInteraction,
 ): Promise<void> {
 	if (!interaction.guildId || !interaction.guild) return;
@@ -21,7 +21,6 @@ export async function handleEndCommand(
 	let mainChannel = interaction.options.getChannel(
 		'mainroom',
 	) as VoiceBasedChannel | null;
-	const force = interaction.options.getBoolean('force') || false;
 
 	if (!mainChannel) {
 		const storedMainChannel = getMainRoom(interaction.guild);
@@ -39,25 +38,24 @@ export async function handleEndCommand(
 	const targetMainChannel = mainChannel;
 
 	const log = logger.child({
-		subcommand: 'end',
+		subcommand: 'recall',
 		guildId: interaction.guildId,
 		mainRoom: targetMainChannel.name,
-		force,
 	});
 
-	log.info('🎯 Ending breakout session');
+	log.info('🎯 Recalling members from breakout session');
 
 	await handleInteraction(
 		interaction,
 		async () => {
-			const result = await executeEnd(interaction, targetMainChannel, force);
+			const result = await executeRecall(interaction, targetMainChannel);
 
 			if (result.success) {
 				await replyOrEdit(interaction, result.message);
 			} else {
 				await replyOrEdit(
 					interaction,
-					result.message || 'Failed to end breakout session.',
+					result.message || 'Failed to recall breakout members.',
 				);
 			}
 		},

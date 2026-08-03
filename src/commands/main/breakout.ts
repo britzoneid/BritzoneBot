@@ -9,8 +9,9 @@ import { logger } from '../../lib/logger.js';
 import {
 	handleBroadcastCommand,
 	handleCreateCommand,
+	handleDeleteCommand,
 	handleDistributeCommand,
-	handleEndCommand,
+	handleRecallCommand,
 	handleSendMessageCommand,
 	handleTimerCommand,
 } from '../../modules/breakout/handlers/index.js';
@@ -27,7 +28,8 @@ const subcommandHandlers: Record<
 > = {
 	create: handleCreateCommand,
 	distribute: handleDistributeCommand,
-	end: handleEndCommand,
+	recall: handleRecallCommand,
+	delete: handleDeleteCommand,
 	timer: handleTimerCommand,
 	broadcast: handleBroadcastCommand,
 	'send-message': handleSendMessageCommand,
@@ -99,27 +101,34 @@ const command: Command = {
 						.setRequired(false),
 				),
 		)
-		// End subcommand
+		// Recall subcommand
 		.addSubcommand((subcommand) =>
 			subcommand
-				.setName('end')
-				.setDescription(
-					'Moves users back to the main voice channel and deletes breakout rooms',
-				)
+				.setName('recall')
+				.setDescription('Move all members back to the main voice channel')
 				.addChannelOption((option) =>
 					option
 						.setName('mainroom')
 						.setDescription(
 							'The main voice channel where users should be moved back',
 						)
-						.addChannelTypes(ChannelType.GuildVoice)
-						.setRequired(false),
-				)
+						.setRequired(true)
+						.addChannelTypes(
+							ChannelType.GuildVoice,
+							ChannelType.GuildStageVoice,
+						),
+				),
+		)
+		// Delete subcommand
+		.addSubcommand((subcommand) =>
+			subcommand
+				.setName('delete')
+				.setDescription('Delete all breakout room channels')
 				.addBooleanOption((option) =>
 					option
 						.setName('force')
 						.setDescription(
-							'Force deletion even if no users are in breakout rooms',
+							'Force deletion even if members are still inside breakout rooms',
 						)
 						.setRequired(false),
 				),

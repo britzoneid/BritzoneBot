@@ -11,7 +11,8 @@ import { logger } from '../../../lib/logger.js';
 export type BreakoutSubcommand =
 	| 'create'
 	| 'distribute'
-	| 'end'
+	| 'recall'
+	| 'delete'
 	| 'timer'
 	| 'broadcast'
 	| 'send-message';

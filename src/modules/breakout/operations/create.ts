@@ -56,7 +56,7 @@ export async function executeCreate(
 		if (existingRooms.exists && !force) {
 			return {
 				success: false,
-				message: `There are already ${existingRooms.rooms.length} breakout rooms in this server. Use '/breakout create' with the force flag set to true to replace them, or '/breakout end' first to clean up existing rooms.`,
+				message: `There are already ${existingRooms.rooms.length} breakout rooms in this server. Use '/breakout create' with the force flag set to true to replace them, or '/breakout delete' first to clean up existing rooms.`,
 			};
 		}
 
