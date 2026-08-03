@@ -17,7 +17,7 @@ import {
 	completeOperation,
 	getCompletedSteps,
 	getCurrentOperation,
-	setMainRoom,
+	setMainRoomId,
 	startOperation,
 	updateProgress,
 } from '../state/state.js';
@@ -144,11 +144,11 @@ export async function executeDistribute(
 		const steps = await getCompletedSteps(guildId);
 
 		if (!steps['set_main_room']) {
-			await setMainRoom(guildId, mainRoom);
+			await setMainRoomId(guildId, mainRoom.id);
 			await updateProgress(guildId, 'set_main_room');
 		} else {
 			// Ensure session manager is in sync if we restarted the bot
-			await setMainRoom(guildId, mainRoom);
+			await setMainRoomId(guildId, mainRoom.id);
 		}
 
 		const movePromises: Promise<void>[] = [];

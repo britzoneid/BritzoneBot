@@ -6,7 +6,7 @@ import {
 } from 'discord.js';
 import { createChannel } from '../../../lib/discord/channel.js';
 import { logger } from '../../../lib/logger.js';
-import { clearSession, getRooms, storeRooms } from '../state/state.js';
+import { clearSession, getRooms, storeRoomIds } from '../state/state.js';
 
 interface ExistingRoomsResult {
 	exists: boolean;
@@ -31,7 +31,10 @@ export async function hasExistingBreakoutRooms(
 		// Sync session manager if we found stale rooms
 		if (existingRooms.length !== storedRooms.length) {
 			if (existingRooms.length > 0) {
-				await storeRooms(guild.id, existingRooms);
+				await storeRoomIds(
+					guild.id,
+					existingRooms.map((r) => r.id),
+				);
 			} else {
 				await clearSession(guild.id);
 			}

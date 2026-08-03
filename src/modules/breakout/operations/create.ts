@@ -16,7 +16,7 @@ import {
 	getCompletedSteps,
 	getCurrentOperation,
 	startOperation,
-	storeRooms,
+	storeRoomIds,
 	updateProgress,
 } from '../state/state.js';
 
@@ -137,7 +137,10 @@ export async function executeCreate(
 		await updateProgress(guildId, 'store_rooms', {
 			roomIds: createdChannels.map((c) => c.id),
 		});
-		await storeRooms(guildId, createdChannels);
+		await storeRoomIds(
+			guildId,
+			createdChannels.map((c) => c.id),
+		);
 
 		// Complete operation
 		await completeOperation(guildId);

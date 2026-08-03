@@ -8,6 +8,14 @@ import {
 } from 'discord.js';
 import { logger } from '../../../lib/logger.js';
 
+export type BreakoutSubcommand =
+	| 'create'
+	| 'distribute'
+	| 'end'
+	| 'timer'
+	| 'broadcast'
+	| 'send-message';
+
 /**
  * Single operation step data
  */
@@ -31,8 +39,8 @@ interface OperationProgress {
 /**
  * Current operation details
  */
-interface CurrentOperation {
-	type: string;
+export interface CurrentOperation {
+	type: BreakoutSubcommand | string;
 	params: Record<string, unknown>;
 	progress: OperationProgress;
 }
@@ -55,7 +63,6 @@ export interface TimerData {
 	guildId: string;
 	breakoutRooms: string[];
 	fiveMinSent: boolean;
-	[key: string]: unknown;
 }
 
 /**
@@ -132,10 +139,9 @@ async function saveState(): Promise<void> {
 		}
 	});
 
-	saveQueue = nextSave.catch((error) => {
-		logger.error({ err: error }, '❌ Unhandled error in state save queue');
+	saveQueue = nextSave.catch((err) => {
+		logger.error({ err }, '❌ Save queue encountered an unhandled rejection');
 	});
-
 	return nextSave;
 }
 
@@ -144,7 +150,7 @@ async function saveState(): Promise<void> {
  */
 export async function startOperation(
 	guildId: string,
-	operationType: string,
+	operationType: BreakoutSubcommand | string,
 	params: Record<string, unknown>,
 ): Promise<void> {
 	await initializeState();
@@ -159,13 +165,15 @@ export async function startOperation(
 			startTime: Date.now(),
 		},
 	};
-
-	logger.info({ guildId, operationType }, '📝 Started tracking operation');
+	logger.info(
+		{ guildId, operationType },
+		'🚀 Started tracking new breakout operation',
+	);
 	await saveState();
 }
 
 /**
- * Update progress for an operation
+ * Update progress for a step
  */
 export async function updateProgress(
 	guildId: string,
@@ -176,7 +184,10 @@ export async function updateProgress(
 	const guildState = inMemoryState[guildId];
 
 	if (!guildState?.currentOperation) {
-		logger.warn({ guildId }, '⚠️ No operation in progress');
+		logger.warn(
+			{ guildId, step },
+			'⚠️ Cannot update progress: No active operation',
+		);
 		return false;
 	}
 
@@ -185,8 +196,7 @@ export async function updateProgress(
 		timestamp: Date.now(),
 		...data,
 	};
-
-	logger.debug({ guildId, step }, '✅ Updated progress');
+	logger.debug({ guildId, step }, '🔄 Updated operation progress');
 	await saveState();
 	return true;
 }
@@ -206,22 +216,15 @@ export async function completeOperation(guildId: string): Promise<void> {
 	if (!guildState.history) {
 		guildState.history = [];
 	}
-
 	guildState.history.push(guildState.currentOperation);
-
-	const HISTORY_MAX = 50;
-	if (guildState.history.length > HISTORY_MAX) {
-		guildState.history = guildState.history.slice(-HISTORY_MAX);
-	}
-
 	delete guildState.currentOperation;
 
-	logger.info({ guildId }, '🏁 Completed operation');
+	logger.info({ guildId }, '✅ Completed breakout operation');
 	await saveState();
 }
 
 /**
- * Check if there's an operation in progress
+ * Check if operation is in progress
  */
 export async function hasOperationInProgress(
 	guildId: string,
@@ -230,13 +233,13 @@ export async function hasOperationInProgress(
 	const guildState = inMemoryState[guildId];
 
 	return (
-		!!guildState?.currentOperation &&
-		!guildState.currentOperation.progress.completed
+		Boolean(guildState?.currentOperation) &&
+		!guildState?.currentOperation?.progress?.completed
 	);
 }
 
 /**
- * Get the current operation details
+ * Get current operation
  */
 export async function getCurrentOperation(
 	guildId: string,
@@ -247,7 +250,7 @@ export async function getCurrentOperation(
 }
 
 /**
- * Get completed steps for the current operation (returns shallow copy)
+ * Get completed steps for current operation
  */
 export async function getCompletedSteps(
 	guildId: string,
@@ -260,38 +263,41 @@ export async function getCompletedSteps(
 }
 
 /**
- * Stores breakout rooms for a guild on disk
+ * Stores breakout room IDs for a guild on disk
  */
-export async function storeRooms(
+export async function storeRoomIds(
 	guildId: string,
-	rooms: VoiceChannel[],
+	roomIds: string[],
 ): Promise<void> {
 	await initializeState();
 	const guildState = getGuildState(guildId);
 	guildState.session = {
 		...guildState.session,
-		roomIds: rooms.map((r) => r.id),
+		roomIds,
 	};
-	logger.debug({ guildId, count: rooms.length }, '📝 Stored breakout rooms');
+	logger.debug(
+		{ guildId, count: roomIds.length },
+		'📝 Stored breakout room IDs',
+	);
 	await saveState();
 }
 
 /**
- * Sets the main room for a guild's breakout session on disk
+ * Sets the main room ID for a guild's breakout session on disk
  */
-export async function setMainRoom(
+export async function setMainRoomId(
 	guildId: string,
-	mainRoom: VoiceBasedChannel,
+	mainRoomId: string,
 ): Promise<void> {
 	await initializeState();
 	const guildState = getGuildState(guildId);
 	guildState.session = {
 		...guildState.session,
-		mainRoomId: mainRoom.id,
+		mainRoomId,
 	};
 	logger.debug(
-		{ guildId, mainRoom: mainRoom.name },
-		'📝 Set main room for breakout session',
+		{ guildId, mainRoomId },
+		'📝 Set main room ID for breakout session',
 	);
 	await saveState();
 }
@@ -300,18 +306,39 @@ export async function setMainRoom(
  * Gets the breakout rooms for a guild resolved from Discord client cache
  */
 export function getRooms(guild: Guild): VoiceChannel[] {
+	if (!initialized) {
+		logger.warn('getRooms called before initializeState');
+	}
 	const guildState = inMemoryState[guild.id];
 	const roomIds = guildState?.session?.roomIds || [];
 
+	if (roomIds.length === 0) {
+		return Array.from(
+			guild.channels.cache
+				.filter(
+					(channel): channel is VoiceChannel =>
+						channel.type === ChannelType.GuildVoice &&
+						channel.name.startsWith('breakout-room-'),
+				)
+				.values(),
+		);
+	}
+
 	return roomIds
 		.map((id) => guild.channels.cache.get(id))
-		.filter((ch): ch is VoiceChannel => ch?.type === ChannelType.GuildVoice);
+		.filter(
+			(channel): channel is VoiceChannel =>
+				channel !== undefined && channel.type === ChannelType.GuildVoice,
+		);
 }
 
 /**
  * Gets the main room for a guild resolved from Discord client cache
  */
 export function getMainRoom(guild: Guild): VoiceBasedChannel | undefined {
+	if (!initialized) {
+		logger.warn('getMainRoom called before initializeState');
+	}
 	const guildState = inMemoryState[guild.id];
 	const mainRoomId = guildState?.session?.mainRoomId;
 	if (!mainRoomId) return undefined;
