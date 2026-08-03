@@ -29,7 +29,7 @@ export async function handleDistributeCommand(
 		| VoiceChannel
 		| StageChannel;
 
-	if (!mainRoom || !mainRoom.isVoiceBased()) {
+	if (!mainRoom?.isVoiceBased()) {
 		await replyOrEdit(interaction, {
 			content: 'Selected main room must be a voice or stage channel.',
 			ephemeral: true,

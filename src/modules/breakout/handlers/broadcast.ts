@@ -14,6 +14,7 @@ export async function handleBroadcastCommand(
 ): Promise<void> {
 	if (!interaction.guildId || !interaction.guild) return;
 
+	const { guild } = interaction;
 	const message = interaction.options.getString('message', true);
 	const log = logger.child({
 		subcommand: 'broadcast',
@@ -25,10 +26,7 @@ export async function handleBroadcastCommand(
 	await handleInteraction(
 		interaction,
 		async () => {
-			const result = await broadcastToBreakoutRooms(
-				interaction.guild!,
-				message,
-			);
+			const result = await broadcastToBreakoutRooms(guild, message);
 
 			if (result.success) {
 				const embed = new EmbedBuilder()

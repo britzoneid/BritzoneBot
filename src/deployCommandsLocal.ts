@@ -18,6 +18,9 @@ if (!BOT_ID || !TOKEN) {
 	throw new Error('BOT_ID and TOKEN must be defined in environment variables');
 }
 
+const botId: string = BOT_ID;
+const token: string = TOKEN;
+
 /**
  * Guild list structure from guildList.json
  */
@@ -29,7 +32,9 @@ interface GuildList {
 const guildListPath = path.join(__dirname, '..', 'guildList.json');
 
 if (!fs.existsSync(guildListPath)) {
-	const finalLogger = (pino as any).final(logger);
+	const finalLogger = (
+		pino as unknown as { final: (logger: pino.Logger) => pino.Logger }
+	).final(logger);
 	finalLogger.fatal(
 		'Error: guildList.json not found. Please copy guildList.json.example to guildList.json and configure your guild IDs.',
 	);
@@ -74,7 +79,7 @@ for (const folder of commandFolders) {
 }
 
 // Construct and prepare an instance of the REST module
-const rest = new REST().setToken(TOKEN);
+const rest = new REST().setToken(token);
 
 /**
  * Deploys commands to a specific guild
@@ -92,7 +97,7 @@ async function deployCommands(
 
 		// The put method is used to fully refresh all commands in the guild with the current set
 		const data = (await rest.put(
-			Routes.applicationGuildCommands(BOT_ID!, guildId),
+			Routes.applicationGuildCommands(botId, guildId),
 			{
 				body: commands,
 			},

@@ -143,7 +143,7 @@ export async function executeDistribute(
 		// But we should update progress step 'set_main_room'
 		const steps = await getCompletedSteps(guildId);
 
-		if (!steps['set_main_room']) {
+		if (!steps.set_main_room) {
 			await setMainRoomId(guildId, mainRoom.id);
 			await updateProgress(guildId, 'set_main_room');
 		} else {
@@ -207,7 +207,7 @@ export async function executeDistribute(
 							});
 							await updateProgress(guildId, moveKey);
 						})
-						.catch((error: any) => {
+						.catch((error: unknown) => {
 							moveResults.failed.push({
 								userId: user.id,
 								userTag: user.user.tag,

@@ -56,7 +56,7 @@ export async function executeEnd(
 		const storedRoomIds = currentOp.params.roomIds as string[];
 		if (storedRoomIds) {
 			breakoutRooms = storedRoomIds
-				.map((id) => interaction.guild!.channels.cache.get(id) as VoiceChannel)
+				.map((id) => interaction.guild?.channels.cache.get(id) as VoiceChannel)
 				.filter((c) => c !== undefined);
 		}
 
@@ -96,7 +96,7 @@ export async function executeEnd(
 			const guildRoom = interaction.guild.channels.cache.get(room.id) as
 				| VoiceChannel
 				| undefined;
-			if (guildRoom && guildRoom.members && guildRoom.members.size > 0) {
+			if (guildRoom?.members && guildRoom.members.size > 0) {
 				hasUsers = true;
 				totalUsers += guildRoom.members.size;
 			}
