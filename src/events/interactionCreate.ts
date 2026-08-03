@@ -1,13 +1,13 @@
 import type { Interaction } from 'discord.js';
 import { Events } from 'discord.js';
-import { replyOrEdit } from '../lib/discord/response.js';
-import { logger } from '../lib/logger.js';
+import { replyOrEdit } from '@/lib/discord/response.js';
+import { logger } from '@/lib/logger.js';
 import type {
 	BritzoneClient,
 	Command,
 	Event,
 	SlashCommand,
-} from '../types/index.js';
+} from '@/types/index.js';
 
 /**
  * Type guard for slash commands

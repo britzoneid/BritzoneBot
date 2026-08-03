@@ -3,12 +3,9 @@ import {
 	MessageFlags,
 	type VoiceChannel,
 } from 'discord.js';
-import {
-	handleInteraction,
-	replyOrEdit,
-} from '../../../lib/discord/response.js';
-import { logger } from '../../../lib/logger.js';
-import { sendMessageToChannel } from '../services/message.js';
+import { handleInteraction, replyOrEdit } from '@/lib/discord/response.js';
+import { logger } from '@/lib/logger.js';
+import { sendMessageToChannel } from '@/modules/breakout/services/message.js';
 
 /**
  * Handles the send-message subcommand for voice channels

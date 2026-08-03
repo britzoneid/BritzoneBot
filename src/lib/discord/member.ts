@@ -1,5 +1,5 @@
 import type { GuildMember, StageChannel, VoiceChannel } from 'discord.js';
-import { logger } from '../logger.js';
+import { logger } from '@/lib/logger.js';
 
 /**
  * Move a user to a specified voice channel

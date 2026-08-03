@@ -3,16 +3,11 @@ import type {
 	VoiceBasedChannel,
 	VoiceChannel,
 } from 'discord.js';
-import { logger } from '../../../lib/logger.js';
-import type {
-	MoveFailure,
-	MoveResult,
-	OperationResult,
-} from '../../../types/index.js';
+import { logger } from '@/lib/logger.js';
 import {
 	hasActiveDistribution,
 	moveUserToRoom,
-} from '../services/distribution.js';
+} from '@/modules/breakout/services/distribution.js';
 import {
 	completeOperation,
 	getCompletedSteps,
@@ -20,8 +15,13 @@ import {
 	setMainRoomId,
 	startOperation,
 	updateProgress,
-} from '../state/state.js';
-import type { UserDistribution } from '../utils/distribution.js';
+} from '@/modules/breakout/state/state.js';
+import type { UserDistribution } from '@/modules/breakout/utils/distribution.js';
+import type {
+	MoveFailure,
+	MoveResult,
+	OperationResult,
+} from '@/types/index.js';
 
 export async function executeDistribute(
 	interaction: CommandInteraction,

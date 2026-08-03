@@ -9,9 +9,9 @@ import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Client, Collection, GatewayIntentBits } from 'discord.js';
-import { logger } from './lib/logger.js';
-import { initializeState } from './modules/breakout/state/state.js';
-import type { BritzoneClient, Command, Event } from './types/index.js';
+import { logger } from '@/lib/logger.js';
+import { initializeState } from '@/modules/breakout/state/state.js';
+import type { BritzoneClient, Command, Event } from '@/types/index.js';
 
 const __dirname = import.meta.dirname;
 

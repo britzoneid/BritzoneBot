@@ -3,9 +3,8 @@ import {
 	type CommandInteraction,
 	type VoiceChannel,
 } from 'discord.js';
-import { logger } from '../../../lib/logger.js';
-import type { OperationResult } from '../../../types/index.js';
-import { deleteRoom } from '../services/room.js';
+import { logger } from '@/lib/logger.js';
+import { deleteRoom } from '@/modules/breakout/services/room.js';
 import {
 	clearSession,
 	completeOperation,
@@ -14,7 +13,8 @@ import {
 	getRooms,
 	startOperation,
 	updateProgress,
-} from '../state/state.js';
+} from '@/modules/breakout/state/state.js';
+import type { OperationResult } from '@/types/index.js';
 
 /**
  * Executes the delete operation: deletes all breakout room channels and clears the session state.

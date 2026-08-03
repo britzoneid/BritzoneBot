@@ -4,8 +4,8 @@ import type {
 	StageChannel,
 	VoiceChannel,
 } from 'discord.js';
-import { moveUser } from '../../../lib/discord/member.js';
-import { getMainRoom, getRooms } from '../state/state.js';
+import { moveUser } from '@/lib/discord/member.js';
+import { getMainRoom, getRooms } from '@/modules/breakout/state/state.js';
 
 /**
  * Checks if a distribution is currently active

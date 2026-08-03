@@ -1,6 +1,6 @@
 import { Events } from 'discord.js';
-import { logger } from '../lib/logger.js';
-import type { Event } from '../types/index.js';
+import { logger } from '@/lib/logger.js';
+import type { Event } from '@/types/index.js';
 
 /**
  * Ready event - fires once when the bot is ready

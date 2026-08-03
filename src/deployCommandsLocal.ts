@@ -7,8 +7,8 @@ import {
 	Routes,
 } from 'discord.js';
 import pino from 'pino';
-import { logger } from './lib/logger.js';
-import type { Command } from './types/index.js';
+import { logger } from '@/lib/logger.js';
+import type { Command } from '@/types/index.js';
 
 const __dirname = import.meta.dirname;
 

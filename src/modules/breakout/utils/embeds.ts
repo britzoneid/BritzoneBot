@@ -4,8 +4,8 @@ import {
 	type VoiceBasedChannel,
 	type VoiceChannel,
 } from 'discord.js';
-import { logger } from '../../../lib/logger.js';
-import type { MoveFailure, MoveResult } from '../../../types/index.js';
+import { logger } from '@/lib/logger.js';
+import type { MoveFailure, MoveResult } from '@/types/index.js';
 import type { UserDistribution } from './distribution.js';
 
 interface DistributionEmbedParams {

@@ -1,6 +1,6 @@
 import type { Guild, VoiceChannel } from 'discord.js';
-import { logger } from '../../../lib/logger.js';
-import { getRooms } from '../state/state.js';
+import { logger } from '@/lib/logger.js';
+import { getRooms } from '@/modules/breakout/state/state.js';
 
 interface BroadcastResult {
 	success: boolean;

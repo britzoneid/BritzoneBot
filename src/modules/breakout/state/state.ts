@@ -6,7 +6,7 @@ import {
 	type VoiceBasedChannel,
 	type VoiceChannel,
 } from 'discord.js';
-import { logger } from '../../../lib/logger.js';
+import { logger } from '@/lib/logger.js';
 
 export type BreakoutSubcommand =
 	| 'create'

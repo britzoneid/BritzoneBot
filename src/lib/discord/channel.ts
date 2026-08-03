@@ -4,7 +4,7 @@ import {
 	type Guild,
 	type VoiceChannel,
 } from 'discord.js';
-import { logger } from '../logger.js';
+import { logger } from '@/lib/logger.js';
 
 /**
  * Creates a new voice channel

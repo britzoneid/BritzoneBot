@@ -1,12 +1,12 @@
 import type { Client } from 'discord.js';
 import type { Logger } from 'pino';
-import { logger } from '../../../lib/logger.js';
+import { logger } from '@/lib/logger.js';
 import {
 	clearTimerData,
 	getTimerData,
 	setTimerData,
 	type TimerData,
-} from '../state/state.js';
+} from '@/modules/breakout/state/state.js';
 
 /**
  * Monitors a breakout timer and sends reminders at defined intervals.

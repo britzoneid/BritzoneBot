@@ -1,10 +1,7 @@
 import type { ChatInputCommandInteraction } from 'discord.js';
-import {
-	handleInteraction,
-	replyOrEdit,
-} from '../../../lib/discord/response.js';
-import { logger } from '../../../lib/logger.js';
-import { executeDelete } from '../operations/delete.js';
+import { handleInteraction, replyOrEdit } from '@/lib/discord/response.js';
+import { logger } from '@/lib/logger.js';
+import { executeDelete } from '@/modules/breakout/operations/delete.js';
 
 /**
  * Handles the delete subcommand for breakout rooms

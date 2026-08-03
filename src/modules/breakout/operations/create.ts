@@ -3,13 +3,12 @@ import {
 	type CommandInteraction,
 	type VoiceChannel,
 } from 'discord.js';
-import { logger } from '../../../lib/logger.js';
-import type { OperationResult } from '../../../types/index.js';
+import { logger } from '@/lib/logger.js';
 import {
 	createRoom,
 	deleteRoom,
 	hasExistingBreakoutRooms,
-} from '../services/room.js';
+} from '@/modules/breakout/services/room.js';
 import {
 	clearSession,
 	completeOperation,
@@ -18,7 +17,8 @@ import {
 	startOperation,
 	storeRoomIds,
 	updateProgress,
-} from '../state/state.js';
+} from '@/modules/breakout/state/state.js';
+import type { OperationResult } from '@/types/index.js';
 
 /**
  * Executes the create breakout rooms operation

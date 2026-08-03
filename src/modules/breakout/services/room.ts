@@ -4,9 +4,13 @@ import {
 	type Guild,
 	type VoiceChannel,
 } from 'discord.js';
-import { createChannel } from '../../../lib/discord/channel.js';
-import { logger } from '../../../lib/logger.js';
-import { clearSession, getRooms, storeRoomIds } from '../state/state.js';
+import { createChannel } from '@/lib/discord/channel.js';
+import { logger } from '@/lib/logger.js';
+import {
+	clearSession,
+	getRooms,
+	storeRoomIds,
+} from '@/modules/breakout/state/state.js';
 
 interface ExistingRoomsResult {
 	exists: boolean;

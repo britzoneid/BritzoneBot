@@ -4,8 +4,8 @@ import {
 	PermissionFlagsBits,
 	SlashCommandBuilder,
 } from 'discord.js';
-import { replyOrEdit } from '../../lib/discord/response.js';
-import { logger } from '../../lib/logger.js';
+import { replyOrEdit } from '@/lib/discord/response.js';
+import { logger } from '@/lib/logger.js';
 import {
 	handleBroadcastCommand,
 	handleCreateCommand,
@@ -14,13 +14,13 @@ import {
 	handleRecallCommand,
 	handleSendMessageCommand,
 	handleTimerCommand,
-} from '../../modules/breakout/handlers/index.js';
+} from '@/modules/breakout/handlers/index.js';
 import {
 	type BreakoutSubcommand,
 	getCurrentOperation,
 	hasOperationInProgress,
-} from '../../modules/breakout/state/state.js';
-import type { Command } from '../../types/index.js';
+} from '@/modules/breakout/state/state.js';
+import type { Command } from '@/types/index.js';
 
 const subcommandHandlers: Record<
 	BreakoutSubcommand,

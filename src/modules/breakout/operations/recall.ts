@@ -4,9 +4,8 @@ import {
 	type VoiceBasedChannel,
 	type VoiceChannel,
 } from 'discord.js';
-import { logger } from '../../../lib/logger.js';
-import type { OperationResult } from '../../../types/index.js';
-import { moveUserToRoom } from '../services/distribution.js';
+import { logger } from '@/lib/logger.js';
+import { moveUserToRoom } from '@/modules/breakout/services/distribution.js';
 import {
 	completeOperation,
 	getCompletedSteps,
@@ -14,7 +13,8 @@ import {
 	getRooms,
 	startOperation,
 	updateProgress,
-} from '../state/state.js';
+} from '@/modules/breakout/state/state.js';
+import type { OperationResult } from '@/types/index.js';
 
 /**
  * Executes the recall operation: moves all members from breakout rooms back to the main voice channel.

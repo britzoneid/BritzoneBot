@@ -1,8 +1,8 @@
 import type { ChatInputCommandInteraction } from 'discord.js';
-import { replyOrEdit } from '../../../lib/discord/response.js';
-import { logger } from '../../../lib/logger.js';
-import { monitorBreakoutTimer } from '../services/timer.js';
-import { getRooms, setTimerData } from '../state/state.js';
+import { replyOrEdit } from '@/lib/discord/response.js';
+import { logger } from '@/lib/logger.js';
+import { monitorBreakoutTimer } from '@/modules/breakout/services/timer.js';
+import { getRooms, setTimerData } from '@/modules/breakout/state/state.js';
 
 /**
  * Handles the timer subcommand for breakout rooms

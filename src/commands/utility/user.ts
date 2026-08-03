@@ -3,8 +3,8 @@ import {
 	type GuildMember,
 	SlashCommandBuilder,
 } from 'discord.js';
-import { handleInteraction, replyOrEdit } from '../../lib/discord/response.js';
-import type { Command } from '../../types/index.js';
+import { handleInteraction, replyOrEdit } from '@/lib/discord/response.js';
+import type { Command } from '@/types/index.js';
 
 const command: Command = {
 	data: new SlashCommandBuilder()

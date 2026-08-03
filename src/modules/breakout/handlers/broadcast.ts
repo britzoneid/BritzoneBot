@@ -1,10 +1,7 @@
 import { type ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
-import {
-	handleInteraction,
-	replyOrEdit,
-} from '../../../lib/discord/response.js';
-import { logger } from '../../../lib/logger.js';
-import { broadcastToBreakoutRooms } from '../services/message.js';
+import { handleInteraction, replyOrEdit } from '@/lib/discord/response.js';
+import { logger } from '@/lib/logger.js';
+import { broadcastToBreakoutRooms } from '@/modules/breakout/services/message.js';
 
 /**
  * Handles the broadcast subcommand for breakout rooms

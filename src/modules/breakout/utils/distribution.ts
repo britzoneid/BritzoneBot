@@ -1,6 +1,6 @@
 import { randomInt } from 'node:crypto';
 import type { GuildMember, StageChannel, VoiceChannel } from 'discord.js';
-import { logger } from '../../../lib/logger.js';
+import { logger } from '@/lib/logger.js';
 
 /**
  * Result of user distribution

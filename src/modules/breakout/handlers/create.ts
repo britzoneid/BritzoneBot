@@ -1,10 +1,7 @@
 import type { ChatInputCommandInteraction } from 'discord.js';
-import {
-	handleInteraction,
-	replyOrEdit,
-} from '../../../lib/discord/response.js';
-import { logger } from '../../../lib/logger.js';
-import { executeCreate } from '../operations/create.js';
+import { handleInteraction, replyOrEdit } from '@/lib/discord/response.js';
+import { logger } from '@/lib/logger.js';
+import { executeCreate } from '@/modules/breakout/operations/create.js';
 
 /**
  * Handles the create subcommand for breakout rooms

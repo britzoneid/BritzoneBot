@@ -2,13 +2,10 @@ import type {
 	ChatInputCommandInteraction,
 	VoiceBasedChannel,
 } from 'discord.js';
-import {
-	handleInteraction,
-	replyOrEdit,
-} from '../../../lib/discord/response.js';
-import { logger } from '../../../lib/logger.js';
-import { executeRecall } from '../operations/recall.js';
-import { getMainRoom } from '../state/state.js';
+import { handleInteraction, replyOrEdit } from '@/lib/discord/response.js';
+import { logger } from '@/lib/logger.js';
+import { executeRecall } from '@/modules/breakout/operations/recall.js';
+import { getMainRoom } from '@/modules/breakout/state/state.js';
 
 /**
  * Handles the recall subcommand for breakout rooms

@@ -7,15 +7,12 @@ import {
 	type StageChannel,
 	type VoiceChannel,
 } from 'discord.js';
-import {
-	handleInteraction,
-	replyOrEdit,
-} from '../../../lib/discord/response.js';
-import { logger } from '../../../lib/logger.js';
-import { executeDistribute } from '../operations/distribute.js';
-import { getRooms } from '../state/state.js';
-import { distributeUsers } from '../utils/distribution.js';
-import { buildDistributionEmbed } from '../utils/embeds.js';
+import { handleInteraction, replyOrEdit } from '@/lib/discord/response.js';
+import { logger } from '@/lib/logger.js';
+import { executeDistribute } from '@/modules/breakout/operations/distribute.js';
+import { getRooms } from '@/modules/breakout/state/state.js';
+import { distributeUsers } from '@/modules/breakout/utils/distribution.js';
+import { buildDistributionEmbed } from '@/modules/breakout/utils/embeds.js';
 
 /**
  * Handles the distribute subcommand for breakout rooms
