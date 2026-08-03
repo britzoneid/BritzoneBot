@@ -12,7 +12,7 @@
 		"dev": "bun --watch src/index.ts",
 		"format": "biome format --write",
 		"lint": "biome lint",
-		"type-check": "tsc --noEmit"
+		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
 		"pino-pretty": "^13.1.3",
