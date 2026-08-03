@@ -18,9 +18,9 @@ export async function handleEndCommand(
 ): Promise<void> {
 	if (!interaction.guildId || !interaction.guild) return;
 
-	// Support both 'mainroom' (standardized) and 'main_room' (legacy fallback)
-	let mainChannel = (interaction.options.getChannel('mainroom') ||
-		interaction.options.getChannel('main_room')) as VoiceBasedChannel | null;
+	let mainChannel = interaction.options.getChannel(
+		'mainroom',
+	) as VoiceBasedChannel | null;
 	const force = interaction.options.getBoolean('force') || false;
 
 	if (!mainChannel) {
@@ -36,10 +36,12 @@ export async function handleEndCommand(
 		}
 	}
 
+	const targetMainChannel = mainChannel;
+
 	const log = logger.child({
 		subcommand: 'end',
 		guildId: interaction.guildId,
-		mainRoom: mainChannel.name,
+		mainRoom: targetMainChannel.name,
 		force,
 	});
 
@@ -48,7 +50,7 @@ export async function handleEndCommand(
 	await handleInteraction(
 		interaction,
 		async () => {
-			const result = await executeEnd(interaction, mainChannel, force);
+			const result = await executeEnd(interaction, targetMainChannel, force);
 
 			if (result.success) {
 				await replyOrEdit(interaction, result.message);

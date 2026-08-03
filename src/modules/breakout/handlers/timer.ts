@@ -34,6 +34,7 @@ export async function handleTimerCommand(
 
 	const fiveMinWarningTime = minutes - 5;
 	const timerData = {
+		timerId: `${interaction.guildId}_${Date.now()}`,
 		totalMinutes: minutes,
 		startTime: Date.now(),
 		guildId: interaction.guildId,

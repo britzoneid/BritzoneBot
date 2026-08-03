@@ -18,18 +18,19 @@ export async function monitorBreakoutTimer(
 	timerData: TimerData,
 	client: Client,
 ): Promise<void> {
-	const { totalMinutes, startTime, guildId, breakoutRooms } = timerData;
+	const { timerId, totalMinutes, startTime, guildId, breakoutRooms } =
+		timerData;
 	const endTime = startTime + totalMinutes * 60 * 1000;
-	const log = logger.child({ guildId });
+	const log = logger.child({ guildId, timerId });
 
-	log.info({ totalMinutes }, `⏱️ Started breakout timer monitoring`);
+	log.info({ totalMinutes }, '⏱️ Started breakout timer monitoring');
 
 	// Use recursive setTimeout to prevent overlapping async executions
 	async function monitorTick(): Promise<void> {
 		try {
 			const timerState = await getTimerData(guildId);
-			if (!timerState) {
-				log.debug(`⏱️ Timer was cancelled or removed`);
+			if (!timerState || (timerId && timerState.timerId !== timerId)) {
+				log.debug('⏱️ Timer was cancelled, replaced, or removed');
 				return; // Stop monitoring
 			}
 

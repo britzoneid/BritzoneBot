@@ -1,4 +1,8 @@
-import type { ChatInputCommandInteraction, VoiceChannel } from 'discord.js';
+import {
+	type ChatInputCommandInteraction,
+	MessageFlags,
+	type VoiceChannel,
+} from 'discord.js';
 import { replyOrEdit } from '../../../lib/discord/response.js';
 import { logger } from '../../../lib/logger.js';
 import { sendMessageToChannel } from '../services/message.js';
@@ -27,6 +31,6 @@ export async function handleSendMessageCommand(
 
 	await replyOrEdit(interaction, {
 		content: result.message,
-		ephemeral: !result.success,
+		flags: !result.success ? MessageFlags.Ephemeral : undefined,
 	});
 }

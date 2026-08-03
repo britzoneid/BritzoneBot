@@ -49,6 +49,7 @@ export interface PersistedSession {
  * Timer data for breakout sessions
  */
 export interface TimerData {
+	timerId?: string;
 	totalMinutes: number;
 	startTime: number;
 	guildId: string;
@@ -91,13 +92,6 @@ export async function initializeState(): Promise<void> {
 }
 
 /**
- * Internal alias for lazy initialize
- */
-async function initialize(): Promise<void> {
-	return initializeState();
-}
-
-/**
  * Gets or creates the GuildState entry for a guild
  */
 function getGuildState(guildId: string): GuildState {
@@ -127,13 +121,10 @@ async function loadState(): Promise<void> {
 	}
 }
 
-/**
- * Save state to disk with concurrency safety
- */
 async function saveState(): Promise<void> {
 	const nextSave = saveQueue.then(async () => {
 		try {
-			await initialize();
+			await initializeState();
 			await fs.writeFile(stateFile, JSON.stringify(inMemoryState, null, 2));
 			logger.trace('💾 Saved breakout state data');
 		} catch (error) {
@@ -156,7 +147,7 @@ export async function startOperation(
 	operationType: string,
 	params: Record<string, unknown>,
 ): Promise<void> {
-	await initialize();
+	await initializeState();
 	const guildState = getGuildState(guildId);
 	guildState.currentOperation = {
 		type: operationType,
@@ -181,7 +172,7 @@ export async function updateProgress(
 	step: string,
 	data: Record<string, unknown> = {},
 ): Promise<boolean> {
-	await initialize();
+	await initializeState();
 	const guildState = inMemoryState[guildId];
 
 	if (!guildState?.currentOperation) {
@@ -204,7 +195,7 @@ export async function updateProgress(
  * Complete an operation
  */
 export async function completeOperation(guildId: string): Promise<void> {
-	await initialize();
+	await initializeState();
 	const guildState = inMemoryState[guildId];
 
 	if (!guildState?.currentOperation) return;
@@ -235,7 +226,7 @@ export async function completeOperation(guildId: string): Promise<void> {
 export async function hasOperationInProgress(
 	guildId: string,
 ): Promise<boolean> {
-	await initialize();
+	await initializeState();
 	const guildState = inMemoryState[guildId];
 
 	return (
@@ -250,7 +241,7 @@ export async function hasOperationInProgress(
 export async function getCurrentOperation(
 	guildId: string,
 ): Promise<CurrentOperation | undefined> {
-	await initialize();
+	await initializeState();
 	const guildState = inMemoryState[guildId];
 	return guildState?.currentOperation;
 }
@@ -261,7 +252,7 @@ export async function getCurrentOperation(
 export async function getCompletedSteps(
 	guildId: string,
 ): Promise<Record<string, OperationStep>> {
-	await initialize();
+	await initializeState();
 	const guildState = inMemoryState[guildId];
 
 	if (!guildState?.currentOperation) return {};
@@ -275,7 +266,7 @@ export async function storeRooms(
 	guildId: string,
 	rooms: VoiceChannel[],
 ): Promise<void> {
-	await initialize();
+	await initializeState();
 	const guildState = getGuildState(guildId);
 	guildState.session = {
 		...guildState.session,
@@ -292,7 +283,7 @@ export async function setMainRoom(
 	guildId: string,
 	mainRoom: VoiceBasedChannel,
 ): Promise<void> {
-	await initialize();
+	await initializeState();
 	const guildState = getGuildState(guildId);
 	guildState.session = {
 		...guildState.session,
@@ -336,7 +327,7 @@ export function getMainRoom(guild: Guild): VoiceBasedChannel | undefined {
  * Clears session data for a guild from disk
  */
 export async function clearSession(guildId: string): Promise<void> {
-	await initialize();
+	await initializeState();
 	const guildState = getGuildState(guildId);
 	delete guildState.session;
 	logger.debug({ guildId }, '🧹 Cleared breakout session');
@@ -350,7 +341,7 @@ export async function setTimerData(
 	guildId: string,
 	timerData: TimerData,
 ): Promise<void> {
-	await initialize();
+	await initializeState();
 	const guildState = getGuildState(guildId);
 	guildState.timerData = timerData;
 	logger.debug({ guildId }, '💾 Storing timer data');
@@ -361,7 +352,7 @@ export async function setTimerData(
  * Gets timer data for a guild
  */
 export async function getTimerData(guildId: string): Promise<TimerData | null> {
-	await initialize();
+	await initializeState();
 	const guildState = inMemoryState[guildId];
 	return guildState?.timerData || null;
 }
@@ -370,7 +361,7 @@ export async function getTimerData(guildId: string): Promise<TimerData | null> {
  * Clears timer data for a guild
  */
 export async function clearTimerData(guildId: string): Promise<void> {
-	await initialize();
+	await initializeState();
 	const guildState = getGuildState(guildId);
 	delete guildState.timerData;
 	logger.debug({ guildId }, '🗑️ Clearing timer data');

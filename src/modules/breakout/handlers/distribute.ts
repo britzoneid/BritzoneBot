@@ -24,6 +24,15 @@ export async function handleDistributeCommand(
 	const mainRoom = interaction.options.getChannel('mainroom', true) as
 		| VoiceChannel
 		| StageChannel;
+
+	if (!mainRoom || !mainRoom.isVoiceBased()) {
+		await replyOrEdit(interaction, {
+			content: 'Selected main room must be a voice or stage channel.',
+			ephemeral: true,
+		});
+		return;
+	}
+
 	const facilitatorsInput = interaction.options.getString('facilitators');
 	const force = interaction.options.getBoolean('force') || false;
 
