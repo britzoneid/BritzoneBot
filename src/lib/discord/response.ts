@@ -1,4 +1,11 @@
-import type { CommandInteraction, RepliableInteraction } from 'discord.js';
+import type {
+	CommandInteraction,
+	InteractionEditReplyOptions,
+	InteractionReplyOptions,
+	Message,
+	MessagePayload,
+	RepliableInteraction,
+} from 'discord.js';
 import { MessageFlags } from 'discord.js';
 import { logger } from '../logger.js';
 
@@ -16,8 +23,9 @@ interface InteractionHandlerOptions {
  * @returns The error code if present, otherwise undefined
  */
 function getErrorCode(error: Error): string | number | undefined {
-	const errorObj = error as any; // Errors from different sources have code properties
-	return errorObj.code;
+	return 'code' in error
+		? (error as Error & { code?: string | number }).code
+		: undefined;
 }
 
 /**
@@ -41,7 +49,7 @@ function getErrorCode(error: Error): string | number | undefined {
  *   { deferReply: true, ephemeral: true }
  * );
  * ```
- */
+ * */
 export async function handleInteraction(
 	interaction: RepliableInteraction | CommandInteraction,
 	handler: () => Promise<void>,
@@ -139,9 +147,15 @@ export async function handleInteraction(
  */
 export function replyOrEdit(
 	interaction: RepliableInteraction | CommandInteraction,
-	content: string | any,
-): Promise<any> {
-	return interaction.replied || interaction.deferred
-		? interaction.editReply(content)
-		: interaction.reply(content);
+	content:
+		| string
+		| InteractionReplyOptions
+		| InteractionEditReplyOptions
+		| MessagePayload,
+): Promise<Message> {
+	return (
+		interaction.replied || interaction.deferred
+			? interaction.editReply(content as InteractionEditReplyOptions)
+			: interaction.reply(content as InteractionReplyOptions)
+	) as Promise<Message>;
 }

@@ -370,8 +370,11 @@ async function handleDistributeCommand(
 				if (result.moveResults?.success) {
 					// Build actual user list from successful moves
 					const actualUsers = result.moveResults.success
-						.filter((entry: string) => entry.includes(`→ ${room.name}`))
-						.map((entry: string) => entry.split(' → ')[0]);
+						.filter(
+							(entry): entry is string =>
+								typeof entry === 'string' && entry.includes(`→ ${room.name}`),
+						)
+						.map((entry) => entry.split(' → ')[0]);
 					usersInRoom =
 						actualUsers.length > 0
 							? actualUsers.join('\n')
