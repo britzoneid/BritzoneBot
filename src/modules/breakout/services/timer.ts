@@ -1,4 +1,4 @@
-import { ChannelType, type Client, type GuildBasedChannel } from 'discord.js';
+import type { Client } from 'discord.js';
 import type { Logger } from 'pino';
 import { logger } from '../../../lib/logger.js';
 import {
@@ -111,30 +111,14 @@ async function sendReminderWithRetry(
 			continue;
 		}
 
-		// Try to find a text channel that matches the voice channel name
-		// This logic assumes a naming convention used in the project
-		const textChannel = guild.channels.cache.find(
-			(c: GuildBasedChannel) =>
-				c.type === ChannelType.GuildText &&
-				c.name
-					.toLowerCase()
-					.includes(voiceChannel.name.toLowerCase().replace(/\s+/g, '-')),
-		);
-
-		if (!textChannel) {
-			log.warn(
-				{ voiceChannel: voiceChannel.name },
-				`⚠️ Could not find matching text channel`,
-			);
-			continue;
-		}
+		// assume the voice channel has integrated text channel
+		const textChannel = voiceChannel;
 
 		// Type guard: ensure it's a text channel before sending
 		if (!textChannel.isTextBased()) {
 			log.warn({ channelId: textChannel.id }, `⚠️ Channel is not text-based`);
 			continue;
 		}
-
 		let success = false;
 		let attempts = 0;
 
