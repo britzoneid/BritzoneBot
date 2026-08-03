@@ -25,6 +25,7 @@ import {
 	setTimerData,
 } from '../../modules/breakout/state/state.js';
 import { distributeUsers } from '../../modules/breakout/utils/distribution.js';
+import { buildDistributionEmbed } from '../../modules/breakout/utils/embeds.js';
 import type { Command } from '../../types/index.js';
 
 const command: Command = {
@@ -334,77 +335,16 @@ async function handleDistributeCommand(
 				return;
 			}
 
-			// Create embed for nice formatting
+			// Create embed using presentation helper
 			log.debug(`📝 Creating response embed`);
-			const embed = new EmbedBuilder()
-				.setTitle('Breakout Room Assignment')
-				.setColor('#00FF00')
-				.setDescription(
-					`Split users from ${mainRoom.name} into ${breakoutRooms.length} breakout rooms.`,
-				)
-				.setTimestamp();
-
-			// Add facilitators field if any exist
-			if (facilitators.size > 0) {
-				const facilitatorUsers = Array.from(usersInMainRoom.values())
-					.filter((member) => facilitators.has(member.user.id))
-					.map((member) => member.user.tag)
-					.join('\n');
-
-				embed.addFields({
-					name: '👥 Facilitators',
-					value: facilitatorUsers || 'None',
-					inline: false,
-				});
-				log.debug(
-					{ count: facilitators.size },
-					`📊 Added facilitators to embed`,
-				);
-			}
-
-			// Add fields for each breakout room
-			breakoutRooms.forEach((room) => {
-				// Use actual moveResults if available, otherwise fall back to planned distribution
-				let usersInRoom: string;
-
-				if (result.moveResults?.success) {
-					// Build actual user list from successful moves
-					const actualUsers = result.moveResults.success
-						.filter(
-							(entry): entry is string =>
-								typeof entry === 'string' && entry.includes(`→ ${room.name}`),
-						)
-						.map((entry) => entry.split(' → ')[0]);
-					usersInRoom =
-						actualUsers.length > 0
-							? actualUsers.join('\n')
-							: 'No users assigned';
-				} else {
-					// Fallback to planned distribution
-					usersInRoom =
-						distribution[room.id]?.map((u) => u.user.tag).join('\n') ||
-						'No users assigned';
-				}
-
-				embed.addFields({
-					name: room.name,
-					value: usersInRoom,
-					inline: true,
-				});
+			const embed = buildDistributionEmbed({
+				mainRoom,
+				breakoutRooms,
+				facilitators,
+				usersInMainRoom,
+				moveResults: result.moveResults,
+				distribution,
 			});
-
-			// Add error field if any
-			if (result.moveResults?.failed && result.moveResults.failed.length > 0) {
-				embed.addFields({
-					name: 'Failed Moves',
-					value: result.moveResults.failed.join('\n'),
-					inline: false,
-				});
-				log.warn(
-					{ failedCount: result.moveResults.failed.length },
-					`⚠️ Added failed moves to embed`,
-				);
-			}
 
 			log.info(`📤 Sending breakout room results`);
 			await replyOrEdit(interaction, { embeds: [embed] });

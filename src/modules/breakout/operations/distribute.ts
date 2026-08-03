@@ -4,7 +4,11 @@ import type {
 	VoiceChannel,
 } from 'discord.js';
 import { logger } from '../../../lib/logger.js';
-import type { OperationResult } from '../../../types/index.js';
+import type {
+	MoveFailure,
+	MoveResult,
+	OperationResult,
+} from '../../../types/index.js';
 import {
 	hasActiveDistribution,
 	moveUserToRoom,
@@ -149,8 +153,8 @@ export async function executeDistribute(
 
 		const movePromises: Promise<void>[] = [];
 		const moveResults = {
-			success: [] as string[],
-			failed: [] as string[],
+			success: [] as MoveResult[],
+			failed: [] as MoveFailure[],
 		};
 
 		// Process each room using the active distribution
@@ -169,19 +173,6 @@ export async function executeDistribute(
 				`🔄 Processing moves for room`,
 			);
 
-			// Refetch steps inside loop? No, outside is fine if we don't await parallel moves that depend on it?
-			// But moves are parallelized here.
-			// The original code fetched steps inside the user loop? No, inside room loop.
-			// "const steps = await stateManager.getCompletedSteps(guildId);" was inside room loop.
-
-			// Wait, the original code had:
-			// for (const [roomId, users] of Object.entries(distribution)) {
-			//   const steps = await stateManager.getCompletedSteps(guildId);
-			//   for (const user of users) { ... }
-			// }
-
-			// So I should fetch steps or reuse. Steps are cumulative.
-
 			for (const user of users) {
 				const moveKey = `move_user_${user.id}_to_${roomId}`;
 
@@ -196,18 +187,32 @@ export async function executeDistribute(
 						{ user: user.user, room: room.name },
 						`⏭️ User was already moved, skipping`,
 					);
-					moveResults.success.push(`${user.user.tag} → ${room.name}`);
+					moveResults.success.push({
+						userId: user.id,
+						userTag: user.user.tag,
+						roomId: room.id,
+						roomName: room.name,
+					});
 					continue;
 				}
 
 				movePromises.push(
 					moveUserToRoom(user, room)
 						.then(async () => {
-							moveResults.success.push(`${user.user.tag} → ${room.name}`);
+							moveResults.success.push({
+								userId: user.id,
+								userTag: user.user.tag,
+								roomId: room.id,
+								roomName: room.name,
+							});
 							await updateProgress(guildId, moveKey);
 						})
 						.catch((error: any) => {
-							moveResults.failed.push(`${user.user.tag} (${error.message})`);
+							moveResults.failed.push({
+								userId: user.id,
+								userTag: user.user.tag,
+								reason: error instanceof Error ? error.message : String(error),
+							});
 							log.error(
 								{ err: error, user: user.user },
 								`❌ Failed to move user`,
