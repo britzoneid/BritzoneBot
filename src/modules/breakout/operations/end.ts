@@ -8,11 +8,12 @@ import { logger } from '../../../lib/logger.js';
 import type { OperationResult } from '../../../types/index.js';
 import { moveUserToRoom } from '../services/distribution.js';
 import { deleteRoom } from '../services/room.js';
-import { clearSession, getRooms } from '../state/session.js';
 import {
+	clearSession,
 	completeOperation,
 	getCompletedSteps,
 	getCurrentOperation,
+	getRooms,
 	startOperation,
 	updateProgress,
 } from '../state/state.js';
@@ -64,7 +65,7 @@ export async function executeEnd(
 
 	if (!isResuming || breakoutRooms.length === 0) {
 		// Get breakout rooms
-		breakoutRooms = getRooms(guildId);
+		breakoutRooms = getRooms(interaction.guild);
 
 		// If no stored rooms, identify them by name pattern as fallback
 		if (!breakoutRooms || breakoutRooms.length === 0) {

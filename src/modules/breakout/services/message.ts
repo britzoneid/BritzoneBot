@@ -1,6 +1,6 @@
-import type { VoiceChannel } from 'discord.js';
+import type { Guild, VoiceChannel } from 'discord.js';
 import { logger } from '../../../lib/logger.js';
-import { getRooms } from '../state/session.js';
+import { getRooms } from '../state/state.js';
 
 interface BroadcastResult {
 	success: boolean;
@@ -16,19 +16,25 @@ interface ChannelMessageResult {
 
 /**
  * Broadcasts a message to all breakout rooms
- * @param guildId The ID of the guild
+ * @param guild The Discord Guild
  * @param message The message to broadcast
  * @returns Result with list of successful and failed sends
  */
 export async function broadcastToBreakoutRooms(
-	guildId: string,
+	guild: Guild,
 	message: string,
 ): Promise<BroadcastResult> {
-	logger.info({ guildId }, `📢 Broadcasting message to breakout rooms`);
-	const rooms = getRooms(guildId);
+	logger.info(
+		{ guildId: guild.id },
+		`📢 Broadcasting message to breakout rooms`,
+	);
+	const rooms = getRooms(guild);
 
 	if (!rooms || rooms.length === 0) {
-		logger.warn({ guildId }, '❌ No breakout rooms found for broadcasting');
+		logger.warn(
+			{ guildId: guild.id },
+			'❌ No breakout rooms found for broadcasting',
+		);
 		return {
 			success: false,
 			sent: [],

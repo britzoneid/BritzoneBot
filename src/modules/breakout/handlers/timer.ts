@@ -2,8 +2,7 @@ import type { ChatInputCommandInteraction } from 'discord.js';
 import { replyOrEdit } from '../../../lib/discord/response.js';
 import { logger } from '../../../lib/logger.js';
 import { monitorBreakoutTimer } from '../services/timer.js';
-import { getRooms } from '../state/session.js';
-import { setTimerData } from '../state/state.js';
+import { getRooms, setTimerData } from '../state/state.js';
 
 /**
  * Handles the timer subcommand for breakout rooms
@@ -11,7 +10,7 @@ import { setTimerData } from '../state/state.js';
 export async function handleTimerCommand(
 	interaction: ChatInputCommandInteraction,
 ): Promise<void> {
-	if (!interaction.guildId) return;
+	if (!interaction.guildId || !interaction.guild) return;
 
 	const minutes = interaction.options.getInteger('minutes', true);
 	const log = logger.child({
@@ -22,7 +21,7 @@ export async function handleTimerCommand(
 
 	log.info('⏱️ Setting breakout timer');
 
-	const breakoutRooms = getRooms(interaction.guildId);
+	const breakoutRooms = getRooms(interaction.guild);
 
 	if (breakoutRooms.length === 0) {
 		log.warn('❌ Error: No breakout rooms found');

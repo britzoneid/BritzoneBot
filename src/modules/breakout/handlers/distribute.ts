@@ -9,7 +9,7 @@ import {
 } from '../../../lib/discord/response.js';
 import { logger } from '../../../lib/logger.js';
 import { executeDistribute } from '../operations/distribute.js';
-import { getRooms } from '../state/session.js';
+import { getRooms } from '../state/state.js';
 import { distributeUsers } from '../utils/distribution.js';
 import { buildDistributionEmbed } from '../utils/embeds.js';
 
@@ -19,7 +19,7 @@ import { buildDistributionEmbed } from '../utils/embeds.js';
 export async function handleDistributeCommand(
 	interaction: ChatInputCommandInteraction,
 ): Promise<void> {
-	if (!interaction.guildId) return;
+	if (!interaction.guildId || !interaction.guild) return;
 
 	const mainRoom = interaction.options.getChannel('mainroom', true) as
 		| VoiceChannel
@@ -46,7 +46,7 @@ export async function handleDistributeCommand(
 		log.debug({ count: facilitators.size }, '👥 Facilitators identified');
 	}
 
-	const breakoutRooms = getRooms(interaction.guildId);
+	const breakoutRooms = getRooms(interaction.guild);
 
 	if (breakoutRooms.length === 0) {
 		log.warn('❌ Error: No breakout rooms found');

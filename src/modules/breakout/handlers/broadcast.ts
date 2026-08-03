@@ -9,7 +9,7 @@ import { broadcastToBreakoutRooms } from '../services/message.js';
 export async function handleBroadcastCommand(
 	interaction: ChatInputCommandInteraction,
 ): Promise<void> {
-	if (!interaction.guildId) return;
+	if (!interaction.guildId || !interaction.guild) return;
 
 	const message = interaction.options.getString('message', true);
 	const log = logger.child({
@@ -21,7 +21,7 @@ export async function handleBroadcastCommand(
 
 	await interaction.deferReply();
 
-	const result = await broadcastToBreakoutRooms(interaction.guildId, message);
+	const result = await broadcastToBreakoutRooms(interaction.guild, message);
 
 	if (result.success) {
 		const embed = new EmbedBuilder()

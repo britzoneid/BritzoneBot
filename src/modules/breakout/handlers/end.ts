@@ -8,7 +8,7 @@ import {
 } from '../../../lib/discord/response.js';
 import { logger } from '../../../lib/logger.js';
 import { executeEnd } from '../operations/end.js';
-import { getMainRoom } from '../state/session.js';
+import { getMainRoom } from '../state/state.js';
 
 /**
  * Handles the end subcommand for breakout rooms
@@ -16,7 +16,7 @@ import { getMainRoom } from '../state/session.js';
 export async function handleEndCommand(
 	interaction: ChatInputCommandInteraction,
 ): Promise<void> {
-	if (!interaction.guildId) return;
+	if (!interaction.guildId || !interaction.guild) return;
 
 	// Support both 'mainroom' (standardized) and 'main_room' (legacy fallback)
 	let mainChannel = (interaction.options.getChannel('mainroom') ||
@@ -24,7 +24,7 @@ export async function handleEndCommand(
 	const force = interaction.options.getBoolean('force') || false;
 
 	if (!mainChannel) {
-		const storedMainChannel = getMainRoom(interaction.guildId);
+		const storedMainChannel = getMainRoom(interaction.guild);
 		if (storedMainChannel) {
 			mainChannel = storedMainChannel;
 		} else {

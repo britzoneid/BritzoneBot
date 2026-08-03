@@ -13,11 +13,11 @@ import {
 	hasActiveDistribution,
 	moveUserToRoom,
 } from '../services/distribution.js';
-import { setMainRoom } from '../state/session.js';
 import {
 	completeOperation,
 	getCompletedSteps,
 	getCurrentOperation,
+	setMainRoom,
 	startOperation,
 	updateProgress,
 } from '../state/state.js';
@@ -102,7 +102,7 @@ export async function executeDistribute(
 		}
 	} else {
 		// Check if distribution is already active
-		const isDistributionActive = await hasActiveDistribution(guildId);
+		const isDistributionActive = await hasActiveDistribution(interaction.guild);
 		if (isDistributionActive && !force) {
 			return {
 				success: false,
