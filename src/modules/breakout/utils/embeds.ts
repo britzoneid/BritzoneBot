@@ -18,6 +18,7 @@ interface DistributionEmbedParams {
 		failed: MoveFailure[];
 	};
 	distribution?: UserDistribution;
+	isPreview?: boolean;
 }
 
 /**
@@ -41,17 +42,21 @@ export function buildDistributionEmbed(
 		usersInMainRoom,
 		moveResults,
 		distribution,
+		isPreview = false,
 	} = params;
 
+	const title = isPreview
+		? '📋 Breakout Room Assignment (Preview)'
+		: 'Breakout Room Assignment';
+
+	const description = isPreview
+		? `Preview of user distribution from **${mainRoom.name}** into **${breakoutRooms.length}** breakout rooms.\n\nPlease confirm below to proceed with moving users.`
+		: `Split users from ${mainRoom.name} into ${breakoutRooms.length} breakout rooms.`;
+
 	const embed = new EmbedBuilder()
-		.setTitle('Breakout Room Assignment')
-		.setColor('#00FF00')
-		.setDescription(
-			truncateValue(
-				`Split users from ${mainRoom.name} into ${breakoutRooms.length} breakout rooms.`,
-				2048,
-			),
-		)
+		.setTitle(title)
+		.setColor(isPreview ? '#3B82F6' : '#00FF00')
+		.setDescription(truncateValue(description, 2048))
 		.setTimestamp();
 
 	let fieldCount = 0;

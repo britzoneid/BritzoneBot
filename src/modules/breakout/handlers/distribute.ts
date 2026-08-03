@@ -1,7 +1,11 @@
-import type {
-	ChatInputCommandInteraction,
-	StageChannel,
-	VoiceChannel,
+import {
+	ActionRowBuilder,
+	ButtonBuilder,
+	ButtonStyle,
+	type ChatInputCommandInteraction,
+	ComponentType,
+	type StageChannel,
+	type VoiceChannel,
 } from 'discord.js';
 import {
 	handleInteraction,
@@ -86,36 +90,134 @@ export async function handleDistributeCommand(
 					usersCount: usersToDistribute.length,
 					roomsCount: breakoutRooms.length,
 				},
-				'🧩 Distributing users',
+				'🧩 Calculating distribution plan',
 			);
 
 			const distribution = distributeUsers(usersToDistribute, breakoutRooms);
 
-			const result = await executeDistribute(
-				interaction,
-				mainRoom,
-				distribution,
-				force,
-			);
-
-			if (!result.success) {
-				await replyOrEdit(interaction, result.message);
-				return;
-			}
-
-			log.debug('📝 Creating response embed');
-			const embed = buildDistributionEmbed({
+			log.debug('📝 Creating preview embed');
+			const previewEmbed = buildDistributionEmbed({
 				mainRoom,
 				breakoutRooms,
 				facilitators,
 				usersInMainRoom,
-				moveResults: result.moveResults,
 				distribution,
+				isPreview: true,
 			});
 
-			log.info('📤 Sending breakout room results');
-			await replyOrEdit(interaction, { embeds: [embed] });
+			const confirmButton = new ButtonBuilder()
+				.setCustomId('confirm_distribute')
+				.setLabel('Confirm')
+				.setStyle(ButtonStyle.Success);
+
+			const cancelButton = new ButtonBuilder()
+				.setCustomId('cancel_distribute')
+				.setLabel('Cancel')
+				.setStyle(ButtonStyle.Secondary);
+
+			const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+				confirmButton,
+				cancelButton,
+			);
+
+			log.info('📤 Sending preview with confirmation buttons');
+			const response = await replyOrEdit(interaction, {
+				embeds: [previewEmbed],
+				components: [row],
+			});
+
+			// Await button confirmation
+			const collector = response.createMessageComponentCollector({
+				componentType: ComponentType.Button,
+				time: 60_000,
+			});
+
+			collector.on('collect', async (i) => {
+				if (i.user.id !== interaction.user.id) {
+					await i.reply({
+						content:
+							'You are not authorized to interact with this distribution preview.',
+						ephemeral: true,
+					});
+					return;
+				}
+
+				if (i.customId === 'cancel_distribute') {
+					collector.stop('cancelled');
+					log.info('❌ Distribution cancelled by user');
+					await i.update({
+						content: '❌ Distribution cancelled.',
+						embeds: [previewEmbed],
+						components: [],
+					});
+					return;
+				}
+
+				if (i.customId === 'confirm_distribute') {
+					collector.stop('confirmed');
+					log.info('✅ Distribution confirmed by user');
+
+					await i.update({
+						content: '⏳ Distributing users to breakout rooms...',
+						embeds: [previewEmbed],
+						components: [],
+					});
+
+					const result = await executeDistribute(
+						interaction,
+						mainRoom,
+						distribution,
+						force,
+					);
+
+					if (!result.success) {
+						await interaction.editReply({
+							content: `❌ ${result.message}`,
+							embeds: [],
+							components: [],
+						});
+						return;
+					}
+
+					log.debug('📝 Creating final response embed');
+					const finalEmbed = buildDistributionEmbed({
+						mainRoom,
+						breakoutRooms,
+						facilitators,
+						usersInMainRoom,
+						moveResults: result.moveResults,
+						distribution,
+					});
+
+					log.info('📤 Distribution completed successfully');
+					await interaction.editReply({
+						content: null,
+						embeds: [finalEmbed],
+						components: [],
+					});
+				}
+			});
+
+			collector.on('end', async (_, reason) => {
+				if (reason !== 'confirmed' && reason !== 'cancelled') {
+					log.warn('⏱️ Distribution preview confirmation timed out');
+					const disabledRow =
+						new ActionRowBuilder<ButtonBuilder>().addComponents(
+							confirmButton.setDisabled(true),
+							cancelButton.setDisabled(true),
+						);
+					try {
+						await interaction.editReply({
+							content: '⏱️ Distribution request timed out.',
+							embeds: [previewEmbed],
+							components: [disabledRow],
+						});
+					} catch (err) {
+						log.error({ err }, 'Failed to edit reply on collector timeout');
+					}
+				}
+			});
 		},
-		{ deferReply: true, ephemeral: true },
+		{ deferReply: true, ephemeral: true, handlerTimeoutMs: 120_000 },
 	);
 }
