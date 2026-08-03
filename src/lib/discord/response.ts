@@ -163,8 +163,8 @@ export function replyOrEdit(
 
 	const options: InteractionReplyOptions =
 		typeof content === 'string'
-			? { content, fetchReply: true }
-			: { ...(content as InteractionReplyOptions), fetchReply: true };
+			? { content, withResponse: true }
+			: { ...(content as InteractionReplyOptions), withResponse: true };
 
 	return interaction.reply(options) as unknown as Promise<Message>;
 }
