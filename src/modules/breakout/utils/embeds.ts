@@ -11,6 +11,7 @@ import type { UserDistribution } from './distribution.js';
 interface DistributionEmbedParams {
 	mainRoom: VoiceBasedChannel;
 	breakoutRooms: VoiceChannel[];
+	facilitators?: Set<string>;
 	excludedUsers?: Set<string>;
 	usersInMainRoom?: Map<string, GuildMember>;
 	moveResults?: {
@@ -38,6 +39,7 @@ export function buildDistributionEmbed(
 	const {
 		mainRoom,
 		breakoutRooms,
+		facilitators,
 		excludedUsers,
 		usersInMainRoom,
 		moveResults,
@@ -83,12 +85,15 @@ export function buildDistributionEmbed(
 	}
 
 	// Index successful moves by roomId
-	const movesByRoom = new Map<string, string[]>();
+	const movesByRoom = new Map<
+		string,
+		Array<{ userId: string; userTag: string }>
+	>();
 	if (moveResults?.success) {
 		for (const move of moveResults.success) {
 			if (move.roomId) {
 				const list = movesByRoom.get(move.roomId) || [];
-				list.push(move.userTag);
+				list.push({ userId: move.userId, userTag: move.userTag });
 				movesByRoom.set(move.roomId, list);
 			}
 		}
@@ -107,13 +112,25 @@ export function buildDistributionEmbed(
 		let usersInRoom: string;
 
 		if (moveResults !== undefined) {
-			const roomUserTags = movesByRoom.get(room.id) || [];
+			const roomUsers = movesByRoom.get(room.id) || [];
 			usersInRoom =
-				roomUserTags.length > 0 ? roomUserTags.join('\n') : 'No users assigned';
+				roomUsers.length > 0
+					? roomUsers
+							.map((u) =>
+								facilitators?.has(u.userId) ? `⭐ ${u.userTag}` : u.userTag,
+							)
+							.join('\n')
+					: 'No users assigned';
 		} else if (distribution) {
-			const plannedUsers = distribution[room.id]?.map((u) => u.user.tag) || [];
+			const plannedUsers = distribution[room.id] || [];
 			usersInRoom =
-				plannedUsers.length > 0 ? plannedUsers.join('\n') : 'No users assigned';
+				plannedUsers.length > 0
+					? plannedUsers
+							.map((u) =>
+								facilitators?.has(u.id) ? `⭐ ${u.user.tag}` : u.user.tag,
+							)
+							.join('\n')
+					: 'No users assigned';
 		} else {
 			usersInRoom = 'No users assigned';
 		}

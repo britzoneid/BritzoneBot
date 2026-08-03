@@ -38,6 +38,7 @@ export async function handleDistributeCommand(
 	}
 
 	const excludeInput = interaction.options.getString('exclude');
+	const facilitatorsInput = interaction.options.getString('facilitators');
 	const force = interaction.options.getBoolean('force') || false;
 
 	const log = logger.child({
@@ -57,6 +58,19 @@ export async function handleDistributeCommand(
 			excludedUsers.add(match[1]);
 		}
 		log.debug({ count: excludedUsers.size }, '🚫 Excluded users identified');
+	}
+
+	// Process facilitators if provided (exclude takes precedence)
+	const facilitators = new Set<string>();
+	if (facilitatorsInput) {
+		const mentionPattern = /<@!?(\d+)>/g;
+		const matches = facilitatorsInput.matchAll(mentionPattern);
+		for (const match of matches) {
+			if (!excludedUsers.has(match[1])) {
+				facilitators.add(match[1]);
+			}
+		}
+		log.debug({ count: facilitators.size }, '👑 Facilitators identified');
 	}
 
 	const breakoutRooms = getRooms(interaction.guild);
@@ -81,24 +95,38 @@ export async function handleDistributeCommand(
 	await handleInteraction(
 		interaction,
 		async () => {
-			const usersToDistribute = Array.from(usersInMainRoom.values()).filter(
-				(member) => !excludedUsers.has(member.user.id),
-			);
+			const facilitatorMembers: import('discord.js').GuildMember[] = [];
+			const regularMembers: import('discord.js').GuildMember[] = [];
+
+			for (const member of usersInMainRoom.values()) {
+				if (excludedUsers.has(member.user.id)) continue;
+				if (facilitators.has(member.user.id)) {
+					facilitatorMembers.push(member);
+				} else {
+					regularMembers.push(member);
+				}
+			}
 
 			log.info(
 				{
-					usersCount: usersToDistribute.length,
+					regularCount: regularMembers.length,
+					facilitatorCount: facilitatorMembers.length,
 					roomsCount: breakoutRooms.length,
 				},
 				'🧩 Calculating distribution plan',
 			);
 
-			const distribution = distributeUsers(usersToDistribute, breakoutRooms);
+			const distribution = distributeUsers(
+				regularMembers,
+				breakoutRooms,
+				facilitatorMembers,
+			);
 
 			log.debug('📝 Creating preview embed');
 			const previewEmbed = buildDistributionEmbed({
 				mainRoom,
 				breakoutRooms,
+				facilitators,
 				excludedUsers,
 				usersInMainRoom,
 				distribution,
@@ -183,6 +211,7 @@ export async function handleDistributeCommand(
 					const finalEmbed = buildDistributionEmbed({
 						mainRoom,
 						breakoutRooms,
+						facilitators,
 						excludedUsers,
 						usersInMainRoom,
 						moveResults: result.moveResults,

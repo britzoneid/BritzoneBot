@@ -11,13 +11,15 @@ export interface UserDistribution {
 
 /**
  * Distribute users among breakout rooms
- * @param users Array of users to distribute (excluding facilitators)
+ * @param users Array or Map of regular users to distribute
  * @param breakoutRooms Array of breakout room channels
- * @returns Mapping of breakout room IDs to arrays of users
+ * @param facilitators Optional Array or Map of facilitator members to distribute first
+ * @returns Mapping of breakout room IDs to arrays of users (facilitators first)
  */
 export function distributeUsers(
 	users: GuildMember[] | Map<string, GuildMember>,
 	breakoutRooms: Array<VoiceChannel | StageChannel>,
+	facilitators?: GuildMember[] | Map<string, GuildMember>,
 ): UserDistribution {
 	const log = logger.child({
 		breakoutRoomsCount: breakoutRooms.length,
@@ -36,20 +38,51 @@ export function distributeUsers(
 		distribution[room.id] = [];
 	});
 
-	// Convert users collection to array if it's not already, and create a copy to avoid mutation
+	// Process facilitators first if provided
+	if (facilitators) {
+		const facilitatorArray = Array.isArray(facilitators)
+			? [...facilitators]
+			: Array.from(facilitators.values());
+
+		log.debug(
+			{ facilitatorsCount: facilitatorArray.length },
+			`👑 Facilitators to distribute first`,
+		);
+
+		// Shuffle facilitators for randomness
+		for (let i = facilitatorArray.length - 1; i > 0; i--) {
+			const j = randomInt(0, i + 1);
+			[facilitatorArray[i], facilitatorArray[j]] = [
+				facilitatorArray[j],
+				facilitatorArray[i],
+			];
+		}
+
+		// Distribute facilitators round-robin across rooms
+		facilitatorArray.forEach((facil, index) => {
+			const roomIndex = index % breakoutRooms.length;
+			const roomId = breakoutRooms[roomIndex].id;
+			distribution[roomId].push(facil);
+		});
+	}
+
+	// Convert regular users collection to array if it's not already, and create a copy to avoid mutation
 	const userArray = Array.isArray(users)
 		? [...users]
 		: Array.from(users.values());
 
-	log.debug({ usersCount: userArray.length }, `👤 Total users to distribute`);
+	log.debug(
+		{ usersCount: userArray.length },
+		`👤 Total regular users to distribute`,
+	);
 
-	// Shuffle users for randomness
+	// Shuffle regular users for randomness
 	for (let i = userArray.length - 1; i > 0; i--) {
 		const j = randomInt(0, i + 1);
 		[userArray[i], userArray[j]] = [userArray[j], userArray[i]];
 	}
 
-	// Distribute users evenly
+	// Distribute regular users evenly
 	userArray.forEach((user, index) => {
 		const roomIndex = index % breakoutRooms.length;
 		const roomId = breakoutRooms[roomIndex].id;

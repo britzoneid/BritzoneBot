@@ -82,6 +82,14 @@ const command: Command = {
 						)
 						.setRequired(false),
 				)
+				.addStringOption((option) =>
+					option
+						.setName('facilitators')
+						.setDescription(
+							'Facilitators to assign into breakout rooms (mention them with @)',
+						)
+						.setRequired(false),
+				)
 				.addBooleanOption((option) =>
 					option
 						.setName('force')
