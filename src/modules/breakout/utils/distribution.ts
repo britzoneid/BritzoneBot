@@ -46,7 +46,7 @@ export function distributeUsers(
 
 		log.debug(
 			{ facilitatorsCount: facilitatorArray.length },
-			`👑 Facilitators to distribute first`,
+			`🗣️ Facilitators to distribute first`,
 		);
 
 		// Shuffle facilitators for randomness

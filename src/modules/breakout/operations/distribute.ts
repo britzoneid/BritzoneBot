@@ -219,7 +219,7 @@ export async function executeDistribute(
 		if (facilitatorPromises.length > 0) {
 			log.info(
 				{ count: facilitatorPromises.length },
-				`👑 Moving facilitators into breakout rooms first...`,
+				`�️ Moving facilitators into breakout rooms first...`,
 			);
 			await Promise.all(facilitatorPromises);
 		}
