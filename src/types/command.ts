@@ -21,7 +21,7 @@ export interface SlashCommand {
 /**
  * Represents a context menu command (right-click menu)
  */
-export interface ContextMenuCommand {
+interface ContextMenuCommand {
 	type: 'context-menu';
 	data: ContextMenuCommandBuilder;
 	execute(interaction: ContextMenuCommandInteraction): Promise<void>;

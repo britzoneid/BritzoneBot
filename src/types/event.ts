@@ -3,7 +3,7 @@ import type { ClientEvents } from 'discord.js';
 /**
  * Event names from Discord.js
  */
-export type EventName = keyof ClientEvents;
+type EventName = keyof ClientEvents;
 
 /**
  * Base interface for all event handlers
@@ -18,4 +18,4 @@ export interface Event<T extends EventName = EventName> {
 /**
  * Utility type for any awaitable value (Promise or plain value)
  */
-export type Awaitable<T> = T | Promise<T>;
+type Awaitable<T> = T | Promise<T>;

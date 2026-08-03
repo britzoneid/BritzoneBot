@@ -49,7 +49,7 @@ export interface CurrentOperation {
 /**
  * Persisted room/session data structure
  */
-export interface PersistedSession {
+interface PersistedSession {
 	mainRoomId?: string;
 	roomIds?: string[];
 }
@@ -69,7 +69,7 @@ export interface TimerData {
 /**
  * Guild state data structure on disk
  */
-export interface GuildState {
+interface GuildState {
 	currentOperation?: CurrentOperation;
 	history?: CurrentOperation[];
 	session?: PersistedSession;
