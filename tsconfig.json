@@ -1,9 +1,10 @@
 {
 	"compilerOptions": {
 		// Language and Environment
-		"target": "ES2020",
+		"target": "ES2025",
 		"module": "ESNext",
-		"lib": ["ES2020"],
+		"lib": ["ES2025"],
+		"rootDir": "./src",
 
 		// Module Resolution
 		"moduleResolution": "bundler",
