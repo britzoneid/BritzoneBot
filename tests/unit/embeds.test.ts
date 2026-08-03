@@ -119,7 +119,14 @@ describe('buildDistributionEmbed', () => {
 	it('renders failed moves field when moveResults contains failures', () => {
 		const rooms = [fakeRoom('r1', 'Room 1')];
 		const moveResults = {
-			success: [{ userId: 'u1', userTag: 'Alice#0001', roomId: 'r1' }],
+			success: [
+				{
+					userId: 'u1',
+					userTag: 'Alice#0001',
+					roomId: 'r1',
+					roomName: 'Room 1',
+				},
+			],
 			failed: [
 				{ userId: 'u2', userTag: 'Bob#0002', reason: 'User left voice' },
 			],

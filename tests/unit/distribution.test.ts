@@ -1,4 +1,4 @@
-import type { GuildMember, StageChannel, VoiceChannel } from 'discord.js';
+import type { GuildMember, VoiceChannel } from 'discord.js';
 import { describe, expect, it } from 'vitest';
 import { distributeUsers } from '@/modules/breakout/utils/distribution.js';
 
