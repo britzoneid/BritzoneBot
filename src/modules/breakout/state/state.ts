@@ -326,7 +326,7 @@ export function getMainRoom(guild: Guild): VoiceBasedChannel | undefined {
 	if (!mainRoomId) return undefined;
 
 	const ch = guild.channels.cache.get(mainRoomId);
-	if (ch && ch.isVoiceBased()) {
+	if (ch?.isVoiceBased()) {
 		return ch as VoiceBasedChannel;
 	}
 	return undefined;

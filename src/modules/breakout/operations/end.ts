@@ -254,7 +254,7 @@ export async function executeEnd(
 
 		// Clear the stored session data
 		await updateProgress(guildId, 'clear_session');
-		clearSession(guildId);
+		await clearSession(guildId);
 
 		// Complete operation
 		await completeOperation(guildId);

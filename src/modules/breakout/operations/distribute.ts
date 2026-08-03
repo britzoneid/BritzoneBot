@@ -144,11 +144,11 @@ export async function executeDistribute(
 		const steps = await getCompletedSteps(guildId);
 
 		if (!steps['set_main_room']) {
-			setMainRoom(guildId, mainRoom);
+			await setMainRoom(guildId, mainRoom);
 			await updateProgress(guildId, 'set_main_room');
 		} else {
 			// Ensure session manager is in sync if we restarted the bot
-			setMainRoom(guildId, mainRoom);
+			await setMainRoom(guildId, mainRoom);
 		}
 
 		const movePromises: Promise<void>[] = [];

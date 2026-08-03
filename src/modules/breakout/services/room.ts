@@ -31,9 +31,9 @@ export async function hasExistingBreakoutRooms(
 		// Sync session manager if we found stale rooms
 		if (existingRooms.length !== storedRooms.length) {
 			if (existingRooms.length > 0) {
-				storeRooms(guild.id, existingRooms);
+				await storeRooms(guild.id, existingRooms);
 			} else {
-				clearSession(guild.id);
+				await clearSession(guild.id);
 			}
 		}
 

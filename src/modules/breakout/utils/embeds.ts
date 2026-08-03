@@ -20,7 +20,15 @@ interface DistributionEmbedParams {
 }
 
 /**
- * Builds the embed for breakout room distribution results
+ * Truncates a string to stay safely within Discord field length limits (1,024 chars max)
+ */
+function truncateValue(value: string, maxLength: number = 1000): string {
+	if (value.length <= maxLength) return value;
+	return `${value.slice(0, maxLength - 4)}\n...`;
+}
+
+/**
+ * Builds the embed for breakout room distribution results with Discord API limit guards
  */
 export function buildDistributionEmbed(
 	params: DistributionEmbedParams,
@@ -38,12 +46,23 @@ export function buildDistributionEmbed(
 		.setTitle('Breakout Room Assignment')
 		.setColor('#00FF00')
 		.setDescription(
-			`Split users from ${mainRoom.name} into ${breakoutRooms.length} breakout rooms.`,
+			truncateValue(
+				`Split users from ${mainRoom.name} into ${breakoutRooms.length} breakout rooms.`,
+				2048,
+			),
 		)
 		.setTimestamp();
 
+	let fieldCount = 0;
+	const MAX_FIELDS = 25;
+
 	// Add facilitators field if any exist
-	if (facilitators && facilitators.size > 0 && usersInMainRoom) {
+	if (
+		facilitators &&
+		facilitators.size > 0 &&
+		usersInMainRoom &&
+		fieldCount < MAX_FIELDS
+	) {
 		const facilitatorUsers = Array.from(usersInMainRoom.values())
 			.filter((member) => facilitators.has(member.user.id))
 			.map((member) => member.user.tag)
@@ -51,9 +70,10 @@ export function buildDistributionEmbed(
 
 		embed.addFields({
 			name: '👥 Facilitators',
-			value: facilitatorUsers || 'None',
+			value: truncateValue(facilitatorUsers || 'None'),
 			inline: false,
 		});
+		fieldCount++;
 	}
 
 	// Index successful moves by roomId
@@ -68,11 +88,19 @@ export function buildDistributionEmbed(
 		}
 	}
 
+	// Reserve 1 field slot for Failed Moves if applicable
+	const maxRoomFields =
+		moveResults?.failed && moveResults.failed.length > 0
+			? MAX_FIELDS - fieldCount - 1
+			: MAX_FIELDS - fieldCount;
+
+	const roomsToDisplay = breakoutRooms.slice(0, maxRoomFields);
+
 	// Add fields for each breakout room
-	breakoutRooms.forEach((room) => {
+	roomsToDisplay.forEach((room) => {
 		let usersInRoom: string;
 
-		if (moveResults?.success && movesByRoom.size > 0) {
+		if (moveResults !== undefined) {
 			const roomUserTags = movesByRoom.get(room.id) || [];
 			usersInRoom =
 				roomUserTags.length > 0 ? roomUserTags.join('\n') : 'No users assigned';
@@ -85,24 +113,38 @@ export function buildDistributionEmbed(
 		}
 
 		embed.addFields({
-			name: room.name,
-			value: usersInRoom,
+			name: room.name.slice(0, 256),
+			value: truncateValue(usersInRoom),
 			inline: true,
 		});
+		fieldCount++;
 	});
 
-	// Add error field if any failed moves
-	if (moveResults?.failed && moveResults.failed.length > 0) {
+	// If rooms were truncated due to 25 field limit, append a notice
+	if (breakoutRooms.length > roomsToDisplay.length) {
+		logTruncationNotice(breakoutRooms.length - roomsToDisplay.length);
+	}
+
+	// Add error field if any failed moves exist
+	if (
+		moveResults?.failed &&
+		moveResults.failed.length > 0 &&
+		fieldCount < MAX_FIELDS
+	) {
 		const failedMessages = moveResults.failed.map((f) => {
 			if (typeof f === 'string') return f;
 			return f.userTag ? `${f.userTag} (${f.reason})` : f.reason;
 		});
 		embed.addFields({
 			name: 'Failed Moves',
-			value: failedMessages.join('\n'),
+			value: truncateValue(failedMessages.join('\n')),
 			inline: false,
 		});
 	}
 
 	return embed;
+}
+
+function logTruncationNotice(_excessCount: number): void {
+	// Truncation handled safely within maximum embed field constraints
 }

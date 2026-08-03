@@ -63,5 +63,4 @@ export interface OperationResult {
 		success: (MoveResult | string)[];
 		failed: (MoveFailure | string)[];
 	};
-	createdRoomsCount?: number;
 }
