@@ -1,9 +1,4 @@
-import {
-	ChannelType,
-	type ChatInputCommandInteraction,
-	type Client,
-	type GuildBasedChannel,
-} from 'discord.js';
+import { ChannelType, type Client, type GuildBasedChannel } from 'discord.js';
 import type { Logger } from 'pino';
 import { logger } from '../../../lib/logger.js';
 import {
@@ -17,24 +12,25 @@ import {
  * Monitors a breakout timer and sends reminders at defined intervals.
  *
  * @param timerData Timer configuration data
- * @param interaction The Discord command interaction
+ * @param client The Discord client instance
  */
 export async function monitorBreakoutTimer(
 	timerData: TimerData,
-	interaction: ChatInputCommandInteraction,
+	client: Client,
 ): Promise<void> {
-	const { totalMinutes, startTime, guildId, breakoutRooms } = timerData;
+	const { timerId, totalMinutes, startTime, guildId, breakoutRooms } =
+		timerData;
 	const endTime = startTime + totalMinutes * 60 * 1000;
-	const log = logger.child({ guildId });
+	const log = logger.child({ guildId, timerId });
 
-	log.info({ totalMinutes }, `⏱️ Started breakout timer monitoring`);
+	log.info({ totalMinutes }, '⏱️ Started breakout timer monitoring');
 
 	// Use recursive setTimeout to prevent overlapping async executions
 	async function monitorTick(): Promise<void> {
 		try {
 			const timerState = await getTimerData(guildId);
-			if (!timerState) {
-				log.debug(`⏱️ Timer was cancelled or removed`);
+			if (!timerState || (timerId && timerState.timerId !== timerId)) {
+				log.debug('⏱️ Timer was cancelled, replaced, or removed');
 				return; // Stop monitoring
 			}
 
@@ -51,7 +47,7 @@ export async function monitorBreakoutTimer(
 					guildId,
 					breakoutRooms,
 					'⏱️ **5 minutes remaining** in this breakout session.',
-					interaction.client,
+					client,
 				);
 
 				timerState.fiveMinSent = true;
@@ -65,7 +61,7 @@ export async function monitorBreakoutTimer(
 					guildId,
 					breakoutRooms,
 					"⏰ **Time's up!** This breakout session has ended.",
-					interaction.client,
+					client,
 				);
 
 				await clearTimerData(guildId);

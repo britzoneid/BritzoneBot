@@ -34,15 +34,33 @@ export interface ContextMenuCommand {
 export type Command = SlashCommand | ContextMenuCommand;
 
 /**
+ * Structure of a successful member move result
+ */
+export interface MoveResult {
+	userId: string;
+	userTag: string;
+	roomId: string;
+	roomName: string;
+}
+
+/**
+ * Structure of a failed member move result
+ */
+export interface MoveFailure {
+	userId?: string;
+	userTag?: string;
+	reason: string;
+}
+
+/**
  * Result from command operations
- * Used in your breakout command and other helpers
+ * Used in breakout commands and other operation handlers
  */
 export interface OperationResult {
 	success: boolean;
 	message: string;
 	moveResults?: {
-		success: string[];
-		failed: string[];
+		success: (MoveResult | string)[];
+		failed: (MoveFailure | string)[];
 	};
-	[key: string]: any;
 }

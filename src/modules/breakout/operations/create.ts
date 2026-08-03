@@ -10,12 +10,13 @@ import {
 	deleteRoom,
 	hasExistingBreakoutRooms,
 } from '../services/room.js';
-import { clearSession, storeRooms } from '../state/session.js';
 import {
+	clearSession,
 	completeOperation,
 	getCompletedSteps,
 	getCurrentOperation,
 	startOperation,
+	storeRooms,
 	updateProgress,
 } from '../state/state.js';
 
@@ -97,7 +98,7 @@ export async function executeCreate(
 				const storedChannelId = steps[stepKey].channelId;
 				let existingChannel: VoiceChannel | undefined;
 
-				if (storedChannelId) {
+				if (typeof storedChannelId === 'string') {
 					const cached = interaction.guild.channels.cache.get(storedChannelId);
 					if (cached?.type === ChannelType.GuildVoice) {
 						existingChannel = cached as VoiceChannel;
@@ -136,7 +137,7 @@ export async function executeCreate(
 		await updateProgress(guildId, 'store_rooms', {
 			roomIds: createdChannels.map((c) => c.id),
 		});
-		storeRooms(guildId, createdChannels);
+		await storeRooms(guildId, createdChannels);
 
 		// Complete operation
 		await completeOperation(guildId);

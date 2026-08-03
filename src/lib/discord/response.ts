@@ -1,4 +1,11 @@
-import type { CommandInteraction, RepliableInteraction } from 'discord.js';
+import type {
+	CommandInteraction,
+	InteractionEditReplyOptions,
+	InteractionReplyOptions,
+	Message,
+	MessagePayload,
+	RepliableInteraction,
+} from 'discord.js';
 import { MessageFlags } from 'discord.js';
 import { logger } from '../logger.js';
 
@@ -8,6 +15,8 @@ import { logger } from '../logger.js';
 interface InteractionHandlerOptions {
 	deferReply?: boolean;
 	ephemeral?: boolean;
+	deferTimeoutMs?: number;
+	handlerTimeoutMs?: number;
 }
 
 /**
@@ -16,55 +25,52 @@ interface InteractionHandlerOptions {
  * @returns The error code if present, otherwise undefined
  */
 function getErrorCode(error: Error): string | number | undefined {
-	const errorObj = error as any; // Errors from different sources have code properties
-	return errorObj.code;
+	return 'code' in error
+		? (error as Error & { code?: string | number }).code
+		: undefined;
 }
 
 /**
  * Handles Discord interactions with built-in error handling for expired interactions
  *
  * Wraps interaction handlers with deferReply support, timeout protection, and error handling.
- * It demonstrates proper TypeScript patterns for your codebase.
  *
  * @param interaction The Discord interaction to handle
  * @param handler Async function that handles the interaction
  * @param options Options for handling the interaction
  * @returns boolean indicating success
- *
- * @example
- * ```typescript
- * await handleInteraction(
- *   interaction,
- *   async () => {
- *     await interaction.reply('Pong!');
- *   },
- *   { deferReply: true, ephemeral: true }
- * );
- * ```
  */
 export async function handleInteraction(
 	interaction: RepliableInteraction | CommandInteraction,
 	handler: () => Promise<void>,
 	options: InteractionHandlerOptions = {},
 ): Promise<boolean> {
-	const { deferReply = false, ephemeral = false } = options;
+	const {
+		deferReply = false,
+		ephemeral = false,
+		deferTimeoutMs = 2500,
+		handlerTimeoutMs = 15000,
+	} = options;
 
 	try {
 		// If deferReply is true, try to defer the reply first
 		if (deferReply && !interaction.replied && !interaction.deferred) {
+			let deferTimeoutId: ReturnType<typeof setTimeout> | undefined;
 			try {
-				// Set a timeout to avoid getting stuck on network issues
 				const deferPromise = interaction.deferReply(
 					ephemeral ? { flags: MessageFlags.Ephemeral } : undefined,
 				);
-				const timeoutPromise = new Promise<never>((_, reject) =>
-					setTimeout(() => reject(new Error('Defer reply timeout')), 2500),
-				);
+				const timeoutPromise = new Promise<never>((_, reject) => {
+					deferTimeoutId = setTimeout(
+						() => reject(new Error('Defer reply timeout')),
+						deferTimeoutMs,
+					);
+				});
 
 				await Promise.race([deferPromise, timeoutPromise]);
 				logger.debug(
 					{ interactionId: interaction.id },
-					`🔄 Successfully deferred interaction`,
+					'🔄 Successfully deferred interaction',
 				);
 			} catch (deferError) {
 				const error =
@@ -73,41 +79,45 @@ export async function handleInteraction(
 						: new Error(String(deferError));
 				const errorCode = getErrorCode(error);
 
-				// If we can't defer, the interaction likely expired
 				if (errorCode === 10062) {
 					logger.warn(
 						{ interactionId: interaction.id },
-						`⏱️ Interaction expired before deferring`,
+						'⏱️ Interaction expired before deferring',
 					);
 					return false;
 				}
 
-				// Handle network errors gracefully
 				if (
 					errorCode === 'EAI_AGAIN' ||
 					error.message === 'Defer reply timeout'
 				) {
 					logger.warn(
 						{ interactionId: interaction.id, err: error },
-						`🌐 Network issue while deferring interaction`,
+						'🌐 Network issue while deferring interaction',
 					);
 					return false;
 				}
 
 				logger.error(
 					{ interactionId: interaction.id, err: error },
-					`❓ Unknown error while deferring interaction`,
+					'❓ Unknown error while deferring interaction',
 				);
 				return false;
+			} finally {
+				if (deferTimeoutId) clearTimeout(deferTimeoutId);
 			}
 		}
 
 		// Execute the handler function with timeout protection
+		let handlerTimeoutId: ReturnType<typeof setTimeout> | undefined;
 		try {
 			const handlerPromise = handler();
-			const timeoutPromise = new Promise<never>((_, reject) =>
-				setTimeout(() => reject(new Error('Handler execution timeout')), 8000),
-			);
+			const timeoutPromise = new Promise<never>((_, reject) => {
+				handlerTimeoutId = setTimeout(
+					() => reject(new Error('Handler execution timeout')),
+					handlerTimeoutMs,
+				);
+			});
 
 			await Promise.race([handlerPromise, timeoutPromise]);
 			return true;
@@ -118,14 +128,16 @@ export async function handleInteraction(
 					: new Error(String(handlerError));
 			logger.error(
 				{ interactionId: interaction.id, err: error },
-				`❌ Handler error for interaction`,
+				'❌ Handler error for interaction',
 			);
 			return false;
+		} finally {
+			if (handlerTimeoutId) clearTimeout(handlerTimeoutId);
 		}
 	} catch (error) {
 		logger.error(
 			{ interactionId: interaction.id, err: error },
-			`❌ Unexpected error in handleInteraction`,
+			'❌ Unexpected error in handleInteraction',
 		);
 		return false;
 	}
@@ -139,9 +151,20 @@ export async function handleInteraction(
  */
 export function replyOrEdit(
 	interaction: RepliableInteraction | CommandInteraction,
-	content: string | any,
-): Promise<any> {
-	return interaction.replied || interaction.deferred
-		? interaction.editReply(content)
-		: interaction.reply(content);
+	content:
+		| string
+		| InteractionReplyOptions
+		| InteractionEditReplyOptions
+		| MessagePayload,
+): Promise<Message> {
+	if (interaction.replied || interaction.deferred) {
+		return interaction.editReply(content as InteractionEditReplyOptions);
+	}
+
+	const options: InteractionReplyOptions =
+		typeof content === 'string'
+			? { content, withResponse: true }
+			: { ...(content as InteractionReplyOptions), withResponse: true };
+
+	return interaction.reply(options) as unknown as Promise<Message>;
 }

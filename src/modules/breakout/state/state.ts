@@ -1,5 +1,11 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import {
+	ChannelType,
+	type Guild,
+	type VoiceBasedChannel,
+	type VoiceChannel,
+} from 'discord.js';
 import { logger } from '../../../lib/logger.js';
 
 /**
@@ -8,7 +14,7 @@ import { logger } from '../../../lib/logger.js';
 interface OperationStep {
 	completed: boolean;
 	timestamp: number;
-	[key: string]: any;
+	[key: string]: unknown;
 }
 
 /**
@@ -27,33 +33,44 @@ interface OperationProgress {
  */
 interface CurrentOperation {
 	type: string;
-	params: Record<string, any>;
+	params: Record<string, unknown>;
 	progress: OperationProgress;
 }
 
 /**
- * Guild state data
+ * Persisted room/session data structure
  */
-interface GuildState {
-	currentOperation?: CurrentOperation;
-	history?: CurrentOperation[];
+export interface PersistedSession {
+	mainRoomId?: string;
+	roomIds?: string[];
 }
 
 /**
  * Timer data for breakout sessions
  */
 export interface TimerData {
+	timerId?: string;
 	totalMinutes: number;
 	startTime: number;
 	guildId: string;
 	breakoutRooms: string[];
 	fiveMinSent: boolean;
-	[key: string]: any;
+	[key: string]: unknown;
+}
+
+/**
+ * Guild state data structure on disk
+ */
+export interface GuildState {
+	currentOperation?: CurrentOperation;
+	history?: CurrentOperation[];
+	session?: PersistedSession;
+	timerData?: TimerData;
 }
 
 const statePath: string = path.join(process.cwd(), 'data');
 const stateFile: string = path.join(statePath, 'breakoutState.json');
-let inMemoryState: Record<string, GuildState | TimerData> = {};
+let inMemoryState: Record<string, GuildState> = {};
 let initialized: boolean = false;
 let saveQueue: Promise<void> = Promise.resolve();
 
@@ -61,7 +78,7 @@ let saveQueue: Promise<void> = Promise.resolve();
  * Initialize the state manager, ensuring the data directory exists
  * and loading any existing state
  */
-async function initialize(): Promise<void> {
+export async function initializeState(): Promise<void> {
 	if (initialized) return;
 
 	try {
@@ -75,6 +92,16 @@ async function initialize(): Promise<void> {
 }
 
 /**
+ * Gets or creates the GuildState entry for a guild
+ */
+function getGuildState(guildId: string): GuildState {
+	if (!inMemoryState[guildId]) {
+		inMemoryState[guildId] = {};
+	}
+	return inMemoryState[guildId];
+}
+
+/**
  * Load state from disk
  */
 async function loadState(): Promise<void> {
@@ -82,27 +109,22 @@ async function loadState(): Promise<void> {
 		const data = await fs.readFile(stateFile, 'utf8');
 		inMemoryState = JSON.parse(data);
 		logger.debug('📤 Loaded breakout state data');
-	} catch (error: any) {
-		if (error.code === 'ENOENT') {
-			// File doesn't exist yet, create new state
+	} catch (error: unknown) {
+		const err = error as { code?: string };
+		if (err.code === 'ENOENT') {
 			inMemoryState = {};
 			logger.info('🆕 Created new breakout state data');
 		} else {
-			// Other error (parse error, permission error, etc.)
 			logger.error({ err: error }, '❌ Error loading breakout state');
 			throw error;
 		}
 	}
 }
 
-/**
- * Save state to disk with concurrency safety
- */
 async function saveState(): Promise<void> {
-	// Queue the save operation to prevent race conditions with file writes
 	const nextSave = saveQueue.then(async () => {
 		try {
-			await initialize();
+			await initializeState();
 			await fs.writeFile(stateFile, JSON.stringify(inMemoryState, null, 2));
 			logger.trace('💾 Saved breakout state data');
 		} catch (error) {
@@ -110,8 +132,9 @@ async function saveState(): Promise<void> {
 		}
 	});
 
-	// Update the queue reference, catching errors to ensure the queue allows future writes
-	saveQueue = nextSave.catch(() => {});
+	saveQueue = nextSave.catch((error) => {
+		logger.error({ err: error }, '❌ Unhandled error in state save queue');
+	});
 
 	return nextSave;
 }
@@ -122,14 +145,10 @@ async function saveState(): Promise<void> {
 export async function startOperation(
 	guildId: string,
 	operationType: string,
-	params: Record<string, any>,
+	params: Record<string, unknown>,
 ): Promise<void> {
-	await initialize();
-	if (!inMemoryState[guildId]) {
-		inMemoryState[guildId] = {} as GuildState;
-	}
-
-	const guildState = inMemoryState[guildId] as GuildState;
+	await initializeState();
+	const guildState = getGuildState(guildId);
 	guildState.currentOperation = {
 		type: operationType,
 		params,
@@ -141,7 +160,7 @@ export async function startOperation(
 		},
 	};
 
-	logger.info({ guildId, operationType }, `📝 Started tracking operation`);
+	logger.info({ guildId, operationType }, '📝 Started tracking operation');
 	await saveState();
 }
 
@@ -151,13 +170,13 @@ export async function startOperation(
 export async function updateProgress(
 	guildId: string,
 	step: string,
-	data: Record<string, any> = {},
+	data: Record<string, unknown> = {},
 ): Promise<boolean> {
-	await initialize();
-	const guildState = inMemoryState[guildId] as GuildState | undefined;
+	await initializeState();
+	const guildState = inMemoryState[guildId];
 
 	if (!guildState?.currentOperation) {
-		logger.warn({ guildId }, `⚠️ No operation in progress`);
+		logger.warn({ guildId }, '⚠️ No operation in progress');
 		return false;
 	}
 
@@ -167,7 +186,7 @@ export async function updateProgress(
 		...data,
 	};
 
-	logger.debug({ guildId, step }, `✅ Updated progress`);
+	logger.debug({ guildId, step }, '✅ Updated progress');
 	await saveState();
 	return true;
 }
@@ -176,31 +195,28 @@ export async function updateProgress(
  * Complete an operation
  */
 export async function completeOperation(guildId: string): Promise<void> {
-	await initialize();
-	const guildState = inMemoryState[guildId] as GuildState | undefined;
+	await initializeState();
+	const guildState = inMemoryState[guildId];
 
 	if (!guildState?.currentOperation) return;
 
 	guildState.currentOperation.progress.completed = true;
 	guildState.currentOperation.progress.completedTime = Date.now();
 
-	// Move current operation to history with capping to prevent unbounded growth
 	if (!guildState.history) {
 		guildState.history = [];
 	}
 
 	guildState.history.push(guildState.currentOperation);
 
-	// Cap history to last 50 entries to prevent memory/disk bloat
 	const HISTORY_MAX = 50;
 	if (guildState.history.length > HISTORY_MAX) {
 		guildState.history = guildState.history.slice(-HISTORY_MAX);
 	}
 
-	// Clear current operation
 	delete guildState.currentOperation;
 
-	logger.info({ guildId }, `🏁 Completed operation`);
+	logger.info({ guildId }, '🏁 Completed operation');
 	await saveState();
 }
 
@@ -210,8 +226,8 @@ export async function completeOperation(guildId: string): Promise<void> {
 export async function hasOperationInProgress(
 	guildId: string,
 ): Promise<boolean> {
-	await initialize();
-	const guildState = inMemoryState[guildId] as GuildState | undefined;
+	await initializeState();
+	const guildState = inMemoryState[guildId];
 
 	return (
 		!!guildState?.currentOperation &&
@@ -225,57 +241,129 @@ export async function hasOperationInProgress(
 export async function getCurrentOperation(
 	guildId: string,
 ): Promise<CurrentOperation | undefined> {
-	await initialize();
-	const guildState = inMemoryState[guildId] as GuildState | undefined;
+	await initializeState();
+	const guildState = inMemoryState[guildId];
 	return guildState?.currentOperation;
 }
 
 /**
- * Get completed steps for the current operation
+ * Get completed steps for the current operation (returns shallow copy)
  */
 export async function getCompletedSteps(
 	guildId: string,
 ): Promise<Record<string, OperationStep>> {
-	await initialize();
-	const guildState = inMemoryState[guildId] as GuildState | undefined;
+	await initializeState();
+	const guildState = inMemoryState[guildId];
 
 	if (!guildState?.currentOperation) return {};
-	return guildState.currentOperation.progress.steps;
+	return { ...guildState.currentOperation.progress.steps };
+}
+
+/**
+ * Stores breakout rooms for a guild on disk
+ */
+export async function storeRooms(
+	guildId: string,
+	rooms: VoiceChannel[],
+): Promise<void> {
+	await initializeState();
+	const guildState = getGuildState(guildId);
+	guildState.session = {
+		...guildState.session,
+		roomIds: rooms.map((r) => r.id),
+	};
+	logger.debug({ guildId, count: rooms.length }, '📝 Stored breakout rooms');
+	await saveState();
+}
+
+/**
+ * Sets the main room for a guild's breakout session on disk
+ */
+export async function setMainRoom(
+	guildId: string,
+	mainRoom: VoiceBasedChannel,
+): Promise<void> {
+	await initializeState();
+	const guildState = getGuildState(guildId);
+	guildState.session = {
+		...guildState.session,
+		mainRoomId: mainRoom.id,
+	};
+	logger.debug(
+		{ guildId, mainRoom: mainRoom.name },
+		'📝 Set main room for breakout session',
+	);
+	await saveState();
+}
+
+/**
+ * Gets the breakout rooms for a guild resolved from Discord client cache
+ */
+export function getRooms(guild: Guild): VoiceChannel[] {
+	const guildState = inMemoryState[guild.id];
+	const roomIds = guildState?.session?.roomIds || [];
+
+	return roomIds
+		.map((id) => guild.channels.cache.get(id))
+		.filter((ch): ch is VoiceChannel => ch?.type === ChannelType.GuildVoice);
+}
+
+/**
+ * Gets the main room for a guild resolved from Discord client cache
+ */
+export function getMainRoom(guild: Guild): VoiceBasedChannel | undefined {
+	const guildState = inMemoryState[guild.id];
+	const mainRoomId = guildState?.session?.mainRoomId;
+	if (!mainRoomId) return undefined;
+
+	const ch = guild.channels.cache.get(mainRoomId);
+	if (ch?.isVoiceBased()) {
+		return ch as VoiceBasedChannel;
+	}
+	return undefined;
+}
+
+/**
+ * Clears session data for a guild from disk
+ */
+export async function clearSession(guildId: string): Promise<void> {
+	await initializeState();
+	const guildState = getGuildState(guildId);
+	delete guildState.session;
+	logger.debug({ guildId }, '🧹 Cleared breakout session');
+	await saveState();
 }
 
 /**
  * Sets timer data for a guild
- * @param guildId The guild ID
- * @param timerData Timer data object
  */
 export async function setTimerData(
 	guildId: string,
 	timerData: TimerData,
 ): Promise<void> {
-	await initialize();
-	logger.debug({ guildId }, `💾 Storing timer data`);
-	inMemoryState[`timer_${guildId}`] = timerData;
+	await initializeState();
+	const guildState = getGuildState(guildId);
+	guildState.timerData = timerData;
+	logger.debug({ guildId }, '💾 Storing timer data');
 	await saveState();
 }
 
 /**
  * Gets timer data for a guild
- * @param guildId The guild ID
- * @returns Timer data object or null if not found
  */
 export async function getTimerData(guildId: string): Promise<TimerData | null> {
-	await initialize();
-	const timerKey = `timer_${guildId}`;
-	return (inMemoryState[timerKey] as TimerData) || null;
+	await initializeState();
+	const guildState = inMemoryState[guildId];
+	return guildState?.timerData || null;
 }
 
 /**
  * Clears timer data for a guild
- * @param guildId The guild ID
  */
 export async function clearTimerData(guildId: string): Promise<void> {
-	await initialize();
-	logger.debug({ guildId }, `🗑️ Clearing timer data`);
-	delete inMemoryState[`timer_${guildId}`];
+	await initializeState();
+	const guildState = getGuildState(guildId);
+	delete guildState.timerData;
+	logger.debug({ guildId }, '🗑️ Clearing timer data');
 	await saveState();
 }

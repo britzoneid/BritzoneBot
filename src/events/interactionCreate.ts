@@ -2,7 +2,7 @@ import type { Interaction } from 'discord.js';
 import { Events } from 'discord.js';
 import { replyOrEdit } from '../lib/discord/response.js';
 import { logger } from '../lib/logger.js';
-import type { BritzoneClient, Event } from '../types/index.js';
+import type { BritzoneClient, Event, SlashCommand } from '../types/index.js';
 
 /**
  * InteractionCreate event - handles all interactions (commands, buttons, etc.)
@@ -54,12 +54,17 @@ const event: Event<typeof Events.InteractionCreate> = {
 		commandLogger.info(`🔵 Command executed: ${interaction.commandName}`);
 
 		try {
-			// At this point, interaction is ChatInputCommandInteraction (narrowed by isChatInputCommand())
-			// The command must be a SlashCommand since we're handling a chat input command
-			if ('execute' in command) {
-				// Use a type assertion here because Collections don't have strong value typing
-				// We've already verified the command has execute via the 'in' check
-				await (command as any).execute(interaction);
+			if ('execute' in command && typeof command.execute === 'function') {
+				await (command as SlashCommand).execute(interaction);
+			} else {
+				commandLogger.error(
+					{ commandName: interaction.commandName },
+					'❌ Command object is missing an execute method',
+				);
+				await replyOrEdit(interaction, {
+					content: '❌ Command execution failed (missing execute handler).',
+					ephemeral: true,
+				});
 			}
 		} catch (error) {
 			commandLogger.error(
