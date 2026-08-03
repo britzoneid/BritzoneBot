@@ -34,24 +34,12 @@ function getErrorCode(error: Error): string | number | undefined {
  * Handles Discord interactions with built-in error handling for expired interactions
  *
  * Wraps interaction handlers with deferReply support, timeout protection, and error handling.
- * It demonstrates proper TypeScript patterns for your codebase.
  *
  * @param interaction The Discord interaction to handle
  * @param handler Async function that handles the interaction
  * @param options Options for handling the interaction
  * @returns boolean indicating success
- *
- * @example
- * ```typescript
- * await handleInteraction(
- *   interaction,
- *   async () => {
- *     await interaction.reply('Pong!');
- *   },
- *   { deferReply: true, ephemeral: true }
- * );
- * ```
- * */
+ */
 export async function handleInteraction(
 	interaction: RepliableInteraction | CommandInteraction,
 	handler: () => Promise<void>,
@@ -67,17 +55,17 @@ export async function handleInteraction(
 	try {
 		// If deferReply is true, try to defer the reply first
 		if (deferReply && !interaction.replied && !interaction.deferred) {
+			let deferTimeoutId: ReturnType<typeof setTimeout> | undefined;
 			try {
-				// Set a timeout to avoid getting stuck on network issues
 				const deferPromise = interaction.deferReply(
 					ephemeral ? { flags: MessageFlags.Ephemeral } : undefined,
 				);
-				const timeoutPromise = new Promise<never>((_, reject) =>
-					setTimeout(
+				const timeoutPromise = new Promise<never>((_, reject) => {
+					deferTimeoutId = setTimeout(
 						() => reject(new Error('Defer reply timeout')),
 						deferTimeoutMs,
-					),
-				);
+					);
+				});
 
 				await Promise.race([deferPromise, timeoutPromise]);
 				logger.debug(
@@ -91,7 +79,6 @@ export async function handleInteraction(
 						: new Error(String(deferError));
 				const errorCode = getErrorCode(error);
 
-				// If we can't defer, the interaction likely expired
 				if (errorCode === 10062) {
 					logger.warn(
 						{ interactionId: interaction.id },
@@ -100,7 +87,6 @@ export async function handleInteraction(
 					return false;
 				}
 
-				// Handle network errors gracefully
 				if (
 					errorCode === 'EAI_AGAIN' ||
 					error.message === 'Defer reply timeout'
@@ -117,18 +103,21 @@ export async function handleInteraction(
 					'❓ Unknown error while deferring interaction',
 				);
 				return false;
+			} finally {
+				if (deferTimeoutId) clearTimeout(deferTimeoutId);
 			}
 		}
 
 		// Execute the handler function with timeout protection
+		let handlerTimeoutId: ReturnType<typeof setTimeout> | undefined;
 		try {
 			const handlerPromise = handler();
-			const timeoutPromise = new Promise<never>((_, reject) =>
-				setTimeout(
+			const timeoutPromise = new Promise<never>((_, reject) => {
+				handlerTimeoutId = setTimeout(
 					() => reject(new Error('Handler execution timeout')),
 					handlerTimeoutMs,
-				),
-			);
+				);
+			});
 
 			await Promise.race([handlerPromise, timeoutPromise]);
 			return true;
@@ -139,14 +128,16 @@ export async function handleInteraction(
 					: new Error(String(handlerError));
 			logger.error(
 				{ interactionId: interaction.id, err: error },
-				`❌ Handler error for interaction`,
+				'❌ Handler error for interaction',
 			);
 			return false;
+		} finally {
+			if (handlerTimeoutId) clearTimeout(handlerTimeoutId);
 		}
 	} catch (error) {
 		logger.error(
 			{ interactionId: interaction.id, err: error },
-			`❌ Unexpected error in handleInteraction`,
+			'❌ Unexpected error in handleInteraction',
 		);
 		return false;
 	}
@@ -166,9 +157,14 @@ export function replyOrEdit(
 		| InteractionEditReplyOptions
 		| MessagePayload,
 ): Promise<Message> {
-	return (
-		interaction.replied || interaction.deferred
-			? interaction.editReply(content as InteractionEditReplyOptions)
-			: interaction.reply(content as InteractionReplyOptions)
-	) as Promise<Message>;
+	if (interaction.replied || interaction.deferred) {
+		return interaction.editReply(content as InteractionEditReplyOptions);
+	}
+
+	const options: InteractionReplyOptions =
+		typeof content === 'string'
+			? { content, fetchReply: true }
+			: { ...(content as InteractionReplyOptions), fetchReply: true };
+
+	return interaction.reply(options) as unknown as Promise<Message>;
 }

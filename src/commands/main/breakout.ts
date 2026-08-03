@@ -202,9 +202,16 @@ const command: Command = {
 		}
 
 		const handler = subcommandHandlers[subcommand];
-		if (handler) {
-			await handler(interaction);
+		if (!handler) {
+			log.error({ subcommand }, '❌ No handler registered for subcommand');
+			await replyOrEdit(interaction, {
+				content: 'This subcommand is not supported.',
+				ephemeral: true,
+			});
+			return;
 		}
+
+		await handler(interaction);
 	},
 };
 

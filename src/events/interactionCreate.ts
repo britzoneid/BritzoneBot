@@ -54,10 +54,17 @@ const event: Event<typeof Events.InteractionCreate> = {
 		commandLogger.info(`🔵 Command executed: ${interaction.commandName}`);
 
 		try {
-			// At this point, interaction is ChatInputCommandInteraction (narrowed by isChatInputCommand())
-			// The command must be a SlashCommand since we're handling a chat input command
 			if ('execute' in command && typeof command.execute === 'function') {
 				await (command as SlashCommand).execute(interaction);
+			} else {
+				commandLogger.error(
+					{ commandName: interaction.commandName },
+					'❌ Command object is missing an execute method',
+				);
+				await replyOrEdit(interaction, {
+					content: '❌ Command execution failed (missing execute handler).',
+					ephemeral: true,
+				});
 			}
 		} catch (error) {
 			commandLogger.error(
