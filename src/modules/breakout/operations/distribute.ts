@@ -28,6 +28,7 @@ export async function executeDistribute(
 	mainRoom: VoiceBasedChannel,
 	distribution: UserDistribution,
 	force: boolean = false,
+	facilitators?: Set<string>,
 ): Promise<OperationResult> {
 	const guildId = interaction.guildId;
 	if (!guildId || !interaction.guild) {
@@ -50,9 +51,14 @@ export async function executeDistribute(
 
 	// Use a local variable for distribution to allow overriding from state
 	let activeDistribution = distribution;
+	let activeFacilitators = facilitators;
 
 	if (isResuming) {
 		log.info(`🔄 Resuming distribute operation`);
+
+		if (currentOp?.params?.facilitatorIds) {
+			activeFacilitators = new Set(currentOp.params.facilitatorIds as string[]);
+		}
 
 		// Reconstruct distribution from stored state
 		if (currentOp?.params?.distribution) {
@@ -94,9 +100,6 @@ export async function executeDistribute(
 				);
 			} catch (error) {
 				log.error({ err: error }, `❌ Failed to reconstruct distribution plan`);
-				// Fallback to provided distribution if reconstruction fails?
-				// Or fail? If we fail here, we might be in a bad state.
-				// Let's log and continue with provided distribution but warn.
 				log.warn(`⚠️ Falling back to fresh distribution plan due to error.`);
 			}
 		}
@@ -111,16 +114,10 @@ export async function executeDistribute(
 			};
 		}
 
-		// If force is true and distribution is active, we should technically clean up.
-		// But similar to CreateOperation, avoiding circular dependency for now.
-		// The original code called endBreakoutSession.
 		if (force && isDistributionActive) {
 			log.info(
 				`🔄 Force flag enabled, proceeding with redistribution (previous session implicit end)`,
 			);
-			// We'll rely on the new distribution simply moving users, effectively "stealing" them from old rooms.
-			// But we should probably clear the session manager's main room if it changes?
-			// sessionManager.setMainRoom handles overwrite.
 		}
 
 		// Store distribution plan for recovery
@@ -133,25 +130,22 @@ export async function executeDistribute(
 		await startOperation(guildId, operationType, {
 			mainRoomId: mainRoom.id,
 			distribution: distributionPlan,
+			facilitatorIds: Array.from(facilitators || []),
 		});
 	}
 
 	try {
-		// Store the main room for future reference
-		// We do this every time just in case, or only if not resuming?
-		// Safe to do every time as it updates in-memory map.
-		// But we should update progress step 'set_main_room'
 		const steps = await getCompletedSteps(guildId);
 
 		if (!steps.set_main_room) {
 			await setMainRoomId(guildId, mainRoom.id);
 			await updateProgress(guildId, 'set_main_room');
 		} else {
-			// Ensure session manager is in sync if we restarted the bot
 			await setMainRoomId(guildId, mainRoom.id);
 		}
 
-		const movePromises: Promise<void>[] = [];
+		const facilitatorPromises: Promise<void>[] = [];
+		const regularPromises: Promise<void>[] = [];
 		const moveResults = {
 			success: [] as MoveResult[],
 			failed: [] as MoveFailure[],
@@ -176,12 +170,6 @@ export async function executeDistribute(
 			for (const user of users) {
 				const moveKey = `move_user_${user.id}_to_${roomId}`;
 
-				// We need latest steps if we want to be 100% correct about concurrent updates,
-				// but here we are generating promises.
-				// Since we are not awaiting inside the user loop, steps won't change *during* this loop
-				// (unless another process updates it, which shouldn't happen).
-				// But if we resume, we fetch steps once.
-
 				if (steps[moveKey]) {
 					log.debug(
 						{ user: user.user, room: room.name },
@@ -196,38 +184,54 @@ export async function executeDistribute(
 					continue;
 				}
 
-				movePromises.push(
-					moveUserToRoom(user, room)
-						.then(async () => {
-							moveResults.success.push({
-								userId: user.id,
-								userTag: user.user.tag,
-								roomId: room.id,
-								roomName: room.name,
-							});
-							await updateProgress(guildId, moveKey);
-						})
-						.catch((error: unknown) => {
-							moveResults.failed.push({
-								userId: user.id,
-								userTag: user.user.tag,
-								reason: error instanceof Error ? error.message : String(error),
-							});
-							log.error(
-								{ err: error, user: user.user },
-								`❌ Failed to move user`,
-							);
-						}),
-				);
+				const isFacilitator = activeFacilitators?.has(user.id) ?? false;
+				const moveTask = moveUserToRoom(user, room)
+					.then(async () => {
+						moveResults.success.push({
+							userId: user.id,
+							userTag: user.user.tag,
+							roomId: room.id,
+							roomName: room.name,
+						});
+						await updateProgress(guildId, moveKey);
+					})
+					.catch((error: unknown) => {
+						moveResults.failed.push({
+							userId: user.id,
+							userTag: user.user.tag,
+							reason: error instanceof Error ? error.message : String(error),
+						});
+						log.error(
+							{ err: error, user: user.user },
+							`❌ Failed to move user`,
+						);
+					});
+
+				if (isFacilitator) {
+					facilitatorPromises.push(moveTask);
+				} else {
+					regularPromises.push(moveTask);
+				}
 			}
 		}
 
-		// Wait for all moves to complete
-		log.info(
-			{ count: movePromises.length },
-			`⏳ Waiting for move operations to complete`,
-		);
-		await Promise.all(movePromises);
+		// Phase 1: Move facilitators first
+		if (facilitatorPromises.length > 0) {
+			log.info(
+				{ count: facilitatorPromises.length },
+				`👑 Moving facilitators into breakout rooms first...`,
+			);
+			await Promise.all(facilitatorPromises);
+		}
+
+		// Phase 2: Move regular members
+		if (regularPromises.length > 0) {
+			log.info(
+				{ count: regularPromises.length },
+				`⏳ Moving remaining members into breakout rooms...`,
+			);
+			await Promise.all(regularPromises);
+		}
 
 		// Mark distribution as complete
 		await updateProgress(guildId, 'distribution_complete', {

@@ -196,6 +196,7 @@ export async function handleDistributeCommand(
 						mainRoom,
 						distribution,
 						force,
+						facilitators,
 					);
 
 					if (!result.success) {
