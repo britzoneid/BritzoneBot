@@ -78,6 +78,7 @@ interface GuildState {
 
 const statePath: string = path.join(process.cwd(), 'data');
 const stateFile: string = path.join(statePath, 'breakoutState.json');
+const MAX_HISTORY = 20;
 let inMemoryState: Record<string, GuildState> = {};
 let initialized: boolean = false;
 let saveQueue: Promise<void> = Promise.resolve();
@@ -218,6 +219,7 @@ export async function completeOperation(guildId: string): Promise<void> {
 		guildState.history = [];
 	}
 	guildState.history.push(guildState.currentOperation);
+	guildState.history = guildState.history.slice(-MAX_HISTORY);
 	delete guildState.currentOperation;
 
 	logger.info({ guildId }, '✅ Completed breakout operation');
