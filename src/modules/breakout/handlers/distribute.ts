@@ -67,7 +67,7 @@ export async function handleDistributeCommand(
 				facilitators.add(match[1]);
 			}
 		}
-		log.debug({ count: facilitators.size }, '👑 Facilitators identified');
+		log.debug({ count: facilitators.size }, '🗣️ Facilitators identified');
 	}
 
 	const breakoutRooms = getRooms(interaction.guild);

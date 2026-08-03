@@ -117,7 +117,7 @@ export function buildDistributionEmbed(
 				roomUsers.length > 0
 					? roomUsers
 							.map((u) =>
-								facilitators?.has(u.userId) ? `⭐ ${u.userTag}` : u.userTag,
+								facilitators?.has(u.userId) ? `🗣️ ${u.userTag}` : u.userTag,
 							)
 							.join('\n')
 					: 'No users assigned';
@@ -127,7 +127,7 @@ export function buildDistributionEmbed(
 				plannedUsers.length > 0
 					? plannedUsers
 							.map((u) =>
-								facilitators?.has(u.id) ? `⭐ ${u.user.tag}` : u.user.tag,
+								facilitators?.has(u.id) ? `🗣️ ${u.user.tag}` : u.user.tag,
 							)
 							.join('\n')
 					: 'No users assigned';
