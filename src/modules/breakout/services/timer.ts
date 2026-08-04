@@ -1,7 +1,10 @@
 import type { Client } from 'discord.js';
 import type { Logger } from 'pino';
 import { logger } from '@/lib/logger.js';
-import { getTimerSchedule } from '@/modules/breakout/constants/timerPresets.js';
+import {
+	formatReminderMessage,
+	getTimerSchedule,
+} from '@/modules/breakout/constants/timerPresets.js';
 import {
 	clearTimerData,
 	getTimerData,
@@ -65,10 +68,10 @@ export async function monitorBreakoutTimer(
 		sentReminders.add(5);
 	}
 
-	for (const reminder of schedule) {
-		const { remainingMinutes, message } = reminder;
+	for (const remainingMinutes of schedule) {
 		const reminderTime = endTime - remainingMinutes * 60 * 1000;
 		const delay = reminderTime - now;
+		const message = formatReminderMessage(remainingMinutes);
 
 		if (sentReminders.has(remainingMinutes)) {
 			continue;
