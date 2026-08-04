@@ -1,6 +1,10 @@
 import type { ChatInputCommandInteraction } from 'discord.js';
 import { confirmAction } from '@/lib/discord/confirm.js';
-import { handleInteraction, replyOrEdit } from '@/lib/discord/response.js';
+import {
+	handleInteraction,
+	replyOrEdit,
+	sendPublicAnnouncement,
+} from '@/lib/discord/response.js';
 import { logger } from '@/lib/logger.js';
 import { executeDelete } from '@/modules/breakout/operations/delete.js';
 import { getMainRoom, getRooms } from '@/modules/breakout/state/state.js';
@@ -47,6 +51,9 @@ export async function handleDeleteCommand(
 								content: result.message,
 								components: [],
 							});
+							await sendPublicAnnouncement(interaction, {
+								content: `🗑️ ${result.message}`,
+							});
 						} else {
 							await interaction.editReply({
 								content: result.message || 'Failed to delete breakout rooms.',
@@ -68,6 +75,9 @@ export async function handleDeleteCommand(
 
 			if (result.success) {
 				await replyOrEdit(interaction, result.message);
+				await sendPublicAnnouncement(interaction, {
+					content: `🗑️ ${result.message}`,
+				});
 			} else {
 				await replyOrEdit(
 					interaction,

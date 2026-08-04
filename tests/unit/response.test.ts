@@ -1,6 +1,10 @@
 import type { CommandInteraction, RepliableInteraction } from 'discord.js';
 import { describe, expect, it, vi } from 'vitest';
-import { handleInteraction, replyOrEdit } from '@/lib/discord/response.js';
+import {
+	handleInteraction,
+	replyOrEdit,
+	sendPublicAnnouncement,
+} from '@/lib/discord/response.js';
 
 describe('Discord Response Utilities (response.ts)', () => {
 	describe('handleInteraction', () => {
@@ -132,6 +136,59 @@ describe('Discord Response Utilities (response.ts)', () => {
 				withResponse: true,
 			});
 			expect(editReplyMock).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('sendPublicAnnouncement', () => {
+		it('sends message to channel when channel is sendable', async () => {
+			const sendMock = vi.fn().mockResolvedValue({ id: 'msg-pub-1' });
+			const mockInteraction = {
+				id: 'int-1',
+				channel: {
+					send: sendMock,
+				},
+			} as unknown as CommandInteraction;
+
+			const result = await sendPublicAnnouncement(mockInteraction, {
+				content: 'Public announcement',
+			});
+
+			expect(sendMock).toHaveBeenCalledWith({ content: 'Public announcement' });
+			expect(result).toEqual({ id: 'msg-pub-1' });
+		});
+
+		it('returns null gracefully when channel is null or lacks send method', async () => {
+			const mockInteraction = {
+				id: 'int-1',
+				channel: null,
+			} as unknown as CommandInteraction;
+
+			const result = await sendPublicAnnouncement(
+				mockInteraction,
+				'Test content',
+			);
+
+			expect(result).toBeNull();
+		});
+
+		it('returns null gracefully when send method throws an error', async () => {
+			const sendMock = vi
+				.fn()
+				.mockRejectedValue(new Error('Missing Permissions'));
+			const mockInteraction = {
+				id: 'int-1',
+				channel: {
+					send: sendMock,
+				},
+			} as unknown as CommandInteraction;
+
+			const result = await sendPublicAnnouncement(
+				mockInteraction,
+				'Test content',
+			);
+
+			expect(sendMock).toHaveBeenCalledWith('Test content');
+			expect(result).toBeNull();
 		});
 	});
 });

@@ -8,7 +8,11 @@ import {
 	type StageChannel,
 	type VoiceChannel,
 } from 'discord.js';
-import { handleInteraction, replyOrEdit } from '@/lib/discord/response.js';
+import {
+	handleInteraction,
+	replyOrEdit,
+	sendPublicAnnouncement,
+} from '@/lib/discord/response.js';
 import { logger } from '@/lib/logger.js';
 import { executeDistribute } from '@/modules/breakout/operations/distribute.js';
 import { getRooms } from '@/modules/breakout/state/state.js';
@@ -237,6 +241,9 @@ export async function handleDistributeCommand(
 								content: null,
 								embeds: [finalEmbed],
 								components: [],
+							});
+							await sendPublicAnnouncement(interaction, {
+								embeds: [finalEmbed],
 							});
 							resolve();
 						}

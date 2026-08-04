@@ -168,3 +168,29 @@ export function replyOrEdit(
 
 	return interaction.reply(options) as unknown as Promise<Message>;
 }
+
+/**
+ * Sends a public message to the text channel where the interaction occurred.
+ * Fails gracefully without throwing errors if the channel doesn't support sending messages or lacks permissions.
+ *
+ * @param interaction The Discord interaction
+ * @param options Content or message options to send
+ * @returns Promise resolving to the sent Message or null if failed/unsupported
+ */
+export async function sendPublicAnnouncement(
+	interaction: RepliableInteraction | CommandInteraction,
+	options: string | MessagePayload | InteractionReplyOptions,
+): Promise<Message | null> {
+	try {
+		const channel = interaction.channel;
+		if (channel && 'send' in channel && typeof channel.send === 'function') {
+			return await channel.send(options as Parameters<typeof channel.send>[0]);
+		}
+	} catch (err) {
+		logger.warn(
+			{ interactionId: interaction.id, err },
+			'⚠️ Failed to send public announcement to channel',
+		);
+	}
+	return null;
+}

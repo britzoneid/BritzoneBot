@@ -1,6 +1,10 @@
 import type { ChatInputCommandInteraction } from 'discord.js';
 import { confirmAction } from '@/lib/discord/confirm.js';
-import { handleInteraction, replyOrEdit } from '@/lib/discord/response.js';
+import {
+	handleInteraction,
+	replyOrEdit,
+	sendPublicAnnouncement,
+} from '@/lib/discord/response.js';
 import { logger } from '@/lib/logger.js';
 import { executeCreate } from '@/modules/breakout/operations/create.js';
 import { hasExistingBreakoutRooms } from '@/modules/breakout/services/room.js';
@@ -52,6 +56,9 @@ export async function handleCreateCommand(
 								content: result.message,
 								components: [],
 							});
+							await sendPublicAnnouncement(interaction, {
+								content: `🛠️ ${result.message}`,
+							});
 						} else {
 							await interaction.editReply({
 								content: result.message || 'Failed to create breakout rooms.',
@@ -73,6 +80,9 @@ export async function handleCreateCommand(
 
 			if (result.success) {
 				await replyOrEdit(interaction, result.message);
+				await sendPublicAnnouncement(interaction, {
+					content: `🛠️ ${result.message}`,
+				});
 			} else {
 				log.error({ result }, '❌ Error creating breakout rooms');
 				await replyOrEdit(interaction, result.message);

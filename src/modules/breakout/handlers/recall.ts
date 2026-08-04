@@ -2,7 +2,11 @@ import type {
 	ChatInputCommandInteraction,
 	VoiceBasedChannel,
 } from 'discord.js';
-import { handleInteraction, replyOrEdit } from '@/lib/discord/response.js';
+import {
+	handleInteraction,
+	replyOrEdit,
+	sendPublicAnnouncement,
+} from '@/lib/discord/response.js';
 import { logger } from '@/lib/logger.js';
 import { executeRecall } from '@/modules/breakout/operations/recall.js';
 import { getMainRoom } from '@/modules/breakout/state/state.js';
@@ -49,6 +53,9 @@ export async function handleRecallCommand(
 
 			if (result.success) {
 				await replyOrEdit(interaction, result.message);
+				await sendPublicAnnouncement(interaction, {
+					content: `📢 ${result.message}`,
+				});
 			} else {
 				await replyOrEdit(
 					interaction,
