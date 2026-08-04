@@ -6,6 +6,8 @@ import {
 	clearSession,
 	clearTimerData,
 	completeOperation,
+	flushState,
+	getAllGuildStates,
 	getCompletedSteps,
 	getCurrentOperation,
 	getTimerData,
@@ -164,6 +166,34 @@ describe('StateManager (state.ts)', () => {
 
 			const afterClear = await getTimerData(guildId);
 			expect(afterClear).toBeNull();
+		});
+	});
+
+	describe('State retrieval and flushing', () => {
+		it('getAllGuildStates returns all in-memory guild states', async () => {
+			await setTimerData('guild-1', {
+				totalMinutes: 5,
+				startTime: Date.now(),
+				guildId: 'guild-1',
+				breakoutRooms: ['r1'],
+				fiveMinSent: false,
+			});
+			await setMainRoomId('guild-2', 'main-2');
+
+			const allStates = await getAllGuildStates();
+			expect(allStates['guild-1']?.timerData).toBeDefined();
+			expect(allStates['guild-2']?.session?.mainRoomId).toBe('main-2');
+		});
+
+		it('flushState completes without errors', async () => {
+			await setTimerData('guild-1', {
+				totalMinutes: 10,
+				startTime: Date.now(),
+				guildId: 'guild-1',
+				breakoutRooms: ['r1'],
+				fiveMinSent: false,
+			});
+			await expect(flushState()).resolves.toBeUndefined();
 		});
 	});
 });

@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Client, Collection, GatewayIntentBits } from 'discord.js';
 import { logger } from '@/lib/logger.js';
-import { initializeState } from '@/modules/breakout/state/state.js';
+import { flushState, initializeState } from '@/modules/breakout/state/state.js';
 import type { BritzoneClient, Command, Event } from '@/types/index.js';
 
 const __dirname = import.meta.dirname;
@@ -134,8 +134,44 @@ client
 	});
 
 // ============================================================================
-// ERROR HANDLING
+// GRACEFUL SHUTDOWN & ERROR HANDLING
 // ============================================================================
+
+let isShuttingDown = false;
+
+const handleShutdown = async (signal: string) => {
+	if (isShuttingDown) return;
+	isShuttingDown = true;
+
+	logger.info(`🛑 Received ${signal}, initiating graceful shutdown...`);
+
+	// Force exit timeout in case cleanup hangs
+	const forceExitTimeout = setTimeout(() => {
+		logger.error('⏰ Shutdown timed out. Forcing exit.');
+		process.exit(1);
+	}, 5000);
+	forceExitTimeout.unref();
+
+	try {
+		client.destroy();
+		logger.info('🔌 Discord client destroyed.');
+
+		await flushState();
+		logger.info('💾 State flushed to disk successfully.');
+
+		logger.info('👋 Graceful shutdown complete.');
+		process.exit(0);
+	} catch (error) {
+		logger.error({ err: error }, '❌ Error during graceful shutdown');
+		process.exit(1);
+	}
+};
+
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+	process.on(signal, () => {
+		handleShutdown(signal);
+	});
+}
 
 // Handle unhandled promise rejections
 process.on(

@@ -69,7 +69,7 @@ export interface TimerData {
 /**
  * Guild state data structure on disk
  */
-interface GuildState {
+export interface GuildState {
 	currentOperation?: CurrentOperation;
 	history?: CurrentOperation[];
 	session?: PersistedSession;
@@ -416,4 +416,19 @@ export async function clearTimerData(guildId: string): Promise<void> {
 	delete guildState.timerData;
 	logger.debug({ guildId }, '🗑️ Clearing timer data');
 	await saveState();
+}
+
+/**
+ * Gets a shallow copy of all guild states in memory
+ */
+export async function getAllGuildStates(): Promise<Record<string, GuildState>> {
+	await initializeState();
+	return { ...inMemoryState };
+}
+
+/**
+ * Ensures all pending state save operations are flushed to disk
+ */
+export async function flushState(): Promise<void> {
+	await saveQueue;
 }
