@@ -4,6 +4,7 @@ import {
 	ButtonStyle,
 	type ChatInputCommandInteraction,
 	ComponentType,
+	MessageFlags,
 } from 'discord.js';
 import { handleInteraction, replyOrEdit } from '@/lib/discord/response.js';
 import { logger } from '@/lib/logger.js';
@@ -61,60 +62,72 @@ export async function handleDeleteCommand(
 					time: 60_000,
 				});
 
-				collector.on('collect', async (i) => {
-					if (i.user.id !== interaction.user.id) {
-						await i.reply({
-							content: 'You are not authorized to interact with this prompt.',
-							ephemeral: true,
-						});
-						return;
-					}
-
-					if (i.customId === 'cancel_delete') {
-						collector.stop('cancelled');
-						log.info('❌ Room deletion cancelled by user');
-						await i.update({
-							content: '❌ Deletion cancelled.',
-							components: [],
-						});
-						return;
-					}
-
-					if (i.customId === 'confirm_delete') {
-						collector.stop('confirmed');
-						log.info('✅ Room deletion confirmed by user');
-						await i.update({
-							content: '⏳ Deleting breakout rooms...',
-							components: [],
-						});
-
-						const result = await executeDelete(interaction);
-						if (result.success) {
-							await interaction.editReply({
-								content: result.message,
-								components: [],
-							});
-						} else {
-							await interaction.editReply({
-								content: result.message || 'Failed to delete breakout rooms.',
-								components: [],
-							});
-						}
-					}
-				});
-
-				collector.on('end', async (_, reason) => {
-					if (reason !== 'confirmed' && reason !== 'cancelled') {
-						log.warn('⏱️ Delete confirmation timed out');
+				await new Promise<void>((resolve) => {
+					collector.on('collect', async (i) => {
 						try {
-							await interaction.editReply({
-								content: '⏱️ Delete request timed out.',
-								components: [],
-							});
+							if (i.user.id !== interaction.user.id) {
+								await i.reply({
+									content:
+										'You are not authorized to interact with this prompt.',
+									flags: MessageFlags.Ephemeral,
+								});
+								return;
+							}
+
+							if (i.customId === 'cancel_delete') {
+								collector.stop('cancelled');
+								log.info('❌ Room deletion cancelled by user');
+								await i.update({
+									content: '❌ Deletion cancelled.',
+									components: [],
+								});
+								resolve();
+								return;
+							}
+
+							if (i.customId === 'confirm_delete') {
+								collector.stop('confirmed');
+								log.info('✅ Room deletion confirmed by user');
+								await i.update({
+									content: '⏳ Deleting breakout rooms...',
+									components: [],
+								});
+
+								const result = await executeDelete(interaction);
+								if (result.success) {
+									await interaction.editReply({
+										content: result.message,
+										components: [],
+									});
+								} else {
+									await interaction.editReply({
+										content:
+											result.message || 'Failed to delete breakout rooms.',
+										components: [],
+									});
+								}
+								resolve();
+							}
 						} catch (err) {
-							log.error({ err }, 'Failed to edit reply on collector timeout');
+							log.error({ err }, 'Failed handling delete component collector');
+							resolve();
 						}
-					}
+					});
+
+					collector.on('end', async (_, reason) => {
+						if (reason !== 'confirmed' && reason !== 'cancelled') {
+							log.warn('⏱️ Delete confirmation timed out');
+							try {
+								await interaction.editReply({
+									content: '⏱️ Delete request timed out.',
+									components: [],
+								});
+							} catch (err) {
+								log.error({ err }, 'Failed to edit reply on collector timeout');
+							}
+						}
+						resolve();
+					});
 				});
 			},
 			{ deferReply: true, ephemeral: true, handlerTimeoutMs: 120_000 },
