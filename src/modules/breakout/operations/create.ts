@@ -49,55 +49,62 @@ export async function executeCreate(
 	const currentOp = await getCurrentOperation(guildId);
 	const isResuming = currentOp?.type === operationType;
 
-	if (isResuming) {
-		log.info(`🔄 Resuming create operation`);
-	} else {
-		// Check for existing breakout rooms and auto-reconcile
-		const existingRooms = await hasExistingBreakoutRooms(interaction.guild);
+	try {
+		if (isResuming) {
+			log.info(`🔄 Resuming create operation`);
+		} else {
+			// Check for existing breakout rooms and auto-reconcile
+			const existingRooms = await hasExistingBreakoutRooms(interaction.guild);
 
-		if (existingRooms.exists) {
-			const occupiedRooms = existingRooms.rooms.filter(
-				(r) => r.members && r.members.size > 0,
-			);
+			if (existingRooms.exists) {
+				const occupiedRooms = existingRooms.rooms.filter(
+					(r) => r.members && r.members.size > 0,
+				);
 
-			if (occupiedRooms.length > 0) {
-				const mainRoom = getMainRoom(interaction.guild);
-				if (mainRoom && mainRoom.isVoiceBased()) {
-					for (const room of occupiedRooms) {
-						for (const member of room.members.values()) {
-							try {
-								await moveUserToRoom(
-									member,
-									mainRoom as VoiceChannel | StageChannel,
-								);
-							} catch (err) {
-								log.warn(
-									{ memberId: member.id, err },
-									'Failed to move user to main room during create cleanup',
-								);
+				if (occupiedRooms.length > 0) {
+					const mainRoom = getMainRoom(interaction.guild);
+					if (mainRoom) {
+						for (const room of occupiedRooms) {
+							for (const member of room.members.values()) {
+								try {
+									await moveUserToRoom(
+										member,
+										mainRoom as VoiceChannel | StageChannel,
+									);
+								} catch (err) {
+									log.warn(
+										{ memberId: member.id, err },
+										'Failed to move user to main room during create cleanup',
+									);
+								}
 							}
 						}
 					}
+					// If no main room is stored, just delete the channels —
+					// Discord will disconnect occupants from voice.
 				}
-				// If no main room is stored, just delete the channels —
-				// Discord will disconnect occupants from voice.
+
+				for (const room of existingRooms.rooms) {
+					try {
+						await deleteRoom(room);
+					} catch (err) {
+						log.warn(
+							{ roomId: room.id, err },
+							'Failed to delete existing room during cleanup',
+						);
+					}
+				}
+				await clearSession(guildId);
+				log.info(
+					{ cleaned: existingRooms.rooms.length },
+					'♻️ Cleaned existing rooms before create',
+				);
 			}
 
-			for (const room of existingRooms.rooms) {
-				await deleteRoom(room);
-			}
-			await clearSession(guildId);
-			log.info(
-				{ cleaned: existingRooms.rooms.length },
-				'♻️ Cleaned existing rooms before create',
-			);
+			// Start new operation
+			await startOperation(guildId, operationType, { numRooms });
 		}
 
-		// Start new operation
-		await startOperation(guildId, operationType, { numRooms });
-	}
-
-	try {
 		const createdChannels: VoiceChannel[] = [];
 
 		// Fetch completed steps once before the loop for efficiency

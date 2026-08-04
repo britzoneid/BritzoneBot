@@ -80,39 +80,6 @@ export async function executeDelete(
 			};
 		}
 
-		// Auto-recall members to main room if one is configured
-		const mainRoom = getMainRoom(interaction.guild);
-		let membersRecalled = 0;
-
-		for (const room of breakoutRooms) {
-			const guildRoom = interaction.guild.channels.cache.get(room.id) as
-				| VoiceChannel
-				| undefined;
-			if (guildRoom?.members && guildRoom.members.size > 0) {
-				for (const member of guildRoom.members.values()) {
-					if (mainRoom && mainRoom.isVoiceBased()) {
-						try {
-							await moveUserToRoom(
-								member,
-								mainRoom as VoiceChannel | StageChannel,
-							);
-							membersRecalled++;
-						} catch (err) {
-							log.warn(
-								{ memberId: member.id, err },
-								'Failed to move user to main room during delete',
-							);
-						}
-					}
-					// If no main room, Discord handles disconnect on channel delete
-				}
-			}
-		}
-
-		if (membersRecalled > 0) {
-			log.info({ membersRecalled }, '♻️ Recalled members before deleting rooms');
-		}
-
 		// Start new operation
 		if (!isResuming) {
 			await startOperation(guildId, operationType, {
@@ -124,6 +91,39 @@ export async function executeDelete(
 				'🔍 Found breakout room(s) to delete',
 			);
 		}
+	}
+
+	// Auto-recall members to main room if one is configured (runs on both initial run and resume)
+	const mainRoom = getMainRoom(interaction.guild);
+	let membersRecalled = 0;
+
+	for (const room of breakoutRooms) {
+		const guildRoom = interaction.guild.channels.cache.get(room.id) as
+			| VoiceChannel
+			| undefined;
+		if (guildRoom?.members && guildRoom.members.size > 0) {
+			for (const member of guildRoom.members.values()) {
+				if (mainRoom) {
+					try {
+						await moveUserToRoom(
+							member,
+							mainRoom as VoiceChannel | StageChannel,
+						);
+						membersRecalled++;
+					} catch (err) {
+						log.warn(
+							{ memberId: member.id, err },
+							'Failed to move user to main room during delete',
+						);
+					}
+				}
+				// If no main room, Discord handles disconnect on channel delete
+			}
+		}
+	}
+
+	if (membersRecalled > 0) {
+		log.info({ membersRecalled }, '♻️ Recalled members before deleting rooms');
 	}
 
 	const totalRooms = breakoutRooms.length;

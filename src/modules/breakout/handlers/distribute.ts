@@ -4,6 +4,7 @@ import {
 	ButtonStyle,
 	type ChatInputCommandInteraction,
 	ComponentType,
+	MessageFlags,
 	type StageChannel,
 	type VoiceChannel,
 } from 'discord.js';
@@ -79,11 +80,25 @@ export async function handleDistributeCommand(
 		return;
 	}
 
-	const usersInMainRoom = mainRoom.members;
+	// Gather all members from main room and existing breakout rooms
+	const allTargetMembers = new Map<string, import('discord.js').GuildMember>();
+	for (const [id, member] of mainRoom.members) {
+		allTargetMembers.set(id, member);
+	}
+	for (const room of breakoutRooms) {
+		if (room.members && room.members.size > 0) {
+			for (const [id, member] of room.members) {
+				allTargetMembers.set(id, member);
+			}
+		}
+	}
 
-	if (usersInMainRoom.size === 0) {
-		log.warn(`⚠️ No users found in ${mainRoom.name}`);
-		await replyOrEdit(interaction, `There are no users in ${mainRoom.name}.`);
+	if (allTargetMembers.size === 0) {
+		log.warn(`⚠️ No users found in ${mainRoom.name} or breakout rooms`);
+		await replyOrEdit(
+			interaction,
+			`There are no users in ${mainRoom.name} or breakout rooms to distribute.`,
+		);
 		return;
 	}
 
@@ -93,7 +108,7 @@ export async function handleDistributeCommand(
 			const facilitatorMembers: import('discord.js').GuildMember[] = [];
 			const regularMembers: import('discord.js').GuildMember[] = [];
 
-			for (const member of usersInMainRoom.values()) {
+			for (const member of allTargetMembers.values()) {
 				if (excludedUsers.has(member.user.id)) continue;
 				if (facilitators.has(member.user.id)) {
 					facilitatorMembers.push(member);
@@ -123,7 +138,7 @@ export async function handleDistributeCommand(
 				breakoutRooms,
 				facilitators,
 				excludedUsers,
-				usersInMainRoom,
+				usersInMainRoom: mainRoom.members,
 				distribution,
 				isPreview: true,
 			});
@@ -155,91 +170,105 @@ export async function handleDistributeCommand(
 				time: 60_000,
 			});
 
-			collector.on('collect', async (i) => {
-				if (i.user.id !== interaction.user.id) {
-					await i.reply({
-						content:
-							'You are not authorized to interact with this distribution preview.',
-						ephemeral: true,
-					});
-					return;
-				}
-
-				if (i.customId === 'cancel_distribute') {
-					collector.stop('cancelled');
-					log.info('❌ Distribution cancelled by user');
-					await i.update({
-						content: '❌ Distribution cancelled.',
-						embeds: [previewEmbed],
-						components: [],
-					});
-					return;
-				}
-
-				if (i.customId === 'confirm_distribute') {
-					collector.stop('confirmed');
-					log.info('✅ Distribution confirmed by user');
-
-					await i.update({
-						content: '⏳ Distributing users to breakout rooms...',
-						embeds: [previewEmbed],
-						components: [],
-					});
-
-					const result = await executeDistribute(
-						interaction,
-						mainRoom,
-						distribution,
-						facilitators,
-					);
-
-					if (!result.success) {
-						await interaction.editReply({
-							content: `❌ ${result.message}`,
-							embeds: [],
-							components: [],
-						});
-						return;
-					}
-
-					log.debug('📝 Creating final response embed');
-					const finalEmbed = buildDistributionEmbed({
-						mainRoom,
-						breakoutRooms,
-						facilitators,
-						excludedUsers,
-						usersInMainRoom,
-						moveResults: result.moveResults,
-						distribution,
-					});
-
-					log.info('📤 Distribution completed successfully');
-					await interaction.editReply({
-						content: null,
-						embeds: [finalEmbed],
-						components: [],
-					});
-				}
-			});
-
-			collector.on('end', async (_, reason) => {
-				if (reason !== 'confirmed' && reason !== 'cancelled') {
-					log.warn('⏱️ Distribution preview confirmation timed out');
-					const disabledRow =
-						new ActionRowBuilder<ButtonBuilder>().addComponents(
-							confirmButton.setDisabled(true),
-							cancelButton.setDisabled(true),
-						);
+			await new Promise<void>((resolve) => {
+				collector.on('collect', async (i) => {
 					try {
-						await interaction.editReply({
-							content: '⏱️ Distribution request timed out.',
-							embeds: [previewEmbed],
-							components: [disabledRow],
-						});
+						if (i.user.id !== interaction.user.id) {
+							await i.reply({
+								content:
+									'You are not authorized to interact with this distribution preview.',
+								flags: MessageFlags.Ephemeral,
+							});
+							return;
+						}
+
+						if (i.customId === 'cancel_distribute') {
+							collector.stop('cancelled');
+							log.info('❌ Distribution cancelled by user');
+							await i.update({
+								content: '❌ Distribution cancelled.',
+								embeds: [previewEmbed],
+								components: [],
+							});
+							resolve();
+							return;
+						}
+
+						if (i.customId === 'confirm_distribute') {
+							collector.stop('confirmed');
+							log.info('✅ Distribution confirmed by user');
+
+							await i.update({
+								content: '⏳ Distributing users to breakout rooms...',
+								embeds: [previewEmbed],
+								components: [],
+							});
+
+							const result = await executeDistribute(
+								interaction,
+								mainRoom,
+								distribution,
+								facilitators,
+							);
+
+							if (!result.success) {
+								await interaction.editReply({
+									content: `❌ ${result.message}`,
+									embeds: [],
+									components: [],
+								});
+								resolve();
+								return;
+							}
+
+							log.debug('📝 Creating final response embed');
+							const finalEmbed = buildDistributionEmbed({
+								mainRoom,
+								breakoutRooms,
+								facilitators,
+								excludedUsers,
+								usersInMainRoom: mainRoom.members,
+								moveResults: result.moveResults,
+								distribution,
+							});
+
+							log.info('📤 Distribution completed successfully');
+							await interaction.editReply({
+								content: null,
+								embeds: [finalEmbed],
+								components: [],
+							});
+							resolve();
+						}
 					} catch (err) {
-						log.error({ err }, 'Failed to edit reply on collector timeout');
+						log.error(
+							{ err },
+							'Failed handling distribute component collector',
+						);
+						resolve();
 					}
-				}
+				});
+
+				collector.on('end', async (_, reason) => {
+					if (reason !== 'confirmed' && reason !== 'cancelled') {
+						log.warn('⏱️ Distribution preview confirmation timed out');
+						const disabledRow =
+							new ActionRowBuilder<ButtonBuilder>().addComponents(
+								confirmButton.setDisabled(true),
+								cancelButton.setDisabled(true),
+							);
+						try {
+							await interaction.editReply({
+								content: '⏱️ Distribution request timed out.',
+								embeds: [previewEmbed],
+								components: [disabledRow],
+							});
+						} catch (err) {
+							log.error({ err }, 'Failed to edit reply on collector timeout');
+						}
+					}
+					resolve();
+				});
 			});
 		},
 		{ deferReply: true, ephemeral: true, handlerTimeoutMs: 120_000 },

@@ -13,7 +13,6 @@ import {
 	completeOperation,
 	getCompletedSteps,
 	getCurrentOperation,
-	getMainRoom,
 	getRooms,
 	setMainRoomId,
 	startOperation,
@@ -109,23 +108,20 @@ export async function executeDistribute(
 		const isDistributionActive = await hasActiveDistribution(interaction.guild);
 
 		if (isDistributionActive) {
-			const targetMainRoom = mainRoom || getMainRoom(interaction.guild);
-			if (targetMainRoom && targetMainRoom.isVoiceBased()) {
-				const rooms = getRooms(interaction.guild);
-				for (const room of rooms) {
-					if (room.members && room.members.size > 0) {
-						for (const member of room.members.values()) {
-							try {
-								await moveUserToRoom(
-									member,
-									targetMainRoom as VoiceChannel | StageChannel,
-								);
-							} catch (err) {
-								log.warn(
-									{ memberId: member.id, err },
-									'Failed to move user during auto-recall before redistributing',
-								);
-							}
+			const rooms = getRooms(interaction.guild);
+			for (const room of rooms) {
+				if (room.members && room.members.size > 0) {
+					for (const member of room.members.values()) {
+						try {
+							await moveUserToRoom(
+								member,
+								mainRoom as VoiceChannel | StageChannel,
+							);
+						} catch (err) {
+							log.warn(
+								{ memberId: member.id, err },
+								'Failed to move user during auto-recall before redistributing',
+							);
 						}
 					}
 				}
