@@ -64,6 +64,7 @@ export interface TimerData {
 	guildId: string;
 	breakoutRooms: string[];
 	fiveMinSent: boolean;
+	sentReminders?: number[];
 }
 
 /**

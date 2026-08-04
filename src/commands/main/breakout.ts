@@ -116,12 +116,29 @@ const command: Command = {
 			subcommand
 				.setName('timer')
 				.setDescription('Sets a timer for the breakout session')
+				.addStringOption((option) =>
+					option
+						.setName('preset')
+						.setDescription(
+							'Preset FGD timer duration (30, 45, 60, 90 mins, or custom)',
+						)
+						.setRequired(false)
+						.addChoices(
+							{ name: '30 minutes (Reminders at 15m, 5m)', value: '30' },
+							{ name: '45 minutes (Reminders at 22m, 10m, 3m)', value: '45' },
+							{ name: '60 minutes (Reminders at 30m, 15m, 5m)', value: '60' },
+							{ name: '90 minutes (Reminders at 45m, 20m, 5m)', value: '90' },
+							{ name: 'Custom (specify minutes option)', value: 'custom' },
+						),
+				)
 				.addIntegerOption((option) =>
 					option
 						.setName('minutes')
-						.setDescription('Duration of the breakout session in minutes')
+						.setDescription(
+							'Custom duration in minutes (used if custom preset or preset omitted)',
+						)
 						.setMinValue(1)
-						.setRequired(true),
+						.setRequired(false),
 				),
 		)
 		// Broadcast subcommand

@@ -1,6 +1,7 @@
 import type { Client } from 'discord.js';
 import type { Logger } from 'pino';
 import { logger } from '@/lib/logger.js';
+import { getTimerSchedule } from '@/modules/breakout/constants/timerPresets.js';
 import {
 	clearTimerData,
 	getTimerData,
@@ -24,7 +25,6 @@ export async function monitorBreakoutTimer(
 	const { timerId, totalMinutes, startTime, guildId, breakoutRooms } =
 		timerData;
 	const endTime = startTime + totalMinutes * 60 * 1000;
-	const fiveMinTime = endTime - 5 * 60 * 1000;
 	const log = logger.child({ guildId, timerId });
 
 	// Cancel any previously scheduled timer timeouts for this guild
@@ -58,42 +58,62 @@ export async function monitorBreakoutTimer(
 		return;
 	}
 
-	// 2. 5-Minute Warning
-	const fiveMinDelay = fiveMinTime - now;
-	if (fiveMinDelay > 0) {
-		const t5 = setTimeout(async () => {
-			const state = await getTimerData(guildId);
-			if (!state || (timerId && state.timerId !== timerId)) return;
+	// 2. Schedule intermediate reminders from lookup/calculated schedule
+	const schedule = getTimerSchedule(totalMinutes);
+	const sentReminders = new Set<number>(timerData.sentReminders || []);
+	if (timerData.fiveMinSent) {
+		sentReminders.add(5);
+	}
 
+	for (const reminder of schedule) {
+		const { remainingMinutes, message } = reminder;
+		const reminderTime = endTime - remainingMinutes * 60 * 1000;
+		const delay = reminderTime - now;
+
+		if (sentReminders.has(remainingMinutes)) {
+			continue;
+		}
+
+		if (delay > 0) {
+			const t = setTimeout(async () => {
+				const state = await getTimerData(guildId);
+				if (!state || (timerId && state.timerId !== timerId)) return;
+
+				log.info(
+					{ roomCount: breakoutRooms.length, remainingMinutes },
+					`⏱️ Sending ${remainingMinutes}-minute reminder`,
+				);
+				await sendReminderWithRetry(
+					log,
+					guildId,
+					breakoutRooms,
+					message,
+					client,
+				);
+				const updatedSent = Array.from(
+					new Set([...(state.sentReminders || []), remainingMinutes]),
+				);
+				state.sentReminders = updatedSent;
+				if (remainingMinutes === 5) {
+					state.fiveMinSent = true;
+				}
+				await setTimerData(guildId, state);
+			}, delay);
+			timeouts.push(t);
+		} else {
+			// Catch-up: send immediately if missed while offline
 			log.info(
-				{ roomCount: breakoutRooms.length },
-				'⏱️ Sending 5-minute warning',
+				{ remainingMinutes },
+				`⏱️ Missed ${remainingMinutes}-minute warning while offline. Sending catch-up notice.`,
 			);
-			await sendReminderWithRetry(
-				log,
-				guildId,
-				breakoutRooms,
-				'⏱️ **5 minutes remaining** in this breakout session.',
-				client,
-			);
-			state.fiveMinSent = true;
-			await setTimerData(guildId, state);
-		}, fiveMinDelay);
-		timeouts.push(t5);
-	} else if (!timerData.fiveMinSent && totalMinutes > 5) {
-		// Catch-up: send immediately if missed while offline
-		log.info(
-			'⏱️ Missed 5-minute warning while offline. Sending catch-up notice.',
-		);
-		await sendReminderWithRetry(
-			log,
-			guildId,
-			breakoutRooms,
-			'⏱️ **5 minutes remaining** in this breakout session.',
-			client,
-		);
-		timerData.fiveMinSent = true;
-		await setTimerData(guildId, timerData);
+			await sendReminderWithRetry(log, guildId, breakoutRooms, message, client);
+			sentReminders.add(remainingMinutes);
+			timerData.sentReminders = Array.from(sentReminders);
+			if (remainingMinutes === 5) {
+				timerData.fiveMinSent = true;
+			}
+			await setTimerData(guildId, timerData);
+		}
 	}
 
 	// 3. Time's Up
@@ -116,7 +136,7 @@ export async function monitorBreakoutTimer(
 	timeouts.push(tEnd);
 
 	log.info(
-		{ totalMinutes, endDelayMs: endDelay },
+		{ totalMinutes, endDelayMs: endDelay, scheduledReminders: schedule.length },
 		'⏱️ Targeted breakout timer scheduled',
 	);
 }
