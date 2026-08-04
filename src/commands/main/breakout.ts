@@ -51,12 +51,6 @@ const command: Command = {
 						.setDescription('Number of breakout rooms to create')
 						.setMinValue(1)
 						.setRequired(true),
-				)
-				.addBooleanOption((option) =>
-					option
-						.setName('force')
-						.setDescription('Force creation even if rooms already exist')
-						.setRequired(false),
 				),
 		)
 		// Distribute subcommand
@@ -91,14 +85,6 @@ const command: Command = {
 							'Facilitators to assign into breakout rooms (mention them with @)',
 						)
 						.setRequired(false),
-				)
-				.addBooleanOption((option) =>
-					option
-						.setName('force')
-						.setDescription(
-							'Force redistribution even if users are already distributed',
-						)
-						.setRequired(false),
 				),
 		)
 		// Recall subcommand
@@ -123,15 +109,7 @@ const command: Command = {
 		.addSubcommand((subcommand) =>
 			subcommand
 				.setName('delete')
-				.setDescription('Delete all breakout room channels')
-				.addBooleanOption((option) =>
-					option
-						.setName('force')
-						.setDescription(
-							'Force deletion even if members are still inside breakout rooms',
-						)
-						.setRequired(false),
-				),
+				.setDescription('Delete all breakout room channels'),
 		)
 		// Timer subcommand
 		.addSubcommand((subcommand) =>

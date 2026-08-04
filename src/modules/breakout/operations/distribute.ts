@@ -1,5 +1,6 @@
 import type {
 	CommandInteraction,
+	StageChannel,
 	VoiceBasedChannel,
 	VoiceChannel,
 } from 'discord.js';
@@ -12,6 +13,7 @@ import {
 	completeOperation,
 	getCompletedSteps,
 	getCurrentOperation,
+	getRooms,
 	setMainRoomId,
 	startOperation,
 	updateProgress,
@@ -27,7 +29,6 @@ export async function executeDistribute(
 	interaction: CommandInteraction,
 	mainRoom: VoiceBasedChannel,
 	distribution: UserDistribution,
-	force: boolean = false,
 	facilitators?: Set<string>,
 ): Promise<OperationResult> {
 	const guildId = interaction.guildId;
@@ -42,7 +43,6 @@ export async function executeDistribute(
 	const log = logger.child({
 		operation: operationType,
 		guildId,
-		force,
 	});
 
 	// Check if we are resuming an interrupted operation
@@ -104,20 +104,29 @@ export async function executeDistribute(
 			}
 		}
 	} else {
-		// Check if distribution is already active
+		// Check if distribution is already active and recall users first
 		const isDistributionActive = await hasActiveDistribution(interaction.guild);
-		if (isDistributionActive && !force) {
-			return {
-				success: false,
-				message:
-					"Users are already distributed to breakout rooms. Use '/breakout distribute' with the force flag set to true to redistribute, or use '/breakout recall' to move users back.",
-			};
-		}
 
-		if (force && isDistributionActive) {
-			log.info(
-				`🔄 Force flag enabled, proceeding with redistribution (previous session implicit end)`,
-			);
+		if (isDistributionActive) {
+			const rooms = getRooms(interaction.guild);
+			for (const room of rooms) {
+				if (room.members && room.members.size > 0) {
+					for (const member of room.members.values()) {
+						try {
+							await moveUserToRoom(
+								member,
+								mainRoom as VoiceChannel | StageChannel,
+							);
+						} catch (err) {
+							log.warn(
+								{ memberId: member.id, err },
+								'Failed to move user during auto-recall before redistributing',
+							);
+						}
+					}
+				}
+			}
+			log.info('♻️ Recalled existing distribution before redistributing');
 		}
 
 		// Store distribution plan for recovery

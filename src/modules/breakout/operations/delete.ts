@@ -1,15 +1,18 @@
 import {
 	ChannelType,
 	type CommandInteraction,
+	type StageChannel,
 	type VoiceChannel,
 } from 'discord.js';
 import { logger } from '@/lib/logger.js';
+import { moveUserToRoom } from '@/modules/breakout/services/distribution.js';
 import { deleteRoom } from '@/modules/breakout/services/room.js';
 import {
 	clearSession,
 	completeOperation,
 	getCompletedSteps,
 	getCurrentOperation,
+	getMainRoom,
 	getRooms,
 	startOperation,
 	updateProgress,
@@ -21,7 +24,6 @@ import type { OperationResult } from '@/types/index.js';
  */
 export async function executeDelete(
 	interaction: CommandInteraction,
-	force: boolean = false,
 ): Promise<OperationResult> {
 	const guildId = interaction.guildId;
 	if (!guildId || !interaction.guild) {
@@ -35,7 +37,6 @@ export async function executeDelete(
 	const log = logger.child({
 		operation: operationType,
 		guildId,
-		force,
 	});
 
 	// Check if we are resuming an interrupted operation
@@ -79,33 +80,9 @@ export async function executeDelete(
 			};
 		}
 
-		// Check if any rooms still have members inside
-		let totalMembers = 0;
-		for (const room of breakoutRooms) {
-			const guildRoom = interaction.guild.channels.cache.get(room.id) as
-				| VoiceChannel
-				| undefined;
-			if (guildRoom?.members && guildRoom.members.size > 0) {
-				totalMembers += guildRoom.members.size;
-			}
-		}
-
-		if (totalMembers > 0 && !force) {
-			log.warn(
-				{ totalMembers },
-				'⚠️ Refusing to delete: breakout rooms still have members inside.',
-			);
-			return {
-				success: false,
-				message:
-					"Breakout rooms still have members inside! Use '/breakout recall' first to move them back, or run '/breakout delete' with the force flag set to true to delete anyway.",
-			};
-		}
-
 		// Start new operation
 		if (!isResuming) {
 			await startOperation(guildId, operationType, {
-				force,
 				roomIds: breakoutRooms.map((room) => room.id),
 			});
 
@@ -114,6 +91,39 @@ export async function executeDelete(
 				'🔍 Found breakout room(s) to delete',
 			);
 		}
+	}
+
+	// Auto-recall members to main room if one is configured (runs on both initial run and resume)
+	const mainRoom = getMainRoom(interaction.guild);
+	let membersRecalled = 0;
+
+	for (const room of breakoutRooms) {
+		const guildRoom = interaction.guild.channels.cache.get(room.id) as
+			| VoiceChannel
+			| undefined;
+		if (guildRoom?.members && guildRoom.members.size > 0) {
+			for (const member of guildRoom.members.values()) {
+				if (mainRoom) {
+					try {
+						await moveUserToRoom(
+							member,
+							mainRoom as VoiceChannel | StageChannel,
+						);
+						membersRecalled++;
+					} catch (err) {
+						log.warn(
+							{ memberId: member.id, err },
+							'Failed to move user to main room during delete',
+						);
+					}
+				}
+				// If no main room, Discord handles disconnect on channel delete
+			}
+		}
+	}
+
+	if (membersRecalled > 0) {
+		log.info({ membersRecalled }, '♻️ Recalled members before deleting rooms');
 	}
 
 	const totalRooms = breakoutRooms.length;
