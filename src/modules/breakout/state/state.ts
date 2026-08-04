@@ -64,6 +64,7 @@ export interface TimerData {
 	guildId: string;
 	breakoutRooms: string[];
 	fiveMinSent: boolean;
+	sentReminders?: number[];
 }
 
 /**
@@ -396,6 +397,41 @@ export async function setTimerData(
 	guildState.timerData = timerData;
 	logger.debug({ guildId }, '💾 Storing timer data');
 	await saveState();
+}
+
+/**
+ * Safely marks a reminder threshold as sent in the timer state, ensuring
+ * that the timerId has not changed (fenced state update).
+ */
+export async function markReminderSent(
+	guildId: string,
+	timerId: string,
+	remainingMinutes: number,
+): Promise<boolean> {
+	await initializeState();
+	const guildState = getGuildState(guildId);
+	const currentTimer = guildState.timerData;
+
+	if (
+		!currentTimer ||
+		(currentTimer.timerId && currentTimer.timerId !== timerId)
+	) {
+		logger.warn(
+			{ guildId, timerId, currentTimerId: currentTimer?.timerId },
+			'⚠️ Timer state modified or cleared; skipping reminder state write',
+		);
+		return false;
+	}
+
+	const updatedSent = Array.from(
+		new Set([...(currentTimer.sentReminders || []), remainingMinutes]),
+	);
+	currentTimer.sentReminders = updatedSent;
+	if (remainingMinutes === 5) {
+		currentTimer.fiveMinSent = true;
+	}
+	await saveState();
+	return true;
 }
 
 /**
