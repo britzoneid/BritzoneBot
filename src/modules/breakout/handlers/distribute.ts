@@ -18,6 +18,7 @@ import { executeDistribute } from '@/modules/breakout/operations/distribute.js';
 import { getRooms } from '@/modules/breakout/state/state.js';
 import { distributeUsers } from '@/modules/breakout/utils/distribution.js';
 import { buildDistributionEmbed } from '@/modules/breakout/utils/embeds.js';
+import type { OperationResult } from '@/types/index.js';
 
 /**
  * Handles the distribute subcommand for breakout rooms
@@ -202,18 +203,58 @@ export async function handleDistributeCommand(
 							collector.stop('confirmed');
 							log.info('✅ Distribution confirmed by user');
 
+							const totalMembersToMove = Object.values(distribution).reduce(
+								(sum, users) => sum + users.length,
+								0,
+							);
+
 							await i.update({
-								content: '⏳ Distributing users to breakout rooms...',
+								content: `⏳ Distributing users to breakout rooms... (0/${totalMembersToMove} member${totalMembersToMove === 1 ? '' : 's'} moved)`,
 								embeds: [previewEmbed],
 								components: [],
 							});
 
-							const result = await executeDistribute(
-								interaction,
-								mainRoom,
-								distribution,
-								facilitators,
-							);
+							let progressState = {
+								completed: 0,
+								total: totalMembersToMove,
+							};
+							let lastReportedCompleted = 0;
+
+							const progressInterval = setInterval(async () => {
+								if (
+									progressState.total > 0 &&
+									progressState.completed !== lastReportedCompleted
+								) {
+									lastReportedCompleted = progressState.completed;
+									try {
+										await interaction.editReply({
+											content: `⏳ Distributing users to breakout rooms... (${progressState.completed}/${progressState.total} member${progressState.total === 1 ? '' : 's'} moved)`,
+											embeds: [previewEmbed],
+											components: [],
+										});
+									} catch (err) {
+										log.debug(
+											{ err },
+											'Failed to edit distribution progress reply',
+										);
+									}
+								}
+							}, 1000);
+
+							let result: OperationResult;
+							try {
+								result = await executeDistribute(
+									interaction,
+									mainRoom,
+									distribution,
+									facilitators,
+									(completed, total) => {
+										progressState = { completed, total };
+									},
+								);
+							} finally {
+								clearInterval(progressInterval);
+							}
 
 							if (!result.success) {
 								await interaction.editReply({

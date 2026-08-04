@@ -30,6 +30,7 @@ export async function executeDistribute(
 	mainRoom: VoiceBasedChannel,
 	distribution: UserDistribution,
 	facilitators?: Set<string>,
+	onProgress?: (completed: number, total: number) => void,
 ): Promise<OperationResult> {
 	const guildId = interaction.guildId;
 	if (!guildId || !interaction.guild) {
@@ -153,12 +154,20 @@ export async function executeDistribute(
 			await setMainRoomId(guildId, mainRoom.id);
 		}
 
+		let totalToMove = 0;
+		for (const users of Object.values(activeDistribution)) {
+			totalToMove += users.length;
+		}
+		let completedCount = 0;
+
 		const facilitatorPromises: Promise<void>[] = [];
 		const regularPromises: Promise<void>[] = [];
 		const moveResults = {
 			success: [] as MoveResult[],
 			failed: [] as MoveFailure[],
 		};
+
+		onProgress?.(completedCount, totalToMove);
 
 		// Process each room using the active distribution
 		for (const [roomId, users] of Object.entries(activeDistribution)) {
@@ -168,6 +177,8 @@ export async function executeDistribute(
 
 			if (!room) {
 				log.warn({ roomId }, `⚠️ Room not found, skipping users`);
+				completedCount += users.length;
+				onProgress?.(completedCount, totalToMove);
 				continue;
 			}
 
@@ -190,6 +201,8 @@ export async function executeDistribute(
 						roomId: room.id,
 						roomName: room.name,
 					});
+					completedCount++;
+					onProgress?.(completedCount, totalToMove);
 					continue;
 				}
 
@@ -214,6 +227,10 @@ export async function executeDistribute(
 							{ err: error, user: user.user },
 							`❌ Failed to move user`,
 						);
+					})
+					.finally(() => {
+						completedCount++;
+						onProgress?.(completedCount, totalToMove);
 					});
 
 				if (isFacilitator) {
