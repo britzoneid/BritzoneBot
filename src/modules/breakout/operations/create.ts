@@ -1,9 +1,11 @@
 import {
 	ChannelType,
 	type CommandInteraction,
+	type StageChannel,
 	type VoiceChannel,
 } from 'discord.js';
 import { logger } from '@/lib/logger.js';
+import { moveUserToRoom } from '@/modules/breakout/services/distribution.js';
 import {
 	createRoom,
 	deleteRoom,
@@ -14,6 +16,7 @@ import {
 	completeOperation,
 	getCompletedSteps,
 	getCurrentOperation,
+	getMainRoom,
 	startOperation,
 	storeRoomIds,
 	updateProgress,
@@ -26,7 +29,6 @@ import type { OperationResult } from '@/types/index.js';
 export async function executeCreate(
 	interaction: CommandInteraction,
 	numRooms: number,
-	force: boolean = false,
 ): Promise<OperationResult> {
 	const guildId = interaction.guildId;
 	if (!guildId || !interaction.guild) {
@@ -41,7 +43,6 @@ export async function executeCreate(
 		operation: operationType,
 		guildId,
 		numRooms,
-		force,
 	});
 
 	// Check if we are resuming an interrupted operation
@@ -51,27 +52,45 @@ export async function executeCreate(
 	if (isResuming) {
 		log.info(`🔄 Resuming create operation`);
 	} else {
-		// Check for existing breakout rooms
+		// Check for existing breakout rooms and auto-reconcile
 		const existingRooms = await hasExistingBreakoutRooms(interaction.guild);
-		if (existingRooms.exists && !force) {
-			return {
-				success: false,
-				message: `There are already ${existingRooms.rooms.length} breakout rooms in this server. Use '/breakout create' with the force flag set to true to replace them, or '/breakout delete' first to clean up existing rooms.`,
-			};
-		}
 
-		// If force is true and rooms exist, cleanup first
-		if (force && existingRooms.exists) {
-			log.info(
-				{ existingCount: existingRooms.rooms.length },
-				`🔄 Force flag enabled, cleaning up existing rooms`,
+		if (existingRooms.exists) {
+			const occupiedRooms = existingRooms.rooms.filter(
+				(r) => r.members && r.members.size > 0,
 			);
-			// Simple cleanup: delete rooms.
-			// Note: Ideally we would move users back to main room if known, but for simplicity/force we just delete.
+
+			if (occupiedRooms.length > 0) {
+				const mainRoom = getMainRoom(interaction.guild);
+				if (mainRoom && mainRoom.isVoiceBased()) {
+					for (const room of occupiedRooms) {
+						for (const member of room.members.values()) {
+							try {
+								await moveUserToRoom(
+									member,
+									mainRoom as VoiceChannel | StageChannel,
+								);
+							} catch (err) {
+								log.warn(
+									{ memberId: member.id, err },
+									'Failed to move user to main room during create cleanup',
+								);
+							}
+						}
+					}
+				}
+				// If no main room is stored, just delete the channels —
+				// Discord will disconnect occupants from voice.
+			}
+
 			for (const room of existingRooms.rooms) {
 				await deleteRoom(room);
 			}
-			clearSession(guildId);
+			await clearSession(guildId);
+			log.info(
+				{ cleaned: existingRooms.rooms.length },
+				'♻️ Cleaned existing rooms before create',
+			);
 		}
 
 		// Start new operation

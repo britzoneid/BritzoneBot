@@ -126,13 +126,11 @@ BritzoneBot offers a suite of slash commands to manage breakout rooms. All break
 | Command      | Subcommand     | Description                                                        | Options |
 |--------------|----------------|--------------------------------------------------------------------|---------|
 | `/breakout`  | `create`       | Creates multiple breakout voice channels.                          | `number` *(Integer, Required)* – Number of rooms to create (≥ 1). |
-|              |                |                                                                    | `force` *(Boolean, Optional)* – Force creation even if rooms already exist (deletes existing rooms first). |
 | `/breakout`  | `distribute`   | Previews and distributes users from a main room into breakout rooms. Shows a confirmation prompt before moving. | `mainroom` *(Voice/Stage Channel, Required)* – The source voice channel. |
 |              |                |                                                                    | `exclude` *(String, Optional)* – User mentions to keep in the main room. |
 |              |                |                                                                    | `facilitators` *(String, Optional)* – User mentions to assign into breakout rooms first (one per room when possible). |
-|              |                |                                                                    | `force` *(Boolean, Optional)* – Force redistribution even if users are already distributed. |
 | `/breakout`  | `recall`       | Moves all members from breakout rooms back to the main voice channel. Breakout rooms remain intact. | `mainroom` *(Voice/Stage Channel, Required)* – The destination channel. |
-| `/breakout`  | `delete`       | Deletes all breakout room channels.                                | `force` *(Boolean, Optional)* – Force deletion even if members are still inside. |
+| `/breakout`  | `delete`       | Deletes all breakout room channels.                                | None |
 | `/breakout`  | `timer`        | Sets a countdown timer for the breakout session. Sends a 5-minute warning and a "time's up" message. | `minutes` *(Integer, Required)* – Duration in minutes (≥ 1). |
 | `/breakout`  | `broadcast`    | Broadcasts a message to all active breakout rooms.                 | `message` *(String, Required)* – The message content. |
 | `/breakout`  | `send-message` | Sends a message to a specific voice channel's text chat.           | `channel` *(Voice Channel, Required)* – Target channel. |

@@ -36,13 +36,11 @@ export async function handleDistributeCommand(
 
 	const excludeInput = interaction.options.getString('exclude');
 	const facilitatorsInput = interaction.options.getString('facilitators');
-	const force = interaction.options.getBoolean('force') || false;
 
 	const log = logger.child({
 		subcommand: 'distribute',
 		guildId: interaction.guildId,
 		mainRoom: mainRoom.name,
-		force,
 	});
 	log.info('🎯 Main room selected');
 
@@ -192,7 +190,6 @@ export async function handleDistributeCommand(
 						interaction,
 						mainRoom,
 						distribution,
-						force,
 						facilitators,
 					);
 
