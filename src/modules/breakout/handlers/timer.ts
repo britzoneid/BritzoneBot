@@ -27,10 +27,10 @@ export async function handleTimerCommand(
 		minutes = minutesOption;
 	}
 
-	if (!minutes || minutes <= 0) {
+	if (!minutes || minutes <= 0 || minutes > 35791) {
 		await replyOrEdit(
 			interaction,
-			'⚠️ Please select a valid duration preset or specify custom minutes with the `minutes` option.',
+			'⚠️ Please select a valid duration preset or specify custom minutes between 1 and 35,791 with the `minutes` option.',
 		);
 		return;
 	}

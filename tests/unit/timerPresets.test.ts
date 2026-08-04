@@ -42,6 +42,24 @@ describe('timerPresets', () => {
 			const schedule15 = getTimerSchedule(15);
 			expect(schedule15).toEqual([8, 5]);
 		});
+
+		it('handles short durations and boundary branches correctly', () => {
+			// For a custom 10 minute session: 5m, 3m
+			const schedule10 = getTimerSchedule(10);
+			expect(schedule10).toEqual([5, 3]);
+
+			// For a custom 5 minute session: 3m, 2m
+			const schedule5 = getTimerSchedule(5);
+			expect(schedule5).toEqual([3, 2]);
+
+			// For a custom 2 minute session: 1m
+			const schedule2 = getTimerSchedule(2);
+			expect(schedule2).toEqual([1]);
+
+			// For a custom 1 minute session: no intermediate threshold valid
+			const schedule1 = getTimerSchedule(1);
+			expect(schedule1).toEqual([]);
+		});
 	});
 
 	describe('formatScheduleSummary', () => {

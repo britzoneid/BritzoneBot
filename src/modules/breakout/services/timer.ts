@@ -8,7 +8,7 @@ import {
 import {
 	clearTimerData,
 	getTimerData,
-	setTimerData,
+	markReminderSent,
 	type TimerData,
 } from '@/modules/breakout/state/state.js';
 
@@ -79,28 +79,30 @@ export async function monitorBreakoutTimer(
 
 		if (delay > 0) {
 			const t = setTimeout(async () => {
-				const state = await getTimerData(guildId);
-				if (!state || (timerId && state.timerId !== timerId)) return;
+				try {
+					const state = await getTimerData(guildId);
+					if (!state || (timerId && state.timerId !== timerId)) return;
 
-				log.info(
-					{ roomCount: breakoutRooms.length, remainingMinutes },
-					`⏱️ Sending ${remainingMinutes}-minute reminder`,
-				);
-				await sendReminderWithRetry(
-					log,
-					guildId,
-					breakoutRooms,
-					message,
-					client,
-				);
-				const updatedSent = Array.from(
-					new Set([...(state.sentReminders || []), remainingMinutes]),
-				);
-				state.sentReminders = updatedSent;
-				if (remainingMinutes === 5) {
-					state.fiveMinSent = true;
+					log.info(
+						{ roomCount: breakoutRooms.length, remainingMinutes },
+						`⏱️ Sending ${remainingMinutes}-minute reminder`,
+					);
+					await sendReminderWithRetry(
+						log,
+						guildId,
+						breakoutRooms,
+						message,
+						client,
+					);
+					if (timerId) {
+						await markReminderSent(guildId, timerId, remainingMinutes);
+					}
+				} catch (error) {
+					log.error(
+						{ err: error, remainingMinutes, timerId },
+						`❌ Error in ${remainingMinutes}-minute reminder callback`,
+					);
 				}
-				await setTimerData(guildId, state);
 			}, delay);
 			timeouts.push(t);
 		} else {
@@ -110,31 +112,36 @@ export async function monitorBreakoutTimer(
 				`⏱️ Missed ${remainingMinutes}-minute warning while offline. Sending catch-up notice.`,
 			);
 			await sendReminderWithRetry(log, guildId, breakoutRooms, message, client);
-			sentReminders.add(remainingMinutes);
-			timerData.sentReminders = Array.from(sentReminders);
-			if (remainingMinutes === 5) {
-				timerData.fiveMinSent = true;
+			if (timerId) {
+				await markReminderSent(guildId, timerId, remainingMinutes);
 			}
-			await setTimerData(guildId, timerData);
+			sentReminders.add(remainingMinutes);
 		}
 	}
 
 	// 3. Time's Up
 	const endDelay = endTime - now;
 	const tEnd = setTimeout(async () => {
-		const state = await getTimerData(guildId);
-		if (!state || (timerId && state.timerId !== timerId)) return;
+		try {
+			const state = await getTimerData(guildId);
+			if (!state || (timerId && state.timerId !== timerId)) return;
 
-		log.info('⏱️ Breakout timer ended');
-		await sendReminderWithRetry(
-			log,
-			guildId,
-			breakoutRooms,
-			"⏰ **Time's up!** This breakout session has ended.",
-			client,
-		);
-		await clearTimerData(guildId);
-		cleanup();
+			log.info('⏱️ Breakout timer ended');
+			await sendReminderWithRetry(
+				log,
+				guildId,
+				breakoutRooms,
+				"⏰ **Time's up!** This breakout session has ended.",
+				client,
+			);
+			await clearTimerData(guildId);
+			cleanup();
+		} catch (error) {
+			log.error(
+				{ err: error, timerId },
+				'❌ Error in breakout timer completion callback',
+			);
+		}
 	}, endDelay);
 	timeouts.push(tEnd);
 

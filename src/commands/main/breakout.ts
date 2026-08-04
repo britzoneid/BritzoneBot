@@ -138,6 +138,7 @@ const command: Command = {
 							'Custom duration in minutes (used if custom preset or preset omitted)',
 						)
 						.setMinValue(1)
+						.setMaxValue(35791)
 						.setRequired(false),
 				),
 		)
