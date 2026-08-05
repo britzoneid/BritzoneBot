@@ -129,6 +129,14 @@ const command: Command = {
 							{ name: '60 minutes (Reminders at 30m, 15m, 5m)', value: '60' },
 							{ name: '90 minutes (Reminders at 45m, 20m, 5m)', value: '90' },
 						),
+				)
+				.addBooleanOption((option) =>
+					option
+						.setName('auto_recall')
+						.setDescription(
+							'Automatically recall members to the main room when the timer ends (default: true)',
+						)
+						.setRequired(false),
 				),
 		)
 		// Broadcast subcommand

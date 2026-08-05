@@ -155,12 +155,16 @@ describe('StateManager (state.ts)', () => {
 				guildId,
 				breakoutRooms: ['r1', 'r2'],
 				fiveMinSent: false,
+				autoRecall: true,
+				mainRoomId: 'main-1',
 			};
 
 			await setTimerData(guildId, timerData);
 
 			const retrieved = await getTimerData(guildId);
 			expect(retrieved).toEqual(timerData);
+			expect(retrieved?.autoRecall).toBe(true);
+			expect(retrieved?.mainRoomId).toBe('main-1');
 
 			await clearTimerData(guildId);
 

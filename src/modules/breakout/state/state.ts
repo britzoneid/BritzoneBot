@@ -65,6 +65,8 @@ export interface TimerData {
 	breakoutRooms: string[];
 	fiveMinSent: boolean;
 	sentReminders?: number[];
+	autoRecall?: boolean;
+	mainRoomId?: string;
 }
 
 /**

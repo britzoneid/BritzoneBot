@@ -1,10 +1,17 @@
-import type { Client } from 'discord.js';
+import type {
+	Client,
+	Guild,
+	StageChannel,
+	VoiceBasedChannel,
+	VoiceChannel,
+} from 'discord.js';
 import type { Logger } from 'pino';
 import { logger } from '@/lib/logger.js';
 import {
 	formatReminderMessage,
 	getTimerSchedule,
 } from '@/modules/breakout/constants/timerPresets.js';
+import { moveUserToRoom } from '@/modules/breakout/services/distribution.js';
 import {
 	clearTimerData,
 	getTimerData,
@@ -56,6 +63,18 @@ export async function monitorBreakoutTimer(
 			"⏰ **Time's up!** This breakout session has ended.",
 			client,
 		);
+		if (timerData.autoRecall && timerData.mainRoomId) {
+			const guild = client.guilds.cache.get(guildId);
+			const mainChannel = guild?.channels.cache.get(timerData.mainRoomId);
+			if (guild && mainChannel?.isVoiceBased()) {
+				log.info({ mainRoom: mainChannel.name }, '🔁 Auto-recalling members');
+				await autoRecallMembers(guild, breakoutRooms, mainChannel, log);
+			} else {
+				log.warn(
+					'⚠️ Main room no longer exists or guild not cached; skipping auto-recall',
+				);
+			}
+		}
 		await clearTimerData(guildId);
 		cleanup();
 		return;
@@ -134,6 +153,16 @@ export async function monitorBreakoutTimer(
 				"⏰ **Time's up!** This breakout session has ended.",
 				client,
 			);
+			if (state.autoRecall && state.mainRoomId) {
+				const guild = client.guilds.cache.get(guildId);
+				const mainChannel = guild?.channels.cache.get(state.mainRoomId);
+				if (guild && mainChannel?.isVoiceBased()) {
+					log.info({ mainRoom: mainChannel.name }, '🔁 Auto-recalling members');
+					await autoRecallMembers(guild, breakoutRooms, mainChannel, log);
+				} else {
+					log.warn('⚠️ Main room no longer exists; skipping auto-recall');
+				}
+			}
 			await clearTimerData(guildId);
 			cleanup();
 		} catch (error) {
@@ -149,6 +178,35 @@ export async function monitorBreakoutTimer(
 		{ totalMinutes, endDelayMs: endDelay, scheduledReminders: schedule.length },
 		'⏱️ Targeted breakout timer scheduled',
 	);
+}
+
+/**
+ * Recalls members from breakout rooms to the specified main room
+ */
+async function autoRecallMembers(
+	guild: Guild,
+	roomIds: string[],
+	mainChannel: VoiceBasedChannel,
+	log: Logger,
+): Promise<void> {
+	let moved = 0;
+	for (const roomId of roomIds) {
+		const room = guild.channels.cache.get(roomId);
+		if (!room || !room.isVoiceBased()) continue;
+
+		for (const member of room.members.values()) {
+			try {
+				await moveUserToRoom(
+					member,
+					mainChannel as VoiceChannel | StageChannel,
+				);
+				moved++;
+			} catch (err) {
+				log.warn({ memberId: member.id, err }, 'Failed to auto-recall member');
+			}
+		}
+	}
+	log.info({ moved }, '✅ Auto-recall complete');
 }
 
 /**

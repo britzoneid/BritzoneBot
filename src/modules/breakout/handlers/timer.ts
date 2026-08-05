@@ -6,7 +6,12 @@ import {
 	getTimerSchedule,
 } from '@/modules/breakout/constants/timerPresets.js';
 import { monitorBreakoutTimer } from '@/modules/breakout/services/timer.js';
-import { getRooms, setTimerData } from '@/modules/breakout/state/state.js';
+import {
+	getMainRoom,
+	getRooms,
+	setTimerData,
+	type TimerData,
+} from '@/modules/breakout/state/state.js';
 
 /**
  * Handles the timer subcommand for breakout rooms
@@ -18,6 +23,8 @@ export async function handleTimerCommand(
 
 	const minutesOption = interaction.options.getString('minutes', true);
 	const minutes = Number.parseInt(minutesOption, 10);
+	const autoRecallOption =
+		interaction.options.getBoolean('auto_recall') ?? true;
 
 	if (!minutes || minutes <= 0) {
 		await replyOrEdit(
@@ -31,6 +38,7 @@ export async function handleTimerCommand(
 		subcommand: 'timer',
 		guildId: interaction.guildId,
 		minutes,
+		autoRecallOption,
 	});
 
 	log.info('⏱️ Setting breakout timer');
@@ -46,9 +54,12 @@ export async function handleTimerCommand(
 		return;
 	}
 
+	const mainRoom = getMainRoom(interaction.guild);
+	const autoRecall = autoRecallOption && !!mainRoom;
+
 	const schedule = getTimerSchedule(minutes);
 	const fiveMinWarningTime = minutes - 5;
-	const timerData = {
+	const timerData: TimerData = {
 		timerId: `${interaction.guildId}_${Date.now()}`,
 		totalMinutes: minutes,
 		startTime: Date.now(),
@@ -56,6 +67,8 @@ export async function handleTimerCommand(
 		breakoutRooms: breakoutRooms.map((room) => room.id),
 		fiveMinSent: fiveMinWarningTime <= 0,
 		sentReminders: [],
+		autoRecall,
+		mainRoomId: mainRoom?.id,
 	};
 
 	await setTimerData(interaction.guildId, timerData);
@@ -64,8 +77,18 @@ export async function handleTimerCommand(
 	});
 
 	const summary = formatScheduleSummary(schedule);
+
+	let autoRecallNote =
+		'ℹ️ Auto-recall is disabled. Run `/breakout recall` manually when ready.';
+	if (autoRecall && mainRoom) {
+		autoRecallNote = `🔁 **Auto-recall** to *${mainRoom.name}* when time is up.`;
+	} else if (!mainRoom && autoRecallOption) {
+		autoRecallNote =
+			'ℹ️ Auto-recall is disabled (no main room configured). Run `/breakout recall` manually when ready.';
+	}
+
 	await replyOrEdit(
 		interaction,
-		`⏱️ **Breakout timer set for ${minutes} minutes.**\n${summary}`,
+		`⏱️ **Breakout timer set for ${minutes} minutes.**\n${summary}\n${autoRecallNote}`,
 	);
 }
