@@ -1,5 +1,6 @@
 import type {
 	CommandInteraction,
+	GuildMember,
 	StageChannel,
 	VoiceBasedChannel,
 	VoiceChannel,
@@ -160,8 +161,14 @@ export async function executeDistribute(
 		}
 		let completedCount = 0;
 
-		const facilitatorPromises: Promise<void>[] = [];
-		const regularPromises: Promise<void>[] = [];
+		interface MoveTarget {
+			user: GuildMember;
+			room: VoiceChannel;
+			moveKey: string;
+		}
+
+		const facilitatorTargets: MoveTarget[] = [];
+		const regularTargets: MoveTarget[] = [];
 		const moveResults = {
 			success: [] as MoveResult[],
 			failed: [] as MoveFailure[],
@@ -207,56 +214,58 @@ export async function executeDistribute(
 				}
 
 				const isFacilitator = activeFacilitators?.has(user.id) ?? false;
-				const moveTask = moveUserToRoom(user, room)
-					.then(async () => {
-						moveResults.success.push({
-							userId: user.id,
-							userTag: user.user.tag,
-							roomId: room.id,
-							roomName: room.name,
-						});
-						await updateProgress(guildId, moveKey);
-					})
-					.catch((error: unknown) => {
-						moveResults.failed.push({
-							userId: user.id,
-							userTag: user.user.tag,
-							reason: error instanceof Error ? error.message : String(error),
-						});
-						log.error(
-							{ err: error, user: user.user },
-							`❌ Failed to move user`,
-						);
-					})
-					.finally(() => {
-						completedCount++;
-						onProgress?.(completedCount, totalToMove);
-					});
-
 				if (isFacilitator) {
-					facilitatorPromises.push(moveTask);
+					facilitatorTargets.push({ user, room, moveKey });
 				} else {
-					regularPromises.push(moveTask);
+					regularTargets.push({ user, room, moveKey });
 				}
 			}
 		}
 
-		// Phase 1: Move facilitators first
-		if (facilitatorPromises.length > 0) {
+		const processMoveTarget = async (target: MoveTarget) => {
+			const { user, room, moveKey } = target;
+			try {
+				await moveUserToRoom(user, room);
+				moveResults.success.push({
+					userId: user.id,
+					userTag: user.user.tag,
+					roomId: room.id,
+					roomName: room.name,
+				});
+				await updateProgress(guildId, moveKey);
+			} catch (error: unknown) {
+				moveResults.failed.push({
+					userId: user.id,
+					userTag: user.user.tag,
+					reason: error instanceof Error ? error.message : String(error),
+				});
+				log.error({ err: error, user: user.user }, `❌ Failed to move user`);
+			} finally {
+				completedCount++;
+				onProgress?.(completedCount, totalToMove);
+			}
+		};
+
+		// Phase 1: Move facilitators first sequentially
+		if (facilitatorTargets.length > 0) {
 			log.info(
-				{ count: facilitatorPromises.length },
-				`�️ Moving facilitators into breakout rooms first...`,
+				{ count: facilitatorTargets.length },
+				`🛡️ Moving facilitators into breakout rooms first...`,
 			);
-			await Promise.all(facilitatorPromises);
+			for (const target of facilitatorTargets) {
+				await processMoveTarget(target);
+			}
 		}
 
-		// Phase 2: Move regular members
-		if (regularPromises.length > 0) {
+		// Phase 2: Move remaining members sequentially
+		if (regularTargets.length > 0) {
 			log.info(
-				{ count: regularPromises.length },
+				{ count: regularTargets.length },
 				`⏳ Moving remaining members into breakout rooms...`,
 			);
-			await Promise.all(regularPromises);
+			for (const target of regularTargets) {
+				await processMoveTarget(target);
+			}
 		}
 
 		// Mark distribution as complete
