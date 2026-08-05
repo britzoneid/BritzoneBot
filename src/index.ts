@@ -8,7 +8,7 @@
 import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Client, Collection, GatewayIntentBits } from 'discord.js';
+import { Client, Collection, GatewayIntentBits, RESTEvents } from 'discord.js';
 import { logger } from '@/lib/logger.js';
 import { flushState, initializeState } from '@/modules/breakout/state/state.js';
 import type { BritzoneClient, Command, Event } from '@/types/index.js';
@@ -40,6 +40,34 @@ const client = new Client({
 
 // Initialize commands collection with proper typing
 client.commands = new Collection<string, Command>();
+
+// ============================================================================
+// REST RATE LIMIT MONITORING (Temporary Debug)
+// ============================================================================
+client.rest.on(RESTEvents.Response, (request, response) => {
+	const limit = response.headers.get('x-ratelimit-limit');
+	const remaining = response.headers.get('x-ratelimit-remaining');
+	const resetAfter = response.headers.get('x-ratelimit-reset-after');
+	const bucket = response.headers.get('x-ratelimit-bucket');
+
+	logger.info(
+		{
+			method: request.method,
+			path: request.path,
+			bucket,
+			quota: `${remaining}/${limit}`,
+			resetAfter: `${resetAfter}s`,
+		},
+		`[REST Response] ${request.method} ${request.path}`,
+	);
+
+	if (remaining !== null && Number(remaining) <= 1) {
+		logger.warn(
+			{ bucket, path: request.path },
+			`⚠️ Bucket ${bucket} is almost exhausted!`,
+		);
+	}
+});
 
 // ============================================================================
 // COMMAND LOADING
