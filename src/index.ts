@@ -42,7 +42,7 @@ const client = new Client({
 client.commands = new Collection<string, Command>();
 
 // ============================================================================
-// REST RATE LIMIT MONITORING (Temporary Debug)
+// REST RATE LIMIT MONITORING
 // ============================================================================
 client.rest.on(RESTEvents.Response, (request, response) => {
 	const limit = response.headers.get('x-ratelimit-limit');
@@ -50,7 +50,7 @@ client.rest.on(RESTEvents.Response, (request, response) => {
 	const resetAfter = response.headers.get('x-ratelimit-reset-after');
 	const bucket = response.headers.get('x-ratelimit-bucket');
 
-	logger.info(
+	logger.debug(
 		{
 			method: request.method,
 			path: request.path,
