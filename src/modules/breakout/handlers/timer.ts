@@ -22,7 +22,7 @@ export async function handleTimerCommand(
 	if (!interaction.guildId || !interaction.guild) return;
 
 	const minutesOption = interaction.options.getString('minutes', true);
-	const minutes = Number.parseInt(minutesOption, 10);
+	const minutes = Number.parseFloat(minutesOption);
 	const autoRecallOption =
 		interaction.options.getBoolean('auto_recall') ?? true;
 
@@ -87,8 +87,11 @@ export async function handleTimerCommand(
 			'ℹ️ Auto-recall is disabled (no main room configured). Run `/breakout recall` manually when ready.';
 	}
 
+	const durationText =
+		minutes < 1 ? `${Math.round(minutes * 60)} seconds` : `${minutes} minutes`;
+
 	await replyOrEdit(
 		interaction,
-		`⏱️ **Breakout timer set for ${minutes} minutes.**\n${summary}\n${autoRecallNote}`,
+		`⏱️ **Breakout timer set for ${durationText}.**\n${summary}\n${autoRecallNote}`,
 	);
 }

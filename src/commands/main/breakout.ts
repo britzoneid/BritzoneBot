@@ -124,6 +124,7 @@ const command: Command = {
 						)
 						.setRequired(true)
 						.addChoices(
+							{ name: '3 seconds (Testing)', value: '0.05' },
 							{ name: '30 minutes (Reminders at 15m, 5m)', value: '30' },
 							{ name: '45 minutes (Reminders at 22m, 10m, 3m)', value: '45' },
 							{ name: '60 minutes (Reminders at 30m, 15m, 5m)', value: '60' },

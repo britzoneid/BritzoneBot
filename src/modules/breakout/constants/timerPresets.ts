@@ -1,10 +1,11 @@
-export type PresetDuration = 30 | 45 | 60 | 90;
+export type PresetDuration = 0.05 | 30 | 45 | 60 | 90;
 
 /**
  * Single source of truth lookup table for FGD session timer reminder presets.
  * Maps session duration in minutes to an array of remaining minute thresholds.
  */
 export const FGD_TIMER_PRESETS: Record<PresetDuration, number[]> = {
+	0.05: [0.03, 0.015],
 	30: [15, 5],
 	45: [22, 10, 3],
 	60: [30, 15, 5],
