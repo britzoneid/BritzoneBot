@@ -118,9 +118,9 @@ const command: Command = {
 				.setDescription('Sets a timer for the breakout session')
 				.addStringOption((option) =>
 					option
-						.setName('preset')
+						.setName('minutes')
 						.setDescription(
-							'Preset FGD timer duration (30, 45, 60, or 90 mins)',
+							'FGD timer duration in minutes (30, 45, 60, or 90 mins)',
 						)
 						.setRequired(true)
 						.addChoices(

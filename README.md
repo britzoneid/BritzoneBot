@@ -131,7 +131,7 @@ BritzoneBot offers a suite of slash commands to manage breakout rooms. All break
 |              |                |                                                                    | `facilitators` *(String, Optional)* – User mentions to assign into breakout rooms first (one per room when possible). |
 | `/breakout`  | `recall`       | Moves all members from breakout rooms back to the main voice channel. Breakout rooms remain intact. | `mainroom` *(Voice/Stage Channel, Required)* – The destination channel. |
 | `/breakout`  | `delete`       | Deletes all breakout room channels.                                | None |
-| `/breakout`  | `timer`        | Sets a countdown timer for the breakout session. Sends a 5-minute warning and a "time's up" message. | `minutes` *(Integer, Required)* – Duration in minutes (≥ 1). |
+| `/breakout`  | `timer`        | Sets a countdown timer for the breakout session. Sends periodic reminders and a "time's up" message. | `minutes` *(String, Required)* – Duration preset in minutes (30, 45, 60, 90). |
 | `/breakout`  | `broadcast`    | Broadcasts a message to all active breakout rooms.                 | `message` *(String, Required)* – The message content. |
 | `/breakout`  | `send-message` | Sends a message to a specific voice channel's text chat.           | `channel` *(Voice Channel, Required)* – Target channel. |
 |              |                |                                                                    | `message` *(String, Required)* – The message content. |
