@@ -152,10 +152,10 @@ async function saveState(): Promise<void> {
 	const nextSave = saveQueue.then(async () => {
 		try {
 			await initializeState();
-			await fs.writeFile(
-				getStateFile(),
-				JSON.stringify(inMemoryState, null, 2),
-			);
+			const targetFile = getStateFile();
+			const tempFile = `${targetFile}.tmp`;
+			await fs.writeFile(tempFile, JSON.stringify(inMemoryState, null, 2));
+			await fs.rename(tempFile, targetFile);
 			logger.trace('💾 Saved breakout state data');
 		} catch (error) {
 			logger.error({ err: error }, '❌ Error saving breakout state');
