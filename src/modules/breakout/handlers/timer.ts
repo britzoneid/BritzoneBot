@@ -16,22 +16,11 @@ export async function handleTimerCommand(
 ): Promise<void> {
 	if (!interaction.guildId || !interaction.guild) return;
 
-	const presetOption = interaction.options.getString('preset');
-	const minutesOption = interaction.options.getInteger('minutes');
+	const presetOption = interaction.options.getString('preset', true);
+	const minutes = Number.parseInt(presetOption, 10);
 
-	let minutes: number | null = null;
-
-	if (presetOption && presetOption !== 'custom') {
-		minutes = Number.parseInt(presetOption, 10);
-	} else if (minutesOption) {
-		minutes = minutesOption;
-	}
-
-	if (!minutes || minutes <= 0 || minutes > 35791) {
-		await replyOrEdit(
-			interaction,
-			'⚠️ Please select a valid duration preset or specify custom minutes between 1 and 35,791 with the `minutes` option.',
-		);
+	if (!minutes || minutes <= 0) {
+		await replyOrEdit(interaction, '⚠️ Please select a valid duration preset.');
 		return;
 	}
 
@@ -39,7 +28,7 @@ export async function handleTimerCommand(
 		subcommand: 'timer',
 		guildId: interaction.guildId,
 		minutes,
-		preset: presetOption || 'custom',
+		preset: presetOption,
 	});
 
 	log.info('⏱️ Setting breakout timer');
