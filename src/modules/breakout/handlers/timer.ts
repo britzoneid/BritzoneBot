@@ -10,7 +10,10 @@ import {
 	formatScheduleSummary,
 	getTimerSchedule,
 } from '@/modules/breakout/constants/timerPresets.js';
-import { monitorBreakoutTimer } from '@/modules/breakout/services/timer.js';
+import {
+	cancelBreakoutTimer,
+	monitorBreakoutTimer,
+} from '@/modules/breakout/services/timer.js';
 import {
 	getMainRoom,
 	getRooms,
@@ -30,6 +33,17 @@ export async function handleTimerCommand(
 	const guildId = interaction.guildId;
 
 	const minutesOption = interaction.options.getString('minutes', true);
+
+	if (minutesOption === 'cancel') {
+		const canceled = await cancelBreakoutTimer(guildId);
+		if (canceled) {
+			await replyOrEdit(interaction, '⏱️ **Breakout timer canceled.**');
+		} else {
+			await replyOrEdit(interaction, 'ℹ️ No active breakout timer to cancel.');
+		}
+		return;
+	}
+
 	const minutes = Number.parseFloat(minutesOption);
 	const autoRecallOption =
 		interaction.options.getBoolean('auto_recall') ?? true;

@@ -121,10 +121,11 @@ const command: Command = {
 					option
 						.setName('minutes')
 						.setDescription(
-							'FGD timer duration in minutes (30, 45, 60, or 90 mins)',
+							'FGD timer duration in minutes (or select Cancel to stop active timer)',
 						)
 						.setRequired(true)
 						.addChoices(
+							{ name: '❌ Cancel active timer', value: 'cancel' },
 							{ name: '3 seconds (Testing)', value: '0.05' },
 							{ name: '30 minutes (Reminders at 15m, 5m)', value: '30' },
 							{ name: '45 minutes (Reminders at 22m, 10m, 3m)', value: '45' },

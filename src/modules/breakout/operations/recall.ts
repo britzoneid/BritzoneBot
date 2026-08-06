@@ -8,6 +8,7 @@ import {
 import { preflightBreakout } from '@/lib/discord/permission.js';
 import { logger } from '@/lib/logger.js';
 import { moveUserToRoom } from '@/modules/breakout/services/distribution.js';
+import { cancelBreakoutTimer } from '@/modules/breakout/services/timer.js';
 import {
 	completeOperation,
 	getCompletedSteps,
@@ -219,6 +220,7 @@ export async function executeRecall(
 			}
 		}
 
+		await cancelBreakoutTimer(guildId);
 		await completeOperation(guildId);
 
 		log.info(

@@ -9,6 +9,7 @@ import { preflightBreakout } from '@/lib/discord/permission.js';
 import { logger } from '@/lib/logger.js';
 import { moveUserToRoom } from '@/modules/breakout/services/distribution.js';
 import { deleteRoom } from '@/modules/breakout/services/room.js';
+import { cancelBreakoutTimer } from '@/modules/breakout/services/timer.js';
 import {
 	clearSession,
 	completeOperation,
@@ -214,6 +215,9 @@ export async function executeDelete(
 		}
 
 		if (deletedRooms === totalRooms) {
+			// Clear active breakout timer if one exists
+			await cancelBreakoutTimer(guildId);
+
 			// Clear stored session data since rooms are deleted
 			await updateProgress(guildId, 'clear_session');
 			await clearSession(guildId);

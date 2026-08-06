@@ -24,6 +24,22 @@ import {
 const activeTimerCleanups = new Map<string, () => void>();
 
 /**
+ * Cancels any active timer timeouts for a guild and clears persistent timer state.
+ *
+ * @param guildId The ID of the guild
+ * @returns true if an active timer was running or present in state and was canceled, false otherwise
+ */
+export async function cancelBreakoutTimer(guildId: string): Promise<boolean> {
+	const cleanup = activeTimerCleanups.get(guildId);
+	if (cleanup) {
+		cleanup();
+	}
+	const timerState = await getTimerData(guildId);
+	await clearTimerData(guildId);
+	return Boolean(cleanup || timerState);
+}
+
+/**
  * Monitors a breakout timer and sends reminders at exact target times using targeted timeouts.
  *
  * @param timerData Timer configuration data
