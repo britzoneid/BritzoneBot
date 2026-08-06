@@ -1,8 +1,8 @@
 # BritzoneBot
 
 [![Project Status](https://img.shields.io/badge/Status-Stable-brightgreen.svg)](https://github.com/britzoneid/BritzoneBot)
-[![Version](https://img.shields.io/badge/Version-2.0.0-blue.svg)](https://github.com/britzoneid/BritzoneBot/releases)
-[![License](https://img.shields.io/badge/License-AGPLv3-blue.svg)](https://opensource.org/licenses/MIT)
+[![version](https://img.shields.io/github/package-json/v/britzoneid/BritzoneBot)](https://github.com/britzoneid/BritzoneBot/blob/master/package.json)
+[![License](https://img.shields.io/github/license/britzoneid/BritzoneBot)](https://github.com/britzoneid/BritzoneBot/blob/master/LICENSE)
 [![Bun Version](https://img.shields.io/badge/Bun-%3E=v1.3.0-FBF0DF?logo=bun)](https://bun.sh)
 
 
