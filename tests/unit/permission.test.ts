@@ -142,7 +142,7 @@ describe('Discord Permission Utilities (permission.ts)', () => {
 	});
 
 	describe('preflightBreakout composite check', () => {
-		it('fails if member does not have manager role', () => {
+		it('reports missing guildConfig.json when file is absent', () => {
 			const member = {
 				id: 'user-1',
 				guild: { id: 'guild-1', ownerId: 'owner-999' },
@@ -150,6 +150,21 @@ describe('Discord Permission Utilities (permission.ts)', () => {
 			} as unknown as GuildMember;
 
 			const result = preflightBreakout({ member });
+			expect(result.ok).toBe(false);
+			expect(result.reason).toContain('guildConfig.json');
+		});
+
+		it('fails if member does not have manager role when guild is configured', () => {
+			const member = {
+				id: 'user-1',
+				guild: { id: 'guild-1', ownerId: 'owner-999' },
+				roles: { cache: { has: () => false } },
+			} as unknown as GuildMember;
+
+			const result = preflightBreakout(
+				{ member },
+				{ 'guild-1': { managerRoleId: 'role-99' } },
+			);
 			expect(result.ok).toBe(false);
 			expect(result.reason).toContain('manager role');
 		});

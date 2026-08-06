@@ -9,9 +9,18 @@ export interface GuildConfig {
 
 export type GuildConfigMap = Record<string, GuildConfig>;
 
+export type GuildConfigStatus =
+	| 'FILE_MISSING'
+	| 'GUILD_NOT_CONFIGURED'
+	| 'CONFIGURED';
+
 const guildConfigPath = path.resolve(process.cwd(), 'guildConfig.json');
 
 let cachedGuildConfig: GuildConfigMap | null = null;
+
+export function guildConfigExists(): boolean {
+	return fs.existsSync(guildConfigPath);
+}
 
 export function loadGuildConfig(): GuildConfigMap {
 	if (cachedGuildConfig) {
@@ -19,7 +28,7 @@ export function loadGuildConfig(): GuildConfigMap {
 	}
 
 	try {
-		if (!fs.existsSync(guildConfigPath)) {
+		if (!guildConfigExists()) {
 			cachedGuildConfig = {};
 			return cachedGuildConfig;
 		}
@@ -35,6 +44,27 @@ export function loadGuildConfig(): GuildConfigMap {
 		cachedGuildConfig = {};
 		return cachedGuildConfig;
 	}
+}
+
+export function getGuildConfigStatus(
+	guildId?: string,
+	configMap: GuildConfigMap = loadGuildConfig(),
+): GuildConfigStatus {
+	const hasConfig = guildConfigExists() || Object.keys(configMap).length > 0;
+	if (!hasConfig) {
+		return 'FILE_MISSING';
+	}
+
+	if (!guildId) {
+		return 'GUILD_NOT_CONFIGURED';
+	}
+
+	const guildConfig = configMap[guildId];
+	if (!guildConfig || !guildConfig.managerRoleId) {
+		return 'GUILD_NOT_CONFIGURED';
+	}
+
+	return 'CONFIGURED';
 }
 
 export function reloadGuildConfig(): void {

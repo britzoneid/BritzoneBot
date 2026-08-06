@@ -11,6 +11,7 @@ import {
 } from 'discord.js';
 import {
 	type GuildConfigMap as GuildRoleConfigMap,
+	getGuildConfigStatus,
 	loadGuildConfig,
 	reloadGuildConfig as reloadPermissionConfig,
 } from '@/lib/guildConfig.js';
@@ -138,12 +139,30 @@ export interface BreakoutPreflightResult {
  */
 export function preflightBreakout(
 	opts: BreakoutPreflightOptions,
+	guildConfigMap: GuildRoleConfigMap = loadGuildConfig(),
 ): BreakoutPreflightResult {
 	const { member, category, voiceChannel, textChannel, requireUserMove } = opts;
 	const guild = member.guild;
 
-	// 1. Role gate
-	if (!canInvokeBreakout(member)) {
+	// 1. Role gate (Owner bypass or manager role)
+	if (!canInvokeBreakout(member, guildConfigMap)) {
+		const configStatus = getGuildConfigStatus(guild.id, guildConfigMap);
+		if (configStatus === 'FILE_MISSING') {
+			return {
+				ok: false,
+				reason:
+					'⚠️ Server configuration file (`guildConfig.json`) was not found. Please set up `guildConfig.json` before using this command.',
+			};
+		}
+
+		if (configStatus === 'GUILD_NOT_CONFIGURED') {
+			return {
+				ok: false,
+				reason:
+					'⚠️ Bot configuration (`managerRoleId`) for this server is not set in `guildConfig.json`.',
+			};
+		}
+
 		return {
 			ok: false,
 			reason: 'You do not have the required manager role for this server.',

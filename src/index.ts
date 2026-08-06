@@ -19,19 +19,23 @@ const __dirname = import.meta.dirname;
 // LOGGING SETUP
 // ============================================================================
 
+import { validateEnv } from '@/lib/env.js';
+import { guildConfigExists, loadGuildConfig } from '@/lib/guildConfig.js';
+
 logger.info('🚀 Starting the bot...');
 await initializeState();
 
-// ============================================================================
-// BOT INITIALIZATION
-// ============================================================================
+// Validate environment variables early before proceeding
+const env = validateEnv();
 
-const token = process.env.TOKEN;
-if (!token) {
-	throw new Error(
-		'TOKEN environment variable is not defined. Please create a .env file with your bot token.',
+// Validate guildConfig.json existence and log startup warning if missing
+if (!guildConfigExists() || Object.keys(loadGuildConfig()).length === 0) {
+	logger.warn(
+		'⚠️ guildConfig.json was not found or contains no guild configs. Please copy guildConfig.json.example to guildConfig.json and configure your server IDs and managerRoleId.',
 	);
 }
+
+const token = env.TOKEN;
 
 // Create client with proper typing
 const client = new Client({
