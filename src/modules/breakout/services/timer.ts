@@ -1,6 +1,7 @@
 import type {
 	Client,
 	Guild,
+	Message,
 	StageChannel,
 	VoiceBasedChannel,
 	VoiceChannel,
@@ -97,7 +98,7 @@ export async function monitorBreakoutTimer(
 			{ remainingGraceMs: remainingGrace },
 			'⏱️ Timer expired offline, currently in grace period window.',
 		);
-		await sendReminderWithRetry(
+		const sentMessages = await sendReminderWithRetry(
 			log,
 			guildId,
 			breakoutRooms,
@@ -109,6 +110,11 @@ export async function monitorBreakoutTimer(
 				const state = await getTimerData(guildId);
 				if (!state || (timerId && state.timerId !== timerId)) return;
 				await executeAutoRecall(state.mainRoomId);
+				await updateSentMessages(
+					log,
+					sentMessages,
+					"⏰ **Time's up!** This breakout session has ended.\n✅ Moving all members back to the main room now.",
+				);
 				await clearTimerData(guildId);
 				cleanup();
 			} catch (error) {
@@ -191,7 +197,7 @@ export async function monitorBreakoutTimer(
 
 			if (state.autoRecall && state.mainRoomId && gracePeriodSeconds > 0) {
 				const recallUnix = Math.floor((Date.now() + gracePeriodMs) / 1000);
-				await sendReminderWithRetry(
+				const sentMessages = await sendReminderWithRetry(
 					log,
 					guildId,
 					breakoutRooms,
@@ -206,6 +212,11 @@ export async function monitorBreakoutTimer(
 							return;
 
 						await executeAutoRecall(currentState.mainRoomId);
+						await updateSentMessages(
+							log,
+							sentMessages,
+							"⏰ **Time's up!** This breakout session has ended.\n✅ Moving all members back to the main room now.",
+						);
 						await clearTimerData(guildId);
 						cleanup();
 					} catch (error) {
@@ -278,6 +289,27 @@ async function autoRecallMembers(
 }
 
 /**
+ * Updates previously sent reminder messages with a new content.
+ */
+async function updateSentMessages(
+	log: Logger,
+	sentMessages: Map<string, Message>,
+	newMessage: string,
+): Promise<void> {
+	for (const [roomId, msg] of sentMessages.entries()) {
+		try {
+			await msg.edit(newMessage);
+			log.info({ roomId }, '✅ Updated countdown message to completion');
+		} catch (err) {
+			log.warn(
+				{ roomId, err },
+				'⚠️ Could not update countdown message after recall',
+			);
+		}
+	}
+}
+
+/**
  * Sends a reminder message to associated text channels with retry logic.
  *
  * @param guildId The ID of the guild
@@ -291,11 +323,12 @@ async function sendReminderWithRetry(
 	roomIds: string[],
 	message: string,
 	client: Client,
-): Promise<void> {
+): Promise<Map<string, Message>> {
+	const sentMessages = new Map<string, Message>();
 	const guild = client.guilds.cache.get(guildId);
 	if (!guild) {
 		logger.error({ guildId }, `❌ Could not find guild`);
-		return;
+		return sentMessages;
 	}
 
 	const maxRetries = 5;
@@ -320,7 +353,8 @@ async function sendReminderWithRetry(
 
 		while (!success && attempts < maxRetries) {
 			try {
-				await textChannel.send(message);
+				const sentMsg = await textChannel.send(message);
+				sentMessages.set(roomId, sentMsg);
 				success = true;
 				log.info({ channel: textChannel.name }, `✅ Reminder sent`);
 			} catch (error) {
@@ -351,4 +385,6 @@ async function sendReminderWithRetry(
 			);
 		}
 	}
+
+	return sentMessages;
 }
