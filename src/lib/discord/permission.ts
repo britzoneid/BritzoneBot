@@ -75,7 +75,38 @@ export function getMissingBotPermissions(
 		effectiveRequired.unshift(PermissionsBitField.Flags.ViewChannel);
 	}
 
-	return effectiveRequired.filter((perm) => !perms.has(perm));
+	const missing = effectiveRequired.filter((perm) => !perms.has(perm));
+
+	// Inspect category permission overwrites for voice flags ignored by Discord.js CategoryChannel.permissionsFor
+	if (channel && 'permissionOverwrites' in channel) {
+		for (const reqPerm of effectiveRequired) {
+			if (missing.includes(reqPerm)) continue;
+
+			const overwrites = channel.permissionOverwrites.cache;
+
+			const isDeniedInOverwrites = Array.from(overwrites.values()).some(
+				(ov) =>
+					(ov.id === guild.id ||
+						ov.id === me.id ||
+						me.roles.cache.has(ov.id)) &&
+					ov.deny.has(reqPerm),
+			);
+
+			if (isDeniedInOverwrites) {
+				const hasExplicitAllow = Array.from(overwrites.values()).some(
+					(ov) =>
+						(ov.id === me.id || me.roles.cache.has(ov.id)) &&
+						ov.allow.has(reqPerm),
+				);
+
+				if (!hasExplicitAllow) {
+					missing.push(reqPerm);
+				}
+			}
+		}
+	}
+
+	return missing;
 }
 
 /**
