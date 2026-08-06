@@ -70,11 +70,12 @@ Copy `.env.example` to `.env` in the root directory:
 cp .env.example .env
 ```
 
-Fill in your bot credentials obtained from the [Discord Developer Portal](https://discord.com/developers/applications):
+Fill in your bot credentials obtained from the [Discord Developer Portal](https://discord.com/developers/applications), plus the Discord role ID that should be allowed to run breakout commands:
 
 ```env
 BOT_ID=your-bot-id
 TOKEN=your-bot-token
+BOT_MANAGER_ROLE_ID=your-manager-role-id
 
 # Optional
 NODE_ENV=production
@@ -119,7 +120,7 @@ bun run deploy
 
 ## ⚙️ Command Reference
 
-BritzoneBot offers a suite of slash commands to manage breakout rooms. All breakout commands require the **Move Members** permission.
+BritzoneBot offers a suite of slash commands to manage breakout rooms. All breakout commands are restricted to members whose roles include the configured `BOT_MANAGER_ROLE_ID`.
 
 ### 🏠 Breakout Commands
 
