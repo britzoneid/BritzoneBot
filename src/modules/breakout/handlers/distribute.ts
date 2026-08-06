@@ -37,7 +37,7 @@ export async function handleDistributeCommand(
 	if (!mainRoom?.isVoiceBased()) {
 		await replyOrEdit(interaction, {
 			content: 'Selected main room must be a voice or stage channel.',
-			ephemeral: true,
+			flags: MessageFlags.Ephemeral,
 		});
 		return;
 	}
@@ -54,7 +54,7 @@ export async function handleDistributeCommand(
 		if (!check.ok) {
 			await replyOrEdit(interaction, {
 				content: check.reason ?? 'Permission check failed.',
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			});
 			return;
 		}

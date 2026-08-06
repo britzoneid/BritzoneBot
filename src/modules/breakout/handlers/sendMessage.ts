@@ -30,7 +30,7 @@ export async function handleSendMessageCommand(
 		if (!check.ok) {
 			await replyOrEdit(interaction, {
 				content: check.reason ?? 'Permission check failed.',
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			});
 			return;
 		}

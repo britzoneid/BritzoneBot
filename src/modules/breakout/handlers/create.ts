@@ -1,4 +1,8 @@
-import { type ChatInputCommandInteraction, GuildMember } from 'discord.js';
+import {
+	type ChatInputCommandInteraction,
+	GuildMember,
+	MessageFlags,
+} from 'discord.js';
 import { confirmAction } from '@/lib/discord/confirm.js';
 import { preflightBreakout } from '@/lib/discord/permission.js';
 import {
@@ -32,7 +36,7 @@ export async function handleCreateCommand(
 		if (!check.ok) {
 			await replyOrEdit(interaction, {
 				content: check.reason ?? 'Permission check failed.',
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			});
 			return;
 		}

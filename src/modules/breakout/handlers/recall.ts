@@ -1,6 +1,7 @@
 import {
 	type ChatInputCommandInteraction,
 	GuildMember,
+	MessageFlags,
 	type VoiceBasedChannel,
 } from 'discord.js';
 import { preflightBreakout } from '@/lib/discord/permission.js';
@@ -50,7 +51,7 @@ export async function handleRecallCommand(
 		if (!check.ok) {
 			await replyOrEdit(interaction, {
 				content: check.reason ?? 'Permission check failed.',
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			});
 			return;
 		}
