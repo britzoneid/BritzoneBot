@@ -31,6 +31,7 @@ export async function handleCreateCommand(
 		const check = preflightBreakout({
 			member: interaction.member,
 			category: category ?? undefined,
+			requireManageChannels: true,
 		});
 
 		if (!check.ok) {

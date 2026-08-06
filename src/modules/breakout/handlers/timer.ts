@@ -1,4 +1,9 @@
-import type { ChatInputCommandInteraction } from 'discord.js';
+import {
+	type ChatInputCommandInteraction,
+	GuildMember,
+	MessageFlags,
+} from 'discord.js';
+import { preflightBreakout } from '@/lib/discord/permission.js';
 import { replyOrEdit } from '@/lib/discord/response.js';
 import { logger } from '@/lib/logger.js';
 import {
@@ -20,6 +25,20 @@ export async function handleTimerCommand(
 	interaction: ChatInputCommandInteraction,
 ): Promise<void> {
 	if (!interaction.guildId || !interaction.guild) return;
+
+	if (interaction.member instanceof GuildMember) {
+		const check = preflightBreakout({
+			member: interaction.member,
+		});
+
+		if (!check.ok) {
+			await replyOrEdit(interaction, {
+				content: check.reason ?? 'Permission check failed.',
+				flags: MessageFlags.Ephemeral,
+			});
+			return;
+		}
+	}
 
 	const minutesOption = interaction.options.getString('minutes', true);
 	const minutes = Number.parseFloat(minutesOption);

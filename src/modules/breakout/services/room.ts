@@ -108,7 +108,24 @@ export async function deleteRoom(
 ): Promise<void> {
 	try {
 		await room.delete(reason);
-	} catch (error) {
+	} catch (error: unknown) {
+		const isDiscordError =
+			error && typeof error === 'object' && 'code' in error;
+		const code = isDiscordError ? (error as { code: number }).code : null;
+		const status =
+			error && typeof error === 'object' && 'status' in error
+				? (error as { status: number }).status
+				: null;
+
+		// If channel is already deleted on Discord (Code 10003: Unknown Channel, HTTP 404)
+		if (code === 10003 || status === 404) {
+			logger.warn(
+				{ room: room.name, code, status },
+				'⚠️ Room is already deleted on Discord',
+			);
+			return;
+		}
+
 		logger.error({ err: error, room: room.name }, `Failed to delete room`);
 		throw error;
 	}

@@ -1,9 +1,11 @@
 import {
 	ChannelType,
 	type CommandInteraction,
+	GuildMember,
 	type StageChannel,
 	type VoiceChannel,
 } from 'discord.js';
+import { preflightBreakout } from '@/lib/discord/permission.js';
 import { logger } from '@/lib/logger.js';
 import { moveUserToRoom } from '@/modules/breakout/services/distribution.js';
 import { deleteRoom } from '@/modules/breakout/services/room.js';
@@ -49,9 +51,26 @@ export async function executeDelete(
 		log.info('🔄 Resuming delete operation');
 		const storedRoomIds = currentOp.params.roomIds as string[];
 		if (storedRoomIds) {
-			breakoutRooms = storedRoomIds
-				.map((id) => interaction.guild?.channels.cache.get(id) as VoiceChannel)
-				.filter((c) => c !== undefined);
+			const fetched: VoiceChannel[] = [];
+			for (const id of storedRoomIds) {
+				try {
+					const cached = interaction.guild.channels.cache.get(id);
+					const ch = cached ?? (await interaction.guild.channels.fetch(id));
+					if (ch && ch.type === ChannelType.GuildVoice) {
+						fetched.push(ch as VoiceChannel);
+					}
+				} catch (err: unknown) {
+					log.warn(
+						{ roomId: id, err },
+						'❌ Bot lacks View Channel / Manage Channels access to breakout room',
+					);
+					return {
+						success: false,
+						message: `⚠️ I don't have **View Channel** / **Manage Channels** access to breakout room channel (\`${id}\`). Please ask an admin to grant the bot **View Channel** and **Manage Channels** permissions in the category/channel.`,
+					};
+				}
+			}
+			breakoutRooms = fetched;
 		}
 	}
 
@@ -79,18 +98,36 @@ export async function executeDelete(
 				message: 'No breakout rooms found to delete!',
 			};
 		}
+	}
 
-		// Start new operation
-		if (!isResuming) {
-			await startOperation(guildId, operationType, {
-				roomIds: breakoutRooms.map((room) => room.id),
-			});
+	if (interaction.member instanceof GuildMember) {
+		const check = preflightBreakout({
+			member: interaction.member,
+			channels: breakoutRooms,
+			requireManageChannels: true,
+		});
 
-			log.info(
-				{ roomsCount: breakoutRooms.length },
-				'🔍 Found breakout room(s) to delete',
+		if (!check.ok) {
+			log.warn(
+				{ reason: check.reason },
+				'❌ Preflight permission check failed',
 			);
+			return {
+				success: false,
+				message: check.reason ?? 'Permission check failed.',
+			};
 		}
+	}
+
+	if (!isResuming) {
+		await startOperation(guildId, operationType, {
+			roomIds: breakoutRooms.map((room) => room.id),
+		});
+
+		log.info(
+			{ roomsCount: breakoutRooms.length },
+			'🔍 Found breakout room(s) to delete',
+		);
 	}
 
 	// Auto-recall members to main room if one is configured (runs on both initial run and resume)
@@ -176,21 +213,33 @@ export async function executeDelete(
 			}
 		}
 
-		// Clear stored session data since rooms are deleted
-		await updateProgress(guildId, 'clear_session');
-		await clearSession(guildId);
+		if (deletedRooms === totalRooms) {
+			// Clear stored session data since rooms are deleted
+			await updateProgress(guildId, 'clear_session');
+			await clearSession(guildId);
 
-		// Complete operation
-		await completeOperation(guildId);
+			// Complete operation
+			await completeOperation(guildId);
 
-		log.info(
+			log.info(
+				{ deletedRooms, totalRooms },
+				'🎉 Successfully deleted breakout room(s).',
+			);
+
+			return {
+				success: true,
+				message: `Successfully deleted ${deletedRooms}/${totalRooms} breakout room(s)!`,
+			};
+		}
+
+		log.warn(
 			{ deletedRooms, totalRooms },
-			'🎉 Successfully deleted breakout room(s).',
+			'⚠️ Failed to delete some or all breakout rooms',
 		);
 
 		return {
-			success: true,
-			message: `Successfully deleted ${deletedRooms}/${totalRooms} breakout room(s)!`,
+			success: false,
+			message: `Failed to delete ${totalRooms - deletedRooms}/${totalRooms} breakout room(s). Deleted ${deletedRooms}/${totalRooms}. Please check bot permissions and try again.`,
 		};
 	} catch (error) {
 		log.error({ err: error }, '❌ Error in DeleteOperation');

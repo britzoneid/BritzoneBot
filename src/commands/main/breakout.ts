@@ -191,7 +191,7 @@ const command: Command = {
 			return;
 		}
 
-		// Preflight role check
+		// Base preflight role check
 		if (interaction.member instanceof GuildMember) {
 			const check = preflightBreakout({ member: interaction.member });
 			if (!check.ok) {
@@ -203,7 +203,9 @@ const command: Command = {
 				return;
 			}
 		}
-		const subcommand = interaction.options.getSubcommand();
+
+		const subcommand =
+			interaction.options.getSubcommand() as BreakoutSubcommand;
 
 		// Check for interrupted operations
 		const inProgress = await hasOperationInProgress(interaction.guildId);
@@ -226,7 +228,7 @@ const command: Command = {
 			}
 		}
 
-		const handler = subcommandHandlers[subcommand as BreakoutSubcommand];
+		const handler = subcommandHandlers[subcommand];
 		if (!handler) {
 			log.error({ subcommand }, '❌ No handler registered for subcommand');
 			await replyOrEdit(interaction, {
