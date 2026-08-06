@@ -22,27 +22,30 @@ const botId: string = BOT_ID;
 const token: string = TOKEN;
 
 /**
- * Guild list structure from guildList.json
+ * Guild configuration structure from guildConfig.json
  */
-interface GuildList {
-	[guildName: string]: string;
+interface GuildConfig {
+	name?: string;
+	managerRoleId?: string;
 }
 
-// Read and parse the guildList.json file
-const guildListPath = path.join(__dirname, '..', 'guildList.json');
+type GuildConfigMap = Record<string, GuildConfig>;
 
-if (!fs.existsSync(guildListPath)) {
+// Read and parse the guildConfig.json file
+const guildConfigPath = path.join(__dirname, '..', 'guildConfig.json');
+
+if (!fs.existsSync(guildConfigPath)) {
 	const finalLogger = (
 		pino as unknown as { final: (logger: pino.Logger) => pino.Logger }
 	).final(logger);
 	finalLogger.fatal(
-		'Error: guildList.json not found. Please copy guildList.json.example to guildList.json and configure your guild IDs.',
+		'Error: guildConfig.json not found. Please copy guildConfig.json.example to guildConfig.json and configure your guild IDs.',
 	);
 	process.exit(1);
 }
 
-const guildList: GuildList = JSON.parse(
-	fs.readFileSync(guildListPath, 'utf-8'),
+const guildConfig: GuildConfigMap = JSON.parse(
+	fs.readFileSync(guildConfigPath, 'utf-8'),
 );
 
 const commands: RESTPostAPIChatInputApplicationCommandsJSONBody[] = [];
@@ -112,7 +115,8 @@ async function deployCommands(
 	}
 }
 
-// Deploy commands to all guilds in the list
-for (const [guildName, guildId] of Object.entries(guildList)) {
-	await deployCommands(guildName, guildId);
+// Deploy commands to all guilds in the configuration
+for (const [guildId, config] of Object.entries(guildConfig)) {
+	const displayName = config.name || guildId;
+	await deployCommands(displayName, guildId);
 }

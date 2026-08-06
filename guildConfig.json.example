@@ -1,8 +1,10 @@
 {
 	"111111111111111111": {
+		"name": "Britzone Main",
 		"managerRoleId": "222222222222222222"
 	},
 	"333333333333333333": {
+		"name": "Britzone Testing",
 		"managerRoleId": "444444444444444444"
 	}
 }

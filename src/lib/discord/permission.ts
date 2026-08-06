@@ -14,6 +14,7 @@ import {
 import { logger } from '@/lib/logger.js';
 
 export interface GuildRoleConfig {
+	name?: string;
 	managerRoleId: string;
 }
 

@@ -81,41 +81,26 @@ NODE_ENV=production
 LOG_LEVEL=info   # trace | debug | info | warn | error | fatal | silent
 ```
 
-#### Guild Role Configuration
+#### Guild Configuration
 
-Create a `guildConfig.json` file in the root directory to map each guild ID to the role that can run breakout commands:
+Create a `guildConfig.json` file in the root directory to map each guild ID to its server name and manager role ID. This file is required for both registering slash commands (`bun run deploy`) and enforcing permissions:
 
 ```sh
 cp guildConfig.json.example guildConfig.json
 ```
 
-Edit `guildConfig.json` so every guild in `guildList.json` has its own manager role ID:
+Edit `guildConfig.json` with your Discord server IDs and manager role IDs:
 
 ```json
 {
   "YourGuildID1": {
+    "name": "YourServerName1",
     "managerRoleId": "YourManagerRoleID1"
   },
   "YourGuildID2": {
+    "name": "YourServerName2",
     "managerRoleId": "YourManagerRoleID2"
   }
-}
-```
-
-#### Guild List Configuration
-
-Create a `guildList.json` file in the root directory. This is **required** for the deployment script to know where to register slash commands:
-
-```sh
-cp guildList.json.example guildList.json
-```
-
-Edit `guildList.json` to map your Discord server names to their IDs:
-
-```json
-{
-  "YourServerName1": "YourServerID1",
-  "YourServerName2": "YourServerID2"
 }
 ```
 
@@ -125,7 +110,7 @@ Edit `guildList.json` to map your Discord server names to their IDs:
 # Compile TypeScript → JavaScript
 bun run build
 
-# Register slash commands to all guilds in guildList.json
+# Register slash commands to all guilds in guildConfig.json
 bun run deploy
 ```
 
