@@ -14,7 +14,7 @@ BritzoneBot is a Discord bot designed to manage breakout rooms for voice channel
 - **Distribute Users**: Preview and confirm distribution of users from a main voice channel into breakout rooms, with support for facilitators and excluded users.
 - **Recall Members**: Move all users back to the main voice channel while keeping breakout rooms intact.
 - **Delete Breakout Rooms**: Safely delete all breakout room channels (with member-presence protection).
-- **Set Timer**: Set a countdown timer for breakout sessions with a 5-minute warning and end notification.
+- **Set & Cancel Timer**: Set a countdown timer for breakout sessions with periodic reminders, configurable auto-recall (with grace period countdowns), and the ability to cancel or update active timers.
 - **Broadcast Message**: Broadcast a message to all active breakout rooms.
 - **Send Message**: Send a message to a specific voice channel's text chat.
 - **Safe Interaction Handling**: Built-in error handling for expired interactions, network issues, and timeouts.
@@ -137,7 +137,9 @@ BritzoneBot offers a suite of slash commands to manage breakout rooms. All break
 |              |                |                                                                    | `facilitators` *(String, Optional)* – User mentions to assign into breakout rooms first (one per room when possible). |
 | `/breakout`  | `recall`       | Moves all members from breakout rooms back to the main voice channel. Breakout rooms remain intact. | `mainroom` *(Voice/Stage Channel, Required)* – The destination channel. |
 | `/breakout`  | `delete`       | Deletes all breakout room channels.                                | None |
-| `/breakout`  | `timer`        | Sets a countdown timer for the breakout session. Sends periodic reminders and a "time's up" message. | `minutes` *(String, Required)* – Duration preset in minutes (30, 45, 60, 90). |
+| `/breakout`  | `timer`        | Sets or cancels a countdown timer for the breakout session. Sends periodic reminders and handles auto-recall on expiration. | `minutes` *(String, Required)* – Duration preset in minutes (30, 45, 60, 90, 0.05 testing, or `Cancel active timer`). |
+|              |                |                                                                    | `auto_recall` *(Boolean, Optional)* – Automatically recall members to main room when time is up (default: `true`). |
+|              |                |                                                                    | `grace_period` *(Integer, Optional)* – Grace period in seconds before auto-recalling members (0–300s, default: `60s`). |
 | `/breakout`  | `broadcast`    | Broadcasts a message to all active breakout rooms.                 | `message` *(String, Required)* – The message content. |
 | `/breakout`  | `send-message` | Sends a message to a specific voice channel's text chat.           | `channel` *(Voice Channel, Required)* – Target channel. |
 |              |                |                                                                    | `message` *(String, Required)* – The message content. |
@@ -173,6 +175,14 @@ When you run `/breakout distribute`, the bot:
 4. Only after confirmation does it begin moving members.
 
 This prevents accidental mass-moves and gives moderators a chance to review the plan.
+
+## ⏱️ Breakout Timer & Auto-Recall
+
+The `/breakout timer` command provides automated schedule tracking and auto-recall for breakout sessions:
+
+- **Presets & Periodic Reminders**: Choose from preset durations (30, 45, 60, or 90 minutes). The bot automatically calculates and sends targeted reminder messages to each breakout channel at milestone thresholds (e.g. 15m, 5m remaining).
+- **Auto-Recall & Grace Period**: When `auto_recall` is enabled (`true` by default), a live countdown timestamp (`<t:unix:R>`) is displayed in text channels during the grace period (default: `60s`) before members are moved back to the main voice channel.
+- **Timer Cancellation & Replacement**: An active timer can be canceled manually using `minutes: Cancel active timer`, or automatically when running `/breakout recall` or `/breakout delete`. When a timer is replaced or canceled, active countdown messages and pending reminders are cleanly deleted from the channels.
 
 ## 🤝 Contributing
 
