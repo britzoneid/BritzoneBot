@@ -4,7 +4,7 @@ import {
 	GuildMember,
 	SlashCommandBuilder,
 } from 'discord.js';
-import { isBotManager } from '@/lib/discord/permission';
+import { preflightBreakout } from '@/lib/discord/permission.js';
 import { replyOrEdit } from '@/lib/discord/response.js';
 import { logger } from '@/lib/logger.js';
 import {
@@ -190,11 +190,13 @@ const command: Command = {
 			return;
 		}
 
-		// Check Sufficient Role
+		// Preflight role check
 		if (interaction.member instanceof GuildMember) {
-			if (!isBotManager(interaction.member)) {
+			const check = preflightBreakout({ member: interaction.member });
+			if (!check.ok) {
 				await replyOrEdit(interaction, {
-					content: 'This command can only be used by a Bot Manager',
+					content:
+						check.reason ?? 'You do not have permission to run this command.',
 					ephemeral: true,
 				});
 				return;

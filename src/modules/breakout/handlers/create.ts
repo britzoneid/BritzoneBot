@@ -1,5 +1,6 @@
-import type { ChatInputCommandInteraction } from 'discord.js';
+import { type ChatInputCommandInteraction, GuildMember } from 'discord.js';
 import { confirmAction } from '@/lib/discord/confirm.js';
+import { preflightBreakout } from '@/lib/discord/permission.js';
 import {
 	handleInteraction,
 	replyOrEdit,
@@ -17,6 +18,25 @@ export async function handleCreateCommand(
 	interaction: ChatInputCommandInteraction,
 ): Promise<void> {
 	if (!interaction.guildId || !interaction.guild) return;
+
+	if (interaction.member instanceof GuildMember) {
+		const category =
+			interaction.channel && 'parent' in interaction.channel
+				? interaction.channel.parent
+				: undefined;
+		const check = preflightBreakout({
+			member: interaction.member,
+			category: category ?? undefined,
+		});
+
+		if (!check.ok) {
+			await replyOrEdit(interaction, {
+				content: check.reason ?? 'Permission check failed.',
+				ephemeral: true,
+			});
+			return;
+		}
+	}
 
 	const numRooms = interaction.options.getInteger('number', true);
 	const log = logger.child({

@@ -4,10 +4,12 @@ import {
 	ButtonStyle,
 	type ChatInputCommandInteraction,
 	ComponentType,
+	GuildMember,
 	MessageFlags,
 	type StageChannel,
 	type VoiceChannel,
 } from 'discord.js';
+import { preflightBreakout } from '@/lib/discord/permission.js';
 import {
 	handleInteraction,
 	replyOrEdit,
@@ -38,6 +40,24 @@ export async function handleDistributeCommand(
 			ephemeral: true,
 		});
 		return;
+	}
+
+	if (interaction.member instanceof GuildMember) {
+		const category = mainRoom.parent ?? undefined;
+		const check = preflightBreakout({
+			member: interaction.member,
+			voiceChannel: mainRoom,
+			category,
+			requireUserMove: true,
+		});
+
+		if (!check.ok) {
+			await replyOrEdit(interaction, {
+				content: check.reason ?? 'Permission check failed.',
+				ephemeral: true,
+			});
+			return;
+		}
 	}
 
 	const excludeInput = interaction.options.getString('exclude');
