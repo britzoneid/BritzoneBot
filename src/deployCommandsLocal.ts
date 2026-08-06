@@ -7,6 +7,7 @@ import {
 	Routes,
 } from 'discord.js';
 import pino from 'pino';
+import { type GuildConfig, loadGuildConfig } from '@/lib/guildConfig.js';
 import { logger } from '@/lib/logger.js';
 import type { Command } from '@/types/index.js';
 
@@ -21,32 +22,17 @@ if (!BOT_ID || !TOKEN) {
 const botId: string = BOT_ID;
 const token: string = TOKEN;
 
-/**
- * Guild configuration structure from guildConfig.json
- */
-interface GuildConfig {
-	name?: string;
-	managerRoleId?: string;
-}
+const guildConfig = loadGuildConfig();
 
-type GuildConfigMap = Record<string, GuildConfig>;
-
-// Read and parse the guildConfig.json file
-const guildConfigPath = path.join(__dirname, '..', 'guildConfig.json');
-
-if (!fs.existsSync(guildConfigPath)) {
+if (Object.keys(guildConfig).length === 0) {
 	const finalLogger = (
 		pino as unknown as { final: (logger: pino.Logger) => pino.Logger }
 	).final(logger);
 	finalLogger.fatal(
-		'Error: guildConfig.json not found. Please copy guildConfig.json.example to guildConfig.json and configure your guild IDs.',
+		'Error: guildConfig.json not found or empty. Please copy guildConfig.json.example to guildConfig.json and configure your guild IDs.',
 	);
 	process.exit(1);
 }
-
-const guildConfig: GuildConfigMap = JSON.parse(
-	fs.readFileSync(guildConfigPath, 'utf-8'),
-);
 
 const commands: RESTPostAPIChatInputApplicationCommandsJSONBody[] = [];
 // Grab all the command folders from the commands directory
@@ -116,7 +102,10 @@ async function deployCommands(
 }
 
 // Deploy commands to all guilds in the configuration
-for (const [guildId, config] of Object.entries(guildConfig)) {
+for (const [guildId, config] of Object.entries(guildConfig) as [
+	string,
+	GuildConfig,
+][]) {
 	const displayName = config.name || guildId;
 	await deployCommands(displayName, guildId);
 }

@@ -1,5 +1,3 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import {
 	type CategoryChannel,
 	type Guild,
@@ -11,51 +9,13 @@ import {
 	type TextChannel,
 	type VoiceChannel,
 } from 'discord.js';
-import { logger } from '@/lib/logger.js';
+import {
+	type GuildConfigMap as GuildRoleConfigMap,
+	loadGuildConfig,
+	reloadGuildConfig as reloadPermissionConfig,
+} from '@/lib/guildConfig.js';
 
-export interface GuildRoleConfig {
-	name?: string;
-	managerRoleId: string;
-}
-
-export type GuildRoleConfigMap = Record<string, GuildRoleConfig>;
-
-const guildConfigPath = path.resolve(process.cwd(), 'guildConfig.json');
-
-let cachedGuildConfig: GuildRoleConfigMap | null = null;
-
-export function loadGuildConfig(): GuildRoleConfigMap {
-	if (cachedGuildConfig) {
-		return cachedGuildConfig;
-	}
-
-	try {
-		if (!fs.existsSync(guildConfigPath)) {
-			cachedGuildConfig = {};
-			return cachedGuildConfig;
-		}
-
-		const raw = fs.readFileSync(guildConfigPath, 'utf-8');
-		cachedGuildConfig = (JSON.parse(raw) as GuildRoleConfigMap) ?? {};
-		return cachedGuildConfig;
-	} catch (err) {
-		logger.warn(
-			{ err, path: guildConfigPath },
-			'Failed to load guildConfig.json',
-		);
-		cachedGuildConfig = {};
-		return cachedGuildConfig;
-	}
-}
-
-/**
- * Force-reload the permission config from disk.
- */
-export function reloadPermissionConfig(): void {
-	cachedGuildConfig = null;
-	loadGuildConfig();
-	logger.info('Guild permission config reloaded');
-}
+export { reloadPermissionConfig };
 
 /**
  * Returns true if the member holds the per-guild manager role.
