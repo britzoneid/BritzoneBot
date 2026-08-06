@@ -1,9 +1,11 @@
 import {
 	ChannelType,
 	type CommandInteraction,
+	GuildMember,
 	type VoiceBasedChannel,
 	type VoiceChannel,
 } from 'discord.js';
+import { preflightBreakout } from '@/lib/discord/permission.js';
 import { logger } from '@/lib/logger.js';
 import { moveUserToRoom } from '@/modules/breakout/services/distribution.js';
 import {
@@ -49,9 +51,22 @@ export async function executeRecall(
 		log.info('🔄 Resuming recall operation');
 		const storedRoomIds = currentOp.params.roomIds as string[];
 		if (storedRoomIds) {
-			breakoutRooms = storedRoomIds
-				.map((id) => interaction.guild?.channels.cache.get(id) as VoiceChannel)
-				.filter((c) => c !== undefined);
+			const fetched: VoiceChannel[] = [];
+			for (const id of storedRoomIds) {
+				try {
+					const cached = interaction.guild.channels.cache.get(id);
+					const ch = cached ?? (await interaction.guild.channels.fetch(id));
+					if (ch && ch.type === ChannelType.GuildVoice) {
+						fetched.push(ch as VoiceChannel);
+					}
+				} catch (err: unknown) {
+					log.warn(
+						{ roomId: id, err },
+						'❌ Bot lacks permission to access breakout room',
+					);
+				}
+			}
+			breakoutRooms = fetched;
 		}
 	}
 
@@ -79,19 +94,38 @@ export async function executeRecall(
 				message: 'No breakout rooms found to recall members from!',
 			};
 		}
+	}
 
-		// Start new operation
-		if (!isResuming) {
-			await startOperation(guildId, operationType, {
-				mainRoomId: mainChannel.id,
-				roomIds: breakoutRooms.map((room) => room.id),
-			});
+	if (interaction.member instanceof GuildMember) {
+		const check = preflightBreakout({
+			member: interaction.member,
+			voiceChannel: mainChannel,
+			channels: breakoutRooms,
+			requireUserMove: true,
+		});
 
-			log.info(
-				{ roomsCount: breakoutRooms.length },
-				'🔍 Found breakout room(s) to recall members from',
+		if (!check.ok) {
+			log.warn(
+				{ reason: check.reason },
+				'❌ Preflight permission check failed',
 			);
+			return {
+				success: false,
+				message: check.reason ?? 'Permission check failed.',
+			};
 		}
+	}
+
+	if (!isResuming) {
+		await startOperation(guildId, operationType, {
+			mainRoomId: mainChannel.id,
+			roomIds: breakoutRooms.map((room) => room.id),
+		});
+
+		log.info(
+			{ roomsCount: breakoutRooms.length },
+			'🔍 Found breakout room(s) to recall members from',
+		);
 	}
 
 	let totalMoved = 0;

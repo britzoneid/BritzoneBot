@@ -26,19 +26,8 @@ export async function handleTimerCommand(
 ): Promise<void> {
 	if (!interaction.guildId || !interaction.guild) return;
 
-	if (interaction.member instanceof GuildMember) {
-		const check = preflightBreakout({
-			member: interaction.member,
-		});
-
-		if (!check.ok) {
-			await replyOrEdit(interaction, {
-				content: check.reason ?? 'Permission check failed.',
-				flags: MessageFlags.Ephemeral,
-			});
-			return;
-		}
-	}
+	const guild = interaction.guild;
+	const guildId = interaction.guildId;
 
 	const minutesOption = interaction.options.getString('minutes', true);
 	const minutes = Number.parseFloat(minutesOption);
@@ -53,16 +42,34 @@ export async function handleTimerCommand(
 		return;
 	}
 
+	const mainRoom = getMainRoom(guild);
+	const breakoutRooms = getRooms(guild);
+
+	if (interaction.member instanceof GuildMember) {
+		const check = preflightBreakout({
+			member: interaction.member,
+			voiceChannel: mainRoom,
+			channels: breakoutRooms,
+			requireUserMove: autoRecallOption && !!mainRoom,
+		});
+
+		if (!check.ok) {
+			await replyOrEdit(interaction, {
+				content: check.reason ?? 'Permission check failed.',
+				flags: MessageFlags.Ephemeral,
+			});
+			return;
+		}
+	}
+
 	const log = logger.child({
 		subcommand: 'timer',
-		guildId: interaction.guildId,
+		guildId,
 		minutes,
 		autoRecallOption,
 	});
 
 	log.info('⏱️ Setting breakout timer');
-
-	const breakoutRooms = getRooms(interaction.guild);
 
 	if (breakoutRooms.length === 0) {
 		log.warn('❌ Error: No breakout rooms found');
@@ -73,16 +80,14 @@ export async function handleTimerCommand(
 		return;
 	}
 
-	const mainRoom = getMainRoom(interaction.guild);
 	const autoRecall = autoRecallOption && !!mainRoom;
-
 	const schedule = getTimerSchedule(minutes);
 	const fiveMinWarningTime = minutes - 5;
 	const timerData: TimerData = {
-		timerId: `${interaction.guildId}_${Date.now()}`,
+		timerId: `${guildId}_${Date.now()}`,
 		totalMinutes: minutes,
 		startTime: Date.now(),
-		guildId: interaction.guildId,
+		guildId,
 		breakoutRooms: breakoutRooms.map((room) => room.id),
 		fiveMinSent: fiveMinWarningTime <= 0,
 		sentReminders: [],
@@ -90,7 +95,7 @@ export async function handleTimerCommand(
 		mainRoomId: mainRoom?.id,
 	};
 
-	await setTimerData(interaction.guildId, timerData);
+	await setTimerData(guildId, timerData);
 	monitorBreakoutTimer(timerData, interaction.client).catch((error) => {
 		log.error({ err: error }, '❌ Timer monitoring failed');
 	});
