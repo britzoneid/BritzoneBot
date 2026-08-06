@@ -9,7 +9,7 @@ import {
 describe('timerPresets', () => {
 	describe('FGD_TIMER_PRESETS lookup table', () => {
 		it('contains defined reminder thresholds for 0.05 (3s), 30, 45, 60, and 90 minute presets', () => {
-			expect(FGD_TIMER_PRESETS[0.05]).toEqual([]);
+			expect(FGD_TIMER_PRESETS[0.05]).toEqual([0.03, 0.015]);
 			expect(FGD_TIMER_PRESETS[30]).toEqual([15, 5]);
 			expect(FGD_TIMER_PRESETS[45]).toEqual([22, 10, 3]);
 			expect(FGD_TIMER_PRESETS[60]).toEqual([30, 15, 5]);

@@ -197,8 +197,8 @@ const command: Command = {
 					content: 'This command can only be used by a Bot Manager',
 					ephemeral: true,
 				});
+				return;
 			}
-			return;
 		}
 		const subcommand = interaction.options.getSubcommand();
 
