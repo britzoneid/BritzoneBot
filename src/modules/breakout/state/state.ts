@@ -66,6 +66,7 @@ export interface TimerData {
 	fiveMinSent: boolean;
 	sentReminders?: number[];
 	autoRecall?: boolean;
+	gracePeriodSeconds?: number;
 	mainRoomId?: string;
 }
 

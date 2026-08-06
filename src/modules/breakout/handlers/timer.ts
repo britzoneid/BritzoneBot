@@ -33,6 +33,8 @@ export async function handleTimerCommand(
 	const minutes = Number.parseFloat(minutesOption);
 	const autoRecallOption =
 		interaction.options.getBoolean('auto_recall') ?? true;
+	const gracePeriodOption = interaction.options.getInteger('grace_period');
+	const gracePeriodSeconds = gracePeriodOption ?? 60;
 
 	if (!minutes || minutes <= 0) {
 		await replyOrEdit(
@@ -67,6 +69,7 @@ export async function handleTimerCommand(
 		guildId,
 		minutes,
 		autoRecallOption,
+		gracePeriodSeconds,
 	});
 
 	log.info('⏱️ Setting breakout timer');
@@ -92,6 +95,7 @@ export async function handleTimerCommand(
 		fiveMinSent: fiveMinWarningTime <= 0,
 		sentReminders: [],
 		autoRecall,
+		gracePeriodSeconds,
 		mainRoomId: mainRoom?.id,
 	};
 
@@ -105,7 +109,10 @@ export async function handleTimerCommand(
 	let autoRecallNote =
 		'ℹ️ Auto-recall is disabled. Run `/breakout recall` manually when ready.';
 	if (autoRecall && mainRoom) {
-		autoRecallNote = `🔁 **Auto-recall** to *${mainRoom.name}* when time is up.`;
+		autoRecallNote =
+			gracePeriodSeconds > 0
+				? `🔁 **Auto-recall** to *${mainRoom.name}* when time is up (with a ${gracePeriodSeconds}s grace period).`
+				: `🔁 **Auto-recall** to *${mainRoom.name}* immediately when time is up.`;
 	} else if (!mainRoom && autoRecallOption) {
 		autoRecallNote =
 			'ℹ️ Auto-recall is disabled (no main room configured). Run `/breakout recall` manually when ready.';

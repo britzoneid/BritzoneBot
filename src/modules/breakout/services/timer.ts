@@ -35,6 +35,11 @@ export async function monitorBreakoutTimer(
 	const { timerId, totalMinutes, startTime, guildId, breakoutRooms } =
 		timerData;
 	const endTime = startTime + totalMinutes * 60 * 1000;
+	const gracePeriodSeconds = timerData.autoRecall
+		? (timerData.gracePeriodSeconds ?? 60)
+		: 0;
+	const gracePeriodMs = gracePeriodSeconds * 1000;
+	const recallTime = endTime + gracePeriodMs;
 	const log = logger.child({ guildId, timerId });
 
 	// Cancel any previously scheduled timer timeouts for this guild
@@ -51,21 +56,10 @@ export async function monitorBreakoutTimer(
 
 	const now = Date.now();
 
-	// 1. Expired while offline/restarting or past end time
-	if (now >= endTime) {
-		log.info(
-			'⏱️ Timer expired during offline window or past end time. Sending completion notice.',
-		);
-		await sendReminderWithRetry(
-			log,
-			guildId,
-			breakoutRooms,
-			"⏰ **Time's up!** This breakout session has ended.",
-			client,
-		);
-		if (timerData.autoRecall && timerData.mainRoomId) {
+	const executeAutoRecall = async (targetMainRoomId?: string) => {
+		if (timerData.autoRecall && targetMainRoomId) {
 			const guild = client.guilds.cache.get(guildId);
-			const mainChannel = guild?.channels.cache.get(timerData.mainRoomId);
+			const mainChannel = guild?.channels.cache.get(targetMainRoomId);
 			if (guild && mainChannel?.isVoiceBased()) {
 				log.info({ mainRoom: mainChannel.name }, '🔁 Auto-recalling members');
 				await autoRecallMembers(guild, breakoutRooms, mainChannel, log);
@@ -75,8 +69,56 @@ export async function monitorBreakoutTimer(
 				);
 			}
 		}
+	};
+
+	// 1. Expired while offline/restarting or past recall time
+	if (now >= recallTime) {
+		log.info(
+			'⏱️ Timer and grace period expired during offline window or past recall time. Sending completion notice.',
+		);
+		await sendReminderWithRetry(
+			log,
+			guildId,
+			breakoutRooms,
+			"⏰ **Time's up!** This breakout session has ended.",
+			client,
+		);
+		await executeAutoRecall(timerData.mainRoomId);
 		await clearTimerData(guildId);
 		cleanup();
+		return;
+	}
+
+	// 1b. Expired main timer while offline, but still inside grace period window
+	if (now >= endTime) {
+		const remainingGrace = recallTime - now;
+		const recallUnix = Math.floor(recallTime / 1000);
+		log.info(
+			{ remainingGraceMs: remainingGrace },
+			'⏱️ Timer expired offline, currently in grace period window.',
+		);
+		await sendReminderWithRetry(
+			log,
+			guildId,
+			breakoutRooms,
+			`⏰ **Time's up!** This breakout session has ended.\n⏳ Moving all members back to the main room <t:${recallUnix}:R>...`,
+			client,
+		);
+		const tGrace = setTimeout(async () => {
+			try {
+				const state = await getTimerData(guildId);
+				if (!state || (timerId && state.timerId !== timerId)) return;
+				await executeAutoRecall(state.mainRoomId);
+				await clearTimerData(guildId);
+				cleanup();
+			} catch (error) {
+				log.error(
+					{ err: error, timerId },
+					'❌ Error in grace period completion callback',
+				);
+			}
+		}, remainingGrace);
+		timeouts.push(tGrace);
 		return;
 	}
 
@@ -146,25 +188,46 @@ export async function monitorBreakoutTimer(
 			if (!state || (timerId && state.timerId !== timerId)) return;
 
 			log.info('⏱️ Breakout timer ended');
-			await sendReminderWithRetry(
-				log,
-				guildId,
-				breakoutRooms,
-				"⏰ **Time's up!** This breakout session has ended.",
-				client,
-			);
-			if (state.autoRecall && state.mainRoomId) {
-				const guild = client.guilds.cache.get(guildId);
-				const mainChannel = guild?.channels.cache.get(state.mainRoomId);
-				if (guild && mainChannel?.isVoiceBased()) {
-					log.info({ mainRoom: mainChannel.name }, '🔁 Auto-recalling members');
-					await autoRecallMembers(guild, breakoutRooms, mainChannel, log);
-				} else {
-					log.warn('⚠️ Main room no longer exists; skipping auto-recall');
-				}
+
+			if (state.autoRecall && state.mainRoomId && gracePeriodSeconds > 0) {
+				const recallUnix = Math.floor((Date.now() + gracePeriodMs) / 1000);
+				await sendReminderWithRetry(
+					log,
+					guildId,
+					breakoutRooms,
+					`⏰ **Time's up!** This breakout session has ended.\n⏳ Moving all members back to the main room <t:${recallUnix}:R>...`,
+					client,
+				);
+
+				const tGrace = setTimeout(async () => {
+					try {
+						const currentState = await getTimerData(guildId);
+						if (!currentState || (timerId && currentState.timerId !== timerId))
+							return;
+
+						await executeAutoRecall(currentState.mainRoomId);
+						await clearTimerData(guildId);
+						cleanup();
+					} catch (error) {
+						log.error(
+							{ err: error, timerId },
+							'❌ Error in grace period auto-recall callback',
+						);
+					}
+				}, gracePeriodMs);
+				timeouts.push(tGrace);
+			} else {
+				await sendReminderWithRetry(
+					log,
+					guildId,
+					breakoutRooms,
+					"⏰ **Time's up!** This breakout session has ended.",
+					client,
+				);
+				await executeAutoRecall(state.mainRoomId);
+				await clearTimerData(guildId);
+				cleanup();
 			}
-			await clearTimerData(guildId);
-			cleanup();
 		} catch (error) {
 			log.error(
 				{ err: error, timerId },
@@ -175,7 +238,12 @@ export async function monitorBreakoutTimer(
 	timeouts.push(tEnd);
 
 	log.info(
-		{ totalMinutes, endDelayMs: endDelay, scheduledReminders: schedule.length },
+		{
+			totalMinutes,
+			gracePeriodSeconds,
+			endDelayMs: endDelay,
+			scheduledReminders: schedule.length,
+		},
 		'⏱️ Targeted breakout timer scheduled',
 	);
 }

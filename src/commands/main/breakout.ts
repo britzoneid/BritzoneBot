@@ -139,6 +139,16 @@ const command: Command = {
 							'Automatically recall members to the main room when the timer ends (default: true)',
 						)
 						.setRequired(false),
+				)
+				.addIntegerOption((option) =>
+					option
+						.setName('grace_period')
+						.setDescription(
+							'Grace period in seconds before auto-recalling members (default: 60s, set 0 for instant recall)',
+						)
+						.setMinValue(0)
+						.setMaxValue(300)
+						.setRequired(false),
 				),
 		)
 		// Broadcast subcommand
