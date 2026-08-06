@@ -36,6 +36,8 @@ BOT_ID=your-bot-id
 TOKEN=your-bot-token
 ```
 
+Create `guildConfig.json` from `guildConfig.json.example` and set the manager role ID for each guild.
+
 ### 2. Build and run the container
 
 ```bash

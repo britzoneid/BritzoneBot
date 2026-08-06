@@ -70,16 +70,36 @@ Copy `.env.example` to `.env` in the root directory:
 cp .env.example .env
 ```
 
-Fill in your bot credentials obtained from the [Discord Developer Portal](https://discord.com/developers/applications), plus the Discord role ID that should be allowed to run breakout commands:
+Fill in your bot credentials obtained from the [Discord Developer Portal](https://discord.com/developers/applications).
 
 ```env
 BOT_ID=your-bot-id
 TOKEN=your-bot-token
-BOT_MANAGER_ROLE_ID=your-manager-role-id
 
 # Optional
 NODE_ENV=production
 LOG_LEVEL=info   # trace | debug | info | warn | error | fatal | silent
+```
+
+#### Guild Role Configuration
+
+Create a `guildConfig.json` file in the root directory to map each guild ID to the role that can run breakout commands:
+
+```sh
+cp guildConfig.json.example guildConfig.json
+```
+
+Edit `guildConfig.json` so every guild in `guildList.json` has its own manager role ID:
+
+```json
+{
+  "YourGuildID1": {
+    "managerRoleId": "YourManagerRoleID1"
+  },
+  "YourGuildID2": {
+    "managerRoleId": "YourManagerRoleID2"
+  }
+}
 ```
 
 #### Guild List Configuration
@@ -120,7 +140,7 @@ bun run deploy
 
 ## ⚙️ Command Reference
 
-BritzoneBot offers a suite of slash commands to manage breakout rooms. All breakout commands are restricted to members whose roles include the configured `BOT_MANAGER_ROLE_ID`.
+BritzoneBot offers a suite of slash commands to manage breakout rooms. All breakout commands are restricted to members whose roles include the manager role configured for the current guild in `guildConfig.json`.
 
 ### 🏠 Breakout Commands
 

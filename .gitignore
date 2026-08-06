@@ -1,6 +1,7 @@
 node_modules/
 .env
 guildList.json
+guildConfig.json
 data/breakoutState.json
 log/
 dist/

@@ -22,6 +22,8 @@ dist/
 # Development files
 guildList.json
 !guildList.json.example
+guildConfig.json
+!guildConfig.json.example
 
 # IDE and editor files
 .vscode/
