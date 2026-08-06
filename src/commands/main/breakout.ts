@@ -1,9 +1,10 @@
 import {
 	ChannelType,
 	type ChatInputCommandInteraction,
-	PermissionFlagsBits,
+	GuildMember,
 	SlashCommandBuilder,
 } from 'discord.js';
+import { isBotManager } from '@/lib/discord/permission';
 import { replyOrEdit } from '@/lib/discord/response.js';
 import { logger } from '@/lib/logger.js';
 import {
@@ -39,7 +40,6 @@ const command: Command = {
 	data: new SlashCommandBuilder()
 		.setName('breakout')
 		.setDescription('Manage breakout rooms for your voice channels')
-		.setDefaultMemberPermissions(PermissionFlagsBits.MoveMembers)
 		// Create subcommand
 		.addSubcommand((subcommand) =>
 			subcommand
@@ -190,6 +190,16 @@ const command: Command = {
 			return;
 		}
 
+		// Check Sufficient Role
+		if (interaction.member instanceof GuildMember) {
+			if (!isBotManager(interaction.member)) {
+				await replyOrEdit(interaction, {
+					content: 'This command can only be used by a Bot Manager',
+					ephemeral: true,
+				});
+			}
+			return;
+		}
 		const subcommand = interaction.options.getSubcommand();
 
 		// Check for interrupted operations
