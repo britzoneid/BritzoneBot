@@ -1,0 +1,18 @@
+{
+	"$schema": "node_modules/release-it/schema/release-it.json",
+	"git": {
+		"commitMessage": "chore(release): bump version to v${version}",
+		"tagAnnotation": "Release v${version}",
+		"tagName": "v${version}"
+	},
+	"hooks": {
+		"before:github:release": "bun run build"
+	},
+	"github": {
+		"release": true,
+		"releaseName": "v${version}"
+	},
+	"npm": {
+		"publish": false
+	}
+}
