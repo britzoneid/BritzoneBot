@@ -245,37 +245,6 @@ export function preflightBreakout(
 		for (const ch of channels) {
 			if (!ch) continue;
 
-			// Check parent category if channel has a parent
-			const parentCategory =
-				'parent' in ch && ch.parent
-					? ch.parent
-					: ch.parentId
-						? guild.channels.cache.get(ch.parentId)
-						: null;
-
-			if (parentCategory) {
-				const missingCategory = getMissingBotPermissions(
-					guild,
-					parentCategory,
-					[
-						PermissionsBitField.Flags.ManageChannels,
-						PermissionsBitField.Flags.ViewChannel,
-						PermissionsBitField.Flags.Connect,
-					],
-				);
-
-				if (missingCategory.length > 0) {
-					return {
-						ok: false,
-						reason: `I don't have **${formatPermissionNames(
-							missingCategory,
-						)}** permission(s) on parent category (${
-							parentCategory.name
-						}). Ask an admin to grant it.`,
-					};
-				}
-			}
-
 			const missing = getMissingBotPermissions(guild, ch, [
 				PermissionsBitField.Flags.ManageChannels,
 				PermissionsBitField.Flags.ViewChannel,
