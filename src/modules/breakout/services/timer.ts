@@ -21,7 +21,10 @@ import {
 } from '@/modules/breakout/state/state.js';
 
 // Track active in-memory timer cleanup functions per guild
-const activeTimerCleanups = new Map<string, () => void>();
+const activeTimerCleanups = new Map<
+	string,
+	(cleanMessages?: boolean) => Promise<void>
+>();
 
 /**
  * Cancels any active timer timeouts for a guild and clears persistent timer state.
@@ -32,7 +35,7 @@ const activeTimerCleanups = new Map<string, () => void>();
 export async function cancelBreakoutTimer(guildId: string): Promise<boolean> {
 	const cleanup = activeTimerCleanups.get(guildId);
 	if (cleanup) {
-		cleanup();
+		await cleanup(true);
 	}
 	const timerState = await getTimerData(guildId);
 	await clearTimerData(guildId);
@@ -59,13 +62,30 @@ export async function monitorBreakoutTimer(
 	const recallTime = endTime + gracePeriodMs;
 	const log = logger.child({ guildId, timerId });
 
-	// Cancel any previously scheduled timer timeouts for this guild
-	activeTimerCleanups.get(guildId)?.();
+	// Cancel any previously scheduled timer timeouts and clean up sent messages for this guild
+	const prevCleanup = activeTimerCleanups.get(guildId);
+	if (prevCleanup) {
+		await prevCleanup(true);
+	}
 
 	const timeouts: NodeJS.Timeout[] = [];
-	const cleanup = () => {
+	const activeMessages: Message[] = [];
+	const cleanup = async (cleanMessages = false) => {
 		for (const t of timeouts) {
 			clearTimeout(t);
+		}
+		if (cleanMessages) {
+			for (const msg of activeMessages) {
+				try {
+					await msg.delete();
+					log.info({ messageId: msg.id }, '🗑️ Deleted previous timer message');
+				} catch (err) {
+					log.debug(
+						{ err, messageId: msg.id },
+						'⚠️ Could not delete previous timer message',
+					);
+				}
+			}
 		}
 		activeTimerCleanups.delete(guildId);
 	};
@@ -121,6 +141,9 @@ export async function monitorBreakoutTimer(
 			`⏰ **Time's up!** This breakout session has ended.\n⏳ Moving all members back to the main room <t:${recallUnix}:R>...`,
 			client,
 		);
+		for (const msg of sentMessages.values()) {
+			activeMessages.push(msg);
+		}
 		const tGrace = setTimeout(async () => {
 			try {
 				const state = await getTimerData(guildId);
@@ -170,13 +193,16 @@ export async function monitorBreakoutTimer(
 						{ roomCount: breakoutRooms.length, remainingMinutes },
 						`⏱️ Sending ${remainingMinutes}-minute reminder`,
 					);
-					await sendReminderWithRetry(
+					const sentMap = await sendReminderWithRetry(
 						log,
 						guildId,
 						breakoutRooms,
 						message,
 						client,
 					);
+					for (const msg of sentMap.values()) {
+						activeMessages.push(msg);
+					}
 					if (timerId) {
 						await markReminderSent(guildId, timerId, remainingMinutes);
 					}
@@ -194,7 +220,16 @@ export async function monitorBreakoutTimer(
 				{ remainingMinutes },
 				`⏱️ Missed ${remainingMinutes}-minute warning while offline. Sending catch-up notice.`,
 			);
-			await sendReminderWithRetry(log, guildId, breakoutRooms, message, client);
+			const sentMap = await sendReminderWithRetry(
+				log,
+				guildId,
+				breakoutRooms,
+				message,
+				client,
+			);
+			for (const msg of sentMap.values()) {
+				activeMessages.push(msg);
+			}
 			if (timerId) {
 				await markReminderSent(guildId, timerId, remainingMinutes);
 			}
@@ -220,6 +255,9 @@ export async function monitorBreakoutTimer(
 					`⏰ **Time's up!** This breakout session has ended.\n⏳ Moving all members back to the main room <t:${recallUnix}:R>...`,
 					client,
 				);
+				for (const msg of sentMessages.values()) {
+					activeMessages.push(msg);
+				}
 
 				const tGrace = setTimeout(async () => {
 					try {
