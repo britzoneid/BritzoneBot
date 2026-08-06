@@ -50,21 +50,58 @@ export function canInvokeBreakout(
 }
 
 /**
+ * Generic helper to find missing permissions for the bot in a guild channel or guild level.
+ */
+export function getMissingBotPermissions(
+	guild: Guild,
+	channel: GuildBasedChannel | null | undefined,
+	requiredPermissions: bigint[],
+): bigint[] {
+	const me = guild.members.me;
+	if (!me) return requiredPermissions;
+
+	const perms =
+		channel && 'permissionsFor' in channel
+			? channel.permissionsFor(me)
+			: me.permissions;
+
+	if (!perms) return requiredPermissions;
+
+	const effectiveRequired = [...requiredPermissions];
+	if (
+		channel &&
+		!effectiveRequired.includes(PermissionsBitField.Flags.ViewChannel)
+	) {
+		effectiveRequired.unshift(PermissionsBitField.Flags.ViewChannel);
+	}
+
+	return effectiveRequired.filter((perm) => !perms.has(perm));
+}
+
+/**
+ * Utility to convert permission bitfield flags into human-readable labels.
+ */
+export function formatPermissionNames(permissions: bigint[]): string {
+	if (permissions.length === 0) return '';
+	const bitField = new PermissionsBitField(permissions);
+	const names = bitField.toArray();
+	return names
+		.map((name) => name.replace(/([a-z])([A-Z])/g, '$1 $2'))
+		.join(', ');
+}
+
+/**
  * Checks if bot has ManageChannels permission in target category or guild.
  */
 export function canBotManageChannels(
 	guild: Guild,
 	category?: CategoryChannel | GuildBasedChannel | null,
 ): boolean {
-	const me = guild.members.me;
-	if (!me) return false;
-
-	if (category && 'permissionsFor' in category) {
-		const perms = category.permissionsFor(me);
-		return perms?.has(PermissionsBitField.Flags.ManageChannels) ?? false;
-	}
-
-	return me.permissions.has(PermissionsBitField.Flags.ManageChannels);
+	return (
+		getMissingBotPermissions(guild, category, [
+			PermissionsBitField.Flags.ManageChannels,
+		]).length === 0
+	);
 }
 
 /**
@@ -74,21 +111,13 @@ export function canBotMoveMembers(
 	guild: Guild,
 	voiceChannel?: VoiceChannel | StageChannel | GuildBasedChannel | null,
 ): boolean {
-	const me = guild.members.me;
-	if (!me) return false;
-
-	const requiredPerms = [
-		PermissionsBitField.Flags.Connect,
-		PermissionsBitField.Flags.MoveMembers,
-		PermissionsBitField.Flags.ViewChannel,
-	];
-
-	if (voiceChannel && 'permissionsFor' in voiceChannel) {
-		const perms = voiceChannel.permissionsFor(me);
-		return perms?.has(requiredPerms) ?? false;
-	}
-
-	return me.permissions.has(requiredPerms);
+	return (
+		getMissingBotPermissions(guild, voiceChannel, [
+			PermissionsBitField.Flags.Connect,
+			PermissionsBitField.Flags.MoveMembers,
+			PermissionsBitField.Flags.ViewChannel,
+		]).length === 0
+	);
 }
 
 /**
@@ -98,20 +127,12 @@ export function canBotSendMessage(
 	guild: Guild,
 	textChannel?: TextChannel | GuildTextBasedChannel | GuildBasedChannel | null,
 ): boolean {
-	const me = guild.members.me;
-	if (!me) return false;
-
-	const requiredPerms = [
-		PermissionsBitField.Flags.ViewChannel,
-		PermissionsBitField.Flags.SendMessages,
-	];
-
-	if (textChannel && 'permissionsFor' in textChannel) {
-		const perms = textChannel.permissionsFor(me);
-		return perms?.has(requiredPerms) ?? false;
-	}
-
-	return me.permissions.has(requiredPerms);
+	return (
+		getMissingBotPermissions(guild, textChannel, [
+			PermissionsBitField.Flags.ViewChannel,
+			PermissionsBitField.Flags.SendMessages,
+		]).length === 0
+	);
 }
 
 /**
@@ -126,7 +147,9 @@ export interface BreakoutPreflightOptions {
 	category?: CategoryChannel | GuildBasedChannel | null;
 	voiceChannel?: VoiceChannel | StageChannel | GuildBasedChannel | null;
 	textChannel?: TextChannel | GuildTextBasedChannel | GuildBasedChannel | null;
+	channels?: (GuildBasedChannel | null | undefined)[];
 	requireUserMove?: boolean;
+	requireManageChannels?: boolean;
 }
 
 export interface BreakoutPreflightResult {
@@ -141,7 +164,15 @@ export function preflightBreakout(
 	opts: BreakoutPreflightOptions,
 	guildConfigMap: GuildRoleConfigMap = loadGuildConfig(),
 ): BreakoutPreflightResult {
-	const { member, category, voiceChannel, textChannel, requireUserMove } = opts;
+	const {
+		member,
+		category,
+		voiceChannel,
+		textChannel,
+		channels,
+		requireUserMove,
+		requireManageChannels,
+	} = opts;
 	const guild = member.guild;
 
 	// 1. Role gate (Owner bypass or manager role)
@@ -178,28 +209,117 @@ export function preflightBreakout(
 	}
 
 	// 3. Bot capability checks
-	if (category && !canBotManageChannels(guild, category)) {
-		return {
-			ok: false,
-			reason:
-				"I don't have **Manage Channels** permission in the target category. Ask an admin to grant it.",
-		};
+	if (category) {
+		const missing = getMissingBotPermissions(guild, category, [
+			PermissionsBitField.Flags.ManageChannels,
+			PermissionsBitField.Flags.ViewChannel,
+			PermissionsBitField.Flags.Connect,
+		]);
+		if (missing.length > 0) {
+			return {
+				ok: false,
+				reason: `I don't have **${formatPermissionNames(missing)}** permission in the target category. Ask an admin to grant it.`,
+			};
+		}
 	}
 
-	if (voiceChannel && !canBotMoveMembers(guild, voiceChannel)) {
-		return {
-			ok: false,
-			reason:
-				"I don't have **Connect**, **View Channel**, and **Move Members** permissions in that voice channel.",
-		};
+	if (
+		requireManageChannels &&
+		!category &&
+		(!channels || channels.length === 0)
+	) {
+		const missing = getMissingBotPermissions(guild, null, [
+			PermissionsBitField.Flags.ManageChannels,
+			PermissionsBitField.Flags.ViewChannel,
+			PermissionsBitField.Flags.Connect,
+		]);
+		if (missing.length > 0) {
+			return {
+				ok: false,
+				reason: `I don't have **${formatPermissionNames(missing)}** permission in this server. Ask an admin to grant it.`,
+			};
+		}
 	}
 
-	if (textChannel && !canBotSendMessage(guild, textChannel)) {
-		return {
-			ok: false,
-			reason:
-				"I don't have **View Channel** and **Send Messages** permissions in that channel.",
-		};
+	if (channels && channels.length > 0) {
+		for (const ch of channels) {
+			if (!ch) continue;
+
+			// Check parent category if channel has a parent
+			const parentCategory =
+				'parent' in ch && ch.parent
+					? ch.parent
+					: ch.parentId
+						? guild.channels.cache.get(ch.parentId)
+						: null;
+
+			if (parentCategory) {
+				const missingCategory = getMissingBotPermissions(
+					guild,
+					parentCategory,
+					[
+						PermissionsBitField.Flags.ManageChannels,
+						PermissionsBitField.Flags.ViewChannel,
+						PermissionsBitField.Flags.Connect,
+					],
+				);
+
+				if (missingCategory.length > 0) {
+					return {
+						ok: false,
+						reason: `I don't have **${formatPermissionNames(
+							missingCategory,
+						)}** permission(s) on parent category (${
+							parentCategory.name
+						}). Ask an admin to grant it.`,
+					};
+				}
+			}
+
+			const missing = getMissingBotPermissions(guild, ch, [
+				PermissionsBitField.Flags.ManageChannels,
+				PermissionsBitField.Flags.ViewChannel,
+				PermissionsBitField.Flags.Connect,
+			]);
+
+			if (missing.length > 0) {
+				return {
+					ok: false,
+					reason: `I don't have **${formatPermissionNames(
+						missing,
+					)}** permission(s) on breakout room channel (${
+						ch.name
+					}). Ask an admin to grant it.`,
+				};
+			}
+		}
+	}
+
+	if (voiceChannel) {
+		const missing = getMissingBotPermissions(guild, voiceChannel, [
+			PermissionsBitField.Flags.Connect,
+			PermissionsBitField.Flags.MoveMembers,
+			PermissionsBitField.Flags.ViewChannel,
+		]);
+		if (missing.length > 0) {
+			return {
+				ok: false,
+				reason: `I don't have **${formatPermissionNames(missing)}** permission(s) in that voice channel.`,
+			};
+		}
+	}
+
+	if (textChannel) {
+		const missing = getMissingBotPermissions(guild, textChannel, [
+			PermissionsBitField.Flags.ViewChannel,
+			PermissionsBitField.Flags.SendMessages,
+		]);
+		if (missing.length > 0) {
+			return {
+				ok: false,
+				reason: `I don't have **${formatPermissionNames(missing)}** permission(s) in that channel.`,
+			};
+		}
 	}
 
 	return { ok: true };

@@ -1,8 +1,9 @@
-import type {
-	CategoryChannel,
-	Guild,
-	GuildMember,
-	VoiceChannel,
+import {
+	type CategoryChannel,
+	type Guild,
+	type GuildMember,
+	PermissionsBitField,
+	type VoiceChannel,
 } from 'discord.js';
 import { describe, expect, it } from 'vitest';
 import {
@@ -11,6 +12,8 @@ import {
 	canBotSendMessage,
 	canInvokeBreakout,
 	canMemberMoveMembers,
+	formatPermissionNames,
+	getMissingBotPermissions,
 	isBotManager,
 	preflightBreakout,
 	reloadPermissionConfig,
@@ -128,6 +131,36 @@ describe('Discord Permission Utilities (permission.ts)', () => {
 			expect(canBotManageChannels(guild)).toBe(false);
 			expect(canBotMoveMembers(guild)).toBe(false);
 			expect(canBotSendMessage(guild)).toBe(false);
+		});
+
+		it('getMissingBotPermissions correctly identifies missing flags', () => {
+			const me = { id: 'bot-1' };
+			const voiceChannel = {
+				permissionsFor: () => ({
+					has: (perm: bigint) => perm === PermissionsBitField.Flags.ViewChannel,
+				}),
+			} as unknown as VoiceChannel;
+			const guild = { members: { me } } as unknown as Guild;
+
+			const missing = getMissingBotPermissions(guild, voiceChannel, [
+				PermissionsBitField.Flags.Connect,
+				PermissionsBitField.Flags.MoveMembers,
+				PermissionsBitField.Flags.ViewChannel,
+			]);
+
+			expect(missing).toEqual([
+				PermissionsBitField.Flags.Connect,
+				PermissionsBitField.Flags.MoveMembers,
+			]);
+		});
+
+		it('formatPermissionNames converts bitfield array into formatted string', () => {
+			const formatted = formatPermissionNames([
+				PermissionsBitField.Flags.ManageChannels,
+				PermissionsBitField.Flags.MoveMembers,
+			]);
+			expect(formatted).toBe('Manage Channels, Move Members');
+			expect(formatPermissionNames([])).toBe('');
 		});
 	});
 
