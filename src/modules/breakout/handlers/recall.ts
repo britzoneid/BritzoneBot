@@ -73,6 +73,6 @@ export async function handleRecallCommand(
 				await ctx.reply(result.message || 'Failed to recall breakout members.');
 			}
 		},
-		{ deferReply: true, ephemeral: true },
+		{ deferReply: true, ephemeral: true, handlerTimeoutMs: 120_000 },
 	);
 }

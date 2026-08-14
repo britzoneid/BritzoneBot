@@ -66,6 +66,6 @@ export async function handleBroadcastCommand(
 				await ctx.reply(result.message);
 			}
 		},
-		{ deferReply: true },
+		{ deferReply: true, ephemeral: true },
 	);
 }
