@@ -9,7 +9,10 @@ const command: Command = {
 	async execute(interaction: CommandInteraction): Promise<void> {
 		await handleInteraction(interaction, async (ctx) => {
 			if (!ctx.interaction.guild) {
-				await ctx.reply('This command can only be used in a server.');
+				await ctx.reply({
+					content: 'This command can only be used in a server.',
+					ephemeral: true,
+				});
 				return;
 			}
 

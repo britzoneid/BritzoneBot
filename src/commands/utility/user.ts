@@ -1,6 +1,6 @@
 import {
 	type CommandInteraction,
-	type GuildMember,
+	GuildMember,
 	SlashCommandBuilder,
 } from 'discord.js';
 import { handleInteraction } from '@/lib/discord/response.js';
@@ -12,9 +12,12 @@ const command: Command = {
 		.setDescription('Provides information about the user.'),
 	async execute(interaction: CommandInteraction): Promise<void> {
 		await handleInteraction(interaction, async (ctx) => {
-			const member = ctx.interaction.member as GuildMember | null;
-			if (!member) {
-				await ctx.reply('Could not retrieve member information.');
+			const member = ctx.interaction.member;
+			if (!(member instanceof GuildMember)) {
+				await ctx.reply({
+					content: 'Could not retrieve member information.',
+					ephemeral: true,
+				});
 				return;
 			}
 
