@@ -1,3 +1,22 @@
+/**
+ * @fileoverview Discord interaction response and lifecycle management.
+ *
+ * ## Architecture Overview
+ * This module provides a 2-tier abstraction for responding to Discord interactions:
+ *
+ * 1. **High-Level Context (`handleInteraction` + `InteractionContext`):**
+ *    Preferred for all command and subcommand handlers. It wraps the execution inside a
+ *    safe timeout race, manages interaction deferrals (`deferReply`), handles automatic error
+ *    reporting if the handler fails, and provides an ergonomic `ctx` object with intent-based
+ *    helpers (`ctx.reply()`, `ctx.editReply()`, `ctx.sendPublic()`).
+ *
+ * 2. **Low-Level State Dispatch (`replyOrEdit`):**
+ *    A stateless utility that dynamically branches between `interaction.reply()` and
+ *    `interaction.editReply()` based on the interaction's current state (`.replied` / `.deferred`).
+ *    Used internally by `ctx.reply()` and externally in standalone contexts (e.g. event listeners,
+ *    confirmation prompts, preflight permission guards).
+ */
+
 import type {
 	CommandInteraction,
 	InteractionEditReplyOptions,
@@ -10,19 +29,52 @@ import { MessageFlags } from 'discord.js';
 import { logger } from '@/lib/logger.js';
 
 /**
- * Options for handleInteraction function
+ * Configuration options for the `handleInteraction` lifecycle wrapper.
  */
 export interface InteractionHandlerOptions {
+	/**
+	 * Whether to automatically defer the reply before executing the handler.
+	 * Recommended for long-running operations or commands with interactive prompts.
+	 * @default false
+	 */
 	deferReply?: boolean;
+
+	/**
+	 * Whether the interaction response should only be visible to the user who invoked it.
+	 * Automatically applied to `deferReply` if deferred, or to the initial `ctx.reply()` if not.
+	 * @default false
+	 */
 	ephemeral?: boolean;
+
+	/**
+	 * Maximum time in milliseconds to wait for `deferReply()` before timing out.
+	 * Discord requires an initial acknowledgement within 3000ms.
+	 * @default 2500
+	 */
 	deferTimeoutMs?: number;
+
+	/**
+	 * Maximum time in milliseconds to allow the handler to execute before timing out.
+	 * @default 15000 (15 seconds)
+	 */
 	handlerTimeoutMs?: number;
+
+	/**
+	 * Fallback user-facing error message sent if the handler throws an uncaught error or times out.
+	 * @default '❌ An error occurred while processing this command.'
+	 */
 	errorMessage?: string;
+
+	/**
+	 * Whether to automatically send an error message to the user when the handler throws or times out.
+	 * Set to `false` if the handler performs its own complete error reporting.
+	 * @default true
+	 */
 	notifyOnError?: boolean;
 }
 
 /**
- * Payload formats acceptable when sending replies or editing responses
+ * Valid payload formats acceptable when sending replies or editing responses.
  */
 export type ResponsePayload =
 	| string
@@ -31,36 +83,60 @@ export type ResponsePayload =
 	| MessagePayload;
 
 /**
- * Unified context passed to interaction handlers providing ergonomic response methods
- * and preserving interaction lifecycle metadata.
+ * Unified context passed into interaction handlers, providing intent-based response methods
+ * and encapsulating Discord's internal reply/deferral state machine.
  */
 export interface InteractionContext<
 	T extends RepliableInteraction | CommandInteraction =
 		| RepliableInteraction
 		| CommandInteraction,
 > {
-	/** The underlying Discord interaction instance */
+	/**
+	 * The raw Discord interaction instance.
+	 */
 	readonly interaction: T;
-	/** Whether the interaction has been deferred */
+
+	/**
+	 * Whether the interaction has been acknowledged via `deferReply()`.
+	 */
 	readonly isDeferred: boolean;
-	/** Whether ephemeral responses are configured for this interaction */
+
+	/**
+	 * Whether ephemeral responses were requested in `handleInteraction` options.
+	 */
 	readonly isEphemeral: boolean;
 
 	/**
-	 * Replies to or edits the interaction response appropriately based on its state.
-	 * Automatically applies the ephemeral setting if configured and not yet deferred.
+	 * Responds to the interaction with automatic state management.
+	 *
+	 * - **Fresh Interaction:** Calls `interaction.reply()`, automatically applying the configured
+	 *   `ephemeral` flag if set in `handleInteraction` options.
+	 * - **Deferred / Replied Interaction:** Calls `interaction.editReply()`.
+	 * - **Idempotent Updates:** Can be called repeatedly within a handler to update a progress message
+	 *   (e.g., `await ctx.reply('⏳ Working...')` followed by `await ctx.reply('✅ Done!')`).
+	 *
+	 * @param content The response message content, embeds, or options to send.
+	 * @returns Promise resolving to the sent or edited Discord `Message`.
 	 */
 	reply: (content: ResponsePayload) => Promise<Message>;
 
 	/**
 	 * Directly edits the original interaction response.
+	 * Useful when explicitly modifying components (e.g. disabling buttons) or clearing embeds.
+	 *
+	 * @param content The updated content or options.
+	 * @returns Promise resolving to the edited Discord `Message`.
 	 */
 	editReply: (
 		content: InteractionEditReplyOptions | MessagePayload | string,
 	) => Promise<Message>;
 
 	/**
-	 * Sends a public message to the channel where the interaction occurred.
+	 * Sends a public announcement to the text channel where the interaction occurred.
+	 * Fails gracefully without throwing errors if the channel lacks permissions or is non-text.
+	 *
+	 * @param options Content or message options to send to the channel.
+	 * @returns Promise resolving to the sent Message or null if failed/unsupported.
 	 */
 	sendPublic: (
 		options: string | MessagePayload | InteractionReplyOptions,
@@ -68,7 +144,7 @@ export interface InteractionContext<
 }
 
 /**
- * Handler callback receiving a unified interaction context
+ * Async handler callback receiving a unified `InteractionContext`.
  */
 export type InteractionHandler<
 	T extends RepliableInteraction | CommandInteraction =
@@ -77,9 +153,9 @@ export type InteractionHandler<
 > = (ctx: InteractionContext<T>) => Promise<void>;
 
 /**
- * Safely extract error code from an Error object
- * @param error The error to extract code from
- * @returns The error code if present, otherwise undefined
+ * Safely extracts an error code from an Error object if present.
+ * @param error The error to extract code from.
+ * @returns The error code if present, otherwise undefined.
  */
 function getErrorCode(error: Error): string | number | undefined {
 	return 'code' in error
@@ -88,13 +164,13 @@ function getErrorCode(error: Error): string | number | undefined {
 }
 
 /**
- * Handles Discord interactions with built-in deferral, timeout protection, error handling,
- * and passes a unified InteractionContext to the handler.
+ * Orchestrates interaction execution with built-in lifecycle management, deferrals,
+ * timeout races, uncaught error containment, and automatic failure notification.
  *
- * @param interaction The Discord interaction to handle
- * @param handler Async function that handles the interaction
- * @param options Options for handling the interaction
- * @returns boolean indicating success
+ * @param interaction The Discord interaction to handle.
+ * @param handler Async function receiving a unified `InteractionContext`.
+ * @param options Lifecycle, timeout, and notification options.
+ * @returns Promise resolving to `true` on successful completion, or `false` if an error/timeout occurred.
  */
 export async function handleInteraction<
 	T extends RepliableInteraction | CommandInteraction =
@@ -251,10 +327,18 @@ export async function handleInteraction<
 }
 
 /**
- * Replies to an interaction appropriately based on its state (deferred or replied)
- * @param interaction The Discord interaction
- * @param content Content to send
- * @returns Promise resolving to the message or interaction response
+ * Low-level polymorphic dispatch utility for sending interaction replies.
+ *
+ * Automatically inspects `interaction.replied` and `interaction.deferred`:
+ * - If already replied or deferred: executes `interaction.editReply(...)`.
+ * - If untouched: executes `interaction.reply({ ..., withResponse: true })`.
+ *
+ * Use this helper in standalone contexts outside `handleInteraction` (e.g. event listeners,
+ * confirmation collectors, or preflight permission guards).
+ *
+ * @param interaction The Discord interaction to respond to.
+ * @param content The response content, embeds, or options.
+ * @returns Promise resolving to the sent or edited Discord `Message`.
  */
 export function replyOrEdit(
 	interaction: RepliableInteraction | CommandInteraction,
@@ -278,9 +362,9 @@ export function replyOrEdit(
  * Sends a public message to the text channel where the interaction occurred.
  * Fails gracefully without throwing errors if the channel doesn't support sending messages or lacks permissions.
  *
- * @param interaction The Discord interaction
- * @param options Content or message options to send
- * @returns Promise resolving to the sent Message or null if failed/unsupported
+ * @param interaction The Discord interaction.
+ * @param options Content or message options to send.
+ * @returns Promise resolving to the sent Message or null if failed/unsupported.
  */
 export async function sendPublicAnnouncement(
 	interaction: RepliableInteraction | CommandInteraction,
