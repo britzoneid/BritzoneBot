@@ -173,6 +173,147 @@ function getErrorCode(error: Error): string | number | undefined {
 }
 
 /**
+ * Executes an async task with timeout protection, guaranteeing that the timer is cleared.
+ */
+async function executeWithTimeout<T>(
+	task: () => Promise<T>,
+	timeoutMs: number,
+	timeoutErrorMessage: string,
+): Promise<T> {
+	let timeoutId: ReturnType<typeof setTimeout> | undefined;
+	try {
+		const timeoutPromise = new Promise<never>((_, reject) => {
+			timeoutId = setTimeout(
+				() => reject(new Error(timeoutErrorMessage)),
+				timeoutMs,
+			);
+		});
+
+		return await Promise.race([task(), timeoutPromise]);
+	} finally {
+		if (timeoutId) clearTimeout(timeoutId);
+	}
+}
+
+/**
+ * Safely defers an interaction with timeout protection and network error containment.
+ */
+async function safeDeferReply(
+	interaction: RepliableInteraction | CommandInteraction,
+	ephemeral: boolean,
+	timeoutMs: number,
+): Promise<boolean> {
+	try {
+		await executeWithTimeout(
+			() =>
+				interaction.deferReply(
+					ephemeral ? { flags: MessageFlags.Ephemeral } : undefined,
+				),
+			timeoutMs,
+			'Defer reply timeout',
+		);
+		logger.debug(
+			{ interactionId: interaction.id },
+			'🔄 Successfully deferred interaction',
+		);
+		return true;
+	} catch (deferError) {
+		const error =
+			deferError instanceof Error ? deferError : new Error(String(deferError));
+		const errorCode = getErrorCode(error);
+
+		if (errorCode === 10062) {
+			logger.warn(
+				{ interactionId: interaction.id },
+				'⏱️ Interaction expired before deferring',
+			);
+			return false;
+		}
+
+		if (errorCode === 'EAI_AGAIN' || error.message === 'Defer reply timeout') {
+			logger.warn(
+				{ interactionId: interaction.id, err: error },
+				'🌐 Network issue while deferring interaction',
+			);
+			return false;
+		}
+
+		logger.error(
+			{ interactionId: interaction.id, err: error },
+			'❓ Unknown error while deferring interaction',
+		);
+		return false;
+	}
+}
+
+/**
+ * Creates the unified `InteractionContext` instance passed to interaction handlers.
+ */
+function createInteractionContext<
+	T extends RepliableInteraction | CommandInteraction,
+>(interaction: T, ephemeral: boolean): InteractionContext<T> {
+	return {
+		interaction,
+		get isDeferred() {
+			return interaction.deferred;
+		},
+		isEphemeral: ephemeral,
+		reply: (content: ResponsePayload) => {
+			if (!interaction.replied && !interaction.deferred && ephemeral) {
+				const payload: ExtendedInteractionReplyOptions =
+					typeof content === 'string'
+						? { content, ephemeral: true }
+						: {
+								ephemeral: true,
+								...(content as ExtendedInteractionReplyOptions),
+							};
+				return replyOrEdit(interaction, payload);
+			}
+			return replyOrEdit(interaction, content);
+		},
+		editReply: (content) => {
+			return interaction.editReply(
+				content as InteractionEditReplyOptions,
+			) as Promise<Message>;
+		},
+		sendPublic: (content) => {
+			return sendPublicAnnouncement(interaction, content);
+		},
+	};
+}
+
+/**
+ * Handles execution failure by logging structured errors and notifying the user if enabled.
+ */
+async function handleExecutionFailure(
+	interaction: RepliableInteraction | CommandInteraction,
+	error: unknown,
+	errorMessage: string,
+	ephemeral: boolean,
+	notifyOnError: boolean,
+): Promise<void> {
+	const err = error instanceof Error ? error : new Error(String(error));
+	logger.error(
+		{ interactionId: interaction.id, err },
+		'❌ Handler error for interaction',
+	);
+
+	if (notifyOnError) {
+		try {
+			await replyOrEdit(interaction, {
+				content: errorMessage,
+				ephemeral: ephemeral ? true : undefined,
+			});
+		} catch (notifyErr) {
+			logger.warn(
+				{ interactionId: interaction.id, err: notifyErr },
+				'⚠️ Failed to send error notification to interaction',
+			);
+		}
+	}
+}
+
+/**
  * Orchestrates interaction execution with built-in lifecycle management, deferrals,
  * timeout races, uncaught error containment, and automatic failure notification.
  *
@@ -200,136 +341,32 @@ export async function handleInteraction<
 	} = options;
 
 	try {
-		// If deferReply is true, try to defer the reply first
+		// 1. Defer interaction if requested and not yet acknowledged
 		if (deferReply && !interaction.replied && !interaction.deferred) {
-			let deferTimeoutId: ReturnType<typeof setTimeout> | undefined;
-			try {
-				const deferPromise = interaction.deferReply(
-					ephemeral ? { flags: MessageFlags.Ephemeral } : undefined,
-				);
-				const timeoutPromise = new Promise<never>((_, reject) => {
-					deferTimeoutId = setTimeout(
-						() => reject(new Error('Defer reply timeout')),
-						deferTimeoutMs,
-					);
-				});
-
-				await Promise.race([deferPromise, timeoutPromise]);
-				logger.debug(
-					{ interactionId: interaction.id },
-					'🔄 Successfully deferred interaction',
-				);
-			} catch (deferError) {
-				const error =
-					deferError instanceof Error
-						? deferError
-						: new Error(String(deferError));
-				const errorCode = getErrorCode(error);
-
-				if (errorCode === 10062) {
-					logger.warn(
-						{ interactionId: interaction.id },
-						'⏱️ Interaction expired before deferring',
-					);
-					return false;
-				}
-
-				if (
-					errorCode === 'EAI_AGAIN' ||
-					error.message === 'Defer reply timeout'
-				) {
-					logger.warn(
-						{ interactionId: interaction.id, err: error },
-						'🌐 Network issue while deferring interaction',
-					);
-					return false;
-				}
-
-				logger.error(
-					{ interactionId: interaction.id, err: error },
-					'❓ Unknown error while deferring interaction',
-				);
-				return false;
-			} finally {
-				if (deferTimeoutId) clearTimeout(deferTimeoutId);
-			}
-		}
-
-		// Create the unified context for the handler
-		const ctx: InteractionContext<T> = {
-			interaction,
-			get isDeferred() {
-				return interaction.deferred;
-			},
-			isEphemeral: ephemeral,
-			reply: (content: ResponsePayload) => {
-				if (!interaction.replied && !interaction.deferred && ephemeral) {
-					const payload: InteractionReplyOptions =
-						typeof content === 'string'
-							? { content, flags: MessageFlags.Ephemeral }
-							: {
-									flags: MessageFlags.Ephemeral,
-									...(content as InteractionReplyOptions),
-								};
-					return replyOrEdit(interaction, payload);
-				}
-				return replyOrEdit(interaction, content);
-			},
-			editReply: (content) => {
-				return interaction.editReply(
-					content as InteractionEditReplyOptions,
-				) as Promise<Message>;
-			},
-			sendPublic: (content) => {
-				return sendPublicAnnouncement(interaction, content);
-			},
-		};
-
-		// Execute the handler function with timeout protection
-		let handlerTimeoutId: ReturnType<typeof setTimeout> | undefined;
-		try {
-			const handlerPromise = handler(ctx);
-			const timeoutPromise = new Promise<never>((_, reject) => {
-				handlerTimeoutId = setTimeout(
-					() => reject(new Error('Handler execution timeout')),
-					handlerTimeoutMs,
-				);
-			});
-
-			await Promise.race([handlerPromise, timeoutPromise]);
-			return true;
-		} catch (handlerError) {
-			const error =
-				handlerError instanceof Error
-					? handlerError
-					: new Error(String(handlerError));
-			logger.error(
-				{ interactionId: interaction.id, err: error },
-				'❌ Handler error for interaction',
+			const deferred = await safeDeferReply(
+				interaction,
+				ephemeral,
+				deferTimeoutMs,
 			);
-
-			if (notifyOnError) {
-				try {
-					await replyOrEdit(interaction, {
-						content: errorMessage,
-						flags: ephemeral ? MessageFlags.Ephemeral : undefined,
-					});
-				} catch (notifyErr) {
-					logger.warn(
-						{ interactionId: interaction.id, err: notifyErr },
-						'⚠️ Failed to send error notification to interaction',
-					);
-				}
-			}
-
-			return false;
-		} finally {
-			if (handlerTimeoutId) clearTimeout(handlerTimeoutId);
+			if (!deferred) return false;
 		}
+
+		// 2. Build context and execute handler with timeout protection
+		const ctx = createInteractionContext(interaction, ephemeral);
+		await executeWithTimeout(
+			() => handler(ctx),
+			handlerTimeoutMs,
+			'Handler execution timeout',
+		);
+		return true;
 	} catch (error) {
-		logger.error(
-			{ interactionId: interaction.id, err: error },
-			'❌ Unexpected error in handleInteraction',
+		// 3. Contain failure, log, and send fallback notification if enabled
+		await handleExecutionFailure(
+			interaction,
+			error,
+			errorMessage,
+			ephemeral,
+			notifyOnError,
 		);
 		return false;
 	}
@@ -367,12 +404,13 @@ export function replyOrEdit(
 	}
 
 	const rawOptions = content as ExtendedInteractionReplyOptions;
+	const { ephemeral: isEphemeral, ...cleanOptions } = rawOptions;
 	const options: InteractionReplyOptions = {
-		...rawOptions,
+		...cleanOptions,
 		withResponse: true,
 	};
 
-	if (rawOptions.ephemeral && !options.flags) {
+	if (isEphemeral && !options.flags) {
 		options.flags = MessageFlags.Ephemeral;
 	}
 

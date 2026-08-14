@@ -215,7 +215,6 @@ describe('Discord Response Utilities (response.ts)', () => {
 
 			expect(replyMock).toHaveBeenCalledWith({
 				content: 'Private message',
-				ephemeral: true,
 				flags: MessageFlags.Ephemeral,
 				withResponse: true,
 			});
