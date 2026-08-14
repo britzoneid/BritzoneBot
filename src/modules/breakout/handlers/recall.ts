@@ -5,11 +5,7 @@ import {
 	type VoiceBasedChannel,
 } from 'discord.js';
 import { preflightBreakout } from '@/lib/discord/permission.js';
-import {
-	handleInteraction,
-	replyOrEdit,
-	sendPublicAnnouncement,
-} from '@/lib/discord/response.js';
+import { handleInteraction, replyOrEdit } from '@/lib/discord/response.js';
 import { logger } from '@/lib/logger.js';
 import { executeRecall } from '@/modules/breakout/operations/recall.js';
 import { getMainRoom } from '@/modules/breakout/state/state.js';
@@ -67,19 +63,16 @@ export async function handleRecallCommand(
 
 	await handleInteraction(
 		interaction,
-		async () => {
+		async (ctx) => {
 			const result = await executeRecall(interaction, targetMainChannel);
 
 			if (result.success) {
-				await replyOrEdit(interaction, result.message);
-				await sendPublicAnnouncement(interaction, {
+				await ctx.reply(result.message);
+				await ctx.sendPublic({
 					content: `📢 ${result.message}`,
 				});
 			} else {
-				await replyOrEdit(
-					interaction,
-					result.message || 'Failed to recall breakout members.',
-				);
+				await ctx.reply(result.message || 'Failed to recall breakout members.');
 			}
 		},
 		{ deferReply: true, ephemeral: true },

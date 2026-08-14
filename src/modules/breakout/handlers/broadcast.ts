@@ -42,7 +42,7 @@ export async function handleBroadcastCommand(
 
 	await handleInteraction(
 		interaction,
-		async () => {
+		async (ctx) => {
 			const result = await broadcastToBreakoutRooms(guild, message);
 
 			if (result.success) {
@@ -64,9 +64,9 @@ export async function handleBroadcastCommand(
 					});
 				}
 
-				await replyOrEdit(interaction, { embeds: [embed] });
+				await ctx.reply({ embeds: [embed] });
 			} else {
-				await replyOrEdit(interaction, result.message);
+				await ctx.reply(result.message);
 			}
 		},
 		{ deferReply: true },

@@ -5,11 +5,7 @@ import {
 } from 'discord.js';
 import { confirmAction } from '@/lib/discord/confirm.js';
 import { preflightBreakout } from '@/lib/discord/permission.js';
-import {
-	handleInteraction,
-	replyOrEdit,
-	sendPublicAnnouncement,
-} from '@/lib/discord/response.js';
+import { handleInteraction, replyOrEdit } from '@/lib/discord/response.js';
 import { logger } from '@/lib/logger.js';
 import { executeCreate } from '@/modules/breakout/operations/create.js';
 import { hasExistingBreakoutRooms } from '@/modules/breakout/services/room.js';
@@ -68,7 +64,7 @@ export async function handleCreateCommand(
 	if (totalMembers > 0 && !mainRoom) {
 		await handleInteraction(
 			interaction,
-			async () => {
+			async (ctx) => {
 				await confirmAction({
 					interaction,
 					content: `⚠️ ${totalMembers} member(s) are still in existing breakout rooms and no main room is configured. Creating new rooms will disconnect them from voice.`,
@@ -77,15 +73,15 @@ export async function handleCreateCommand(
 					onConfirm: async () => {
 						const result = await executeCreate(interaction, numRooms);
 						if (result.success) {
-							await interaction.editReply({
+							await ctx.editReply({
 								content: result.message,
 								components: [],
 							});
-							await sendPublicAnnouncement(interaction, {
+							await ctx.sendPublic({
 								content: `🛠️ ${result.message}`,
 							});
 						} else {
-							await interaction.editReply({
+							await ctx.editReply({
 								content: result.message || 'Failed to create breakout rooms.',
 								components: [],
 							});
@@ -100,17 +96,17 @@ export async function handleCreateCommand(
 
 	await handleInteraction(
 		interaction,
-		async () => {
+		async (ctx) => {
 			const result = await executeCreate(interaction, numRooms);
 
 			if (result.success) {
-				await replyOrEdit(interaction, result.message);
-				await sendPublicAnnouncement(interaction, {
+				await ctx.reply(result.message);
+				await ctx.sendPublic({
 					content: `🛠️ ${result.message}`,
 				});
 			} else {
 				log.error({ result }, '❌ Error creating breakout rooms');
-				await replyOrEdit(interaction, result.message);
+				await ctx.reply(result.message);
 			}
 		},
 		{ deferReply: true, ephemeral: true },

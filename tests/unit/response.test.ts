@@ -1,4 +1,8 @@
-import type { CommandInteraction, RepliableInteraction } from 'discord.js';
+import {
+	type CommandInteraction,
+	MessageFlags,
+	type RepliableInteraction,
+} from 'discord.js';
 import { describe, expect, it, vi } from 'vitest';
 import {
 	handleInteraction,
@@ -64,20 +68,78 @@ describe('Discord Response Utilities (response.ts)', () => {
 			expect(mockHandler).not.toHaveBeenCalled();
 		});
 
-		it('returns false when handler throws an uncaught error', async () => {
+		it('provides InteractionContext to the handler with working helper methods', async () => {
+			const replyMock = vi.fn().mockResolvedValue({ id: 'msg-1' });
 			const mockInteraction = {
 				id: 'int-1',
 				replied: false,
 				deferred: false,
+				reply: replyMock,
 			} as unknown as RepliableInteraction;
 
-			const mockHandler = vi
-				.fn()
-				.mockRejectedValue(new Error('Handler failed'));
+			let receivedCtx: unknown;
+			const success = await handleInteraction(
+				mockInteraction,
+				async (ctx) => {
+					receivedCtx = ctx;
+					await ctx.reply('Hello from context');
+				},
+				{ ephemeral: true },
+			);
 
-			const success = await handleInteraction(mockInteraction, mockHandler);
+			expect(success).toBe(true);
+			expect(receivedCtx).toBeDefined();
+			expect(replyMock).toHaveBeenCalledWith({
+				content: 'Hello from context',
+				flags: MessageFlags.Ephemeral,
+				withResponse: true,
+			});
+		});
+
+		it('notifies the user on handler error when notifyOnError is true', async () => {
+			const replyMock = vi.fn().mockResolvedValue({ id: 'msg-err' });
+			const mockInteraction = {
+				id: 'int-1',
+				replied: false,
+				deferred: false,
+				reply: replyMock,
+			} as unknown as RepliableInteraction;
+
+			const success = await handleInteraction(
+				mockInteraction,
+				async () => {
+					throw new Error('Something broke');
+				},
+				{ notifyOnError: true, errorMessage: 'Custom error message' },
+			);
 
 			expect(success).toBe(false);
+			expect(replyMock).toHaveBeenCalledWith({
+				content: 'Custom error message',
+				flags: undefined,
+				withResponse: true,
+			});
+		});
+
+		it('does not send notification on handler error when notifyOnError is false', async () => {
+			const replyMock = vi.fn();
+			const mockInteraction = {
+				id: 'int-1',
+				replied: false,
+				deferred: false,
+				reply: replyMock,
+			} as unknown as RepliableInteraction;
+
+			const success = await handleInteraction(
+				mockInteraction,
+				async () => {
+					throw new Error('Silent failure');
+				},
+				{ notifyOnError: false },
+			);
+
+			expect(success).toBe(false);
+			expect(replyMock).not.toHaveBeenCalled();
 		});
 	});
 

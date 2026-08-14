@@ -12,12 +12,69 @@ import { logger } from '@/lib/logger.js';
 /**
  * Options for handleInteraction function
  */
-interface InteractionHandlerOptions {
+export interface InteractionHandlerOptions {
 	deferReply?: boolean;
 	ephemeral?: boolean;
 	deferTimeoutMs?: number;
 	handlerTimeoutMs?: number;
+	errorMessage?: string;
+	notifyOnError?: boolean;
 }
+
+/**
+ * Payload formats acceptable when sending replies or editing responses
+ */
+export type ResponsePayload =
+	| string
+	| InteractionReplyOptions
+	| InteractionEditReplyOptions
+	| MessagePayload;
+
+/**
+ * Unified context passed to interaction handlers providing ergonomic response methods
+ * and preserving interaction lifecycle metadata.
+ */
+export interface InteractionContext<
+	T extends RepliableInteraction | CommandInteraction =
+		| RepliableInteraction
+		| CommandInteraction,
+> {
+	/** The underlying Discord interaction instance */
+	readonly interaction: T;
+	/** Whether the interaction has been deferred */
+	readonly isDeferred: boolean;
+	/** Whether ephemeral responses are configured for this interaction */
+	readonly isEphemeral: boolean;
+
+	/**
+	 * Replies to or edits the interaction response appropriately based on its state.
+	 * Automatically applies the ephemeral setting if configured and not yet deferred.
+	 */
+	reply: (content: ResponsePayload) => Promise<Message>;
+
+	/**
+	 * Directly edits the original interaction response.
+	 */
+	editReply: (
+		content: InteractionEditReplyOptions | MessagePayload | string,
+	) => Promise<Message>;
+
+	/**
+	 * Sends a public message to the channel where the interaction occurred.
+	 */
+	sendPublic: (
+		options: string | MessagePayload | InteractionReplyOptions,
+	) => Promise<Message | null>;
+}
+
+/**
+ * Handler callback receiving a unified interaction context
+ */
+export type InteractionHandler<
+	T extends RepliableInteraction | CommandInteraction =
+		| RepliableInteraction
+		| CommandInteraction,
+> = (ctx: InteractionContext<T>) => Promise<void>;
 
 /**
  * Safely extract error code from an Error object
@@ -31,18 +88,21 @@ function getErrorCode(error: Error): string | number | undefined {
 }
 
 /**
- * Handles Discord interactions with built-in error handling for expired interactions
- *
- * Wraps interaction handlers with deferReply support, timeout protection, and error handling.
+ * Handles Discord interactions with built-in deferral, timeout protection, error handling,
+ * and passes a unified InteractionContext to the handler.
  *
  * @param interaction The Discord interaction to handle
  * @param handler Async function that handles the interaction
  * @param options Options for handling the interaction
  * @returns boolean indicating success
  */
-export async function handleInteraction(
-	interaction: RepliableInteraction | CommandInteraction,
-	handler: () => Promise<void>,
+export async function handleInteraction<
+	T extends RepliableInteraction | CommandInteraction =
+		| RepliableInteraction
+		| CommandInteraction,
+>(
+	interaction: T,
+	handler: InteractionHandler<T>,
 	options: InteractionHandlerOptions = {},
 ): Promise<boolean> {
 	const {
@@ -50,6 +110,8 @@ export async function handleInteraction(
 		ephemeral = false,
 		deferTimeoutMs = 2500,
 		handlerTimeoutMs = 15000,
+		errorMessage = '❌ An error occurred while processing this command.',
+		notifyOnError = true,
 	} = options;
 
 	try {
@@ -108,10 +170,40 @@ export async function handleInteraction(
 			}
 		}
 
+		// Create the unified context for the handler
+		const ctx: InteractionContext<T> = {
+			interaction,
+			get isDeferred() {
+				return interaction.deferred;
+			},
+			isEphemeral: ephemeral,
+			reply: (content: ResponsePayload) => {
+				if (!interaction.replied && !interaction.deferred && ephemeral) {
+					const payload: InteractionReplyOptions =
+						typeof content === 'string'
+							? { content, flags: MessageFlags.Ephemeral }
+							: {
+									flags: MessageFlags.Ephemeral,
+									...(content as InteractionReplyOptions),
+								};
+					return replyOrEdit(interaction, payload);
+				}
+				return replyOrEdit(interaction, content);
+			},
+			editReply: (content) => {
+				return interaction.editReply(
+					content as InteractionEditReplyOptions,
+				) as Promise<Message>;
+			},
+			sendPublic: (content) => {
+				return sendPublicAnnouncement(interaction, content);
+			},
+		};
+
 		// Execute the handler function with timeout protection
 		let handlerTimeoutId: ReturnType<typeof setTimeout> | undefined;
 		try {
-			const handlerPromise = handler();
+			const handlerPromise = handler(ctx);
 			const timeoutPromise = new Promise<never>((_, reject) => {
 				handlerTimeoutId = setTimeout(
 					() => reject(new Error('Handler execution timeout')),
@@ -130,6 +222,21 @@ export async function handleInteraction(
 				{ interactionId: interaction.id, err: error },
 				'❌ Handler error for interaction',
 			);
+
+			if (notifyOnError) {
+				try {
+					await replyOrEdit(interaction, {
+						content: errorMessage,
+						flags: ephemeral ? MessageFlags.Ephemeral : undefined,
+					});
+				} catch (notifyErr) {
+					logger.warn(
+						{ interactionId: interaction.id, err: notifyErr },
+						'⚠️ Failed to send error notification to interaction',
+					);
+				}
+			}
+
 			return false;
 		} finally {
 			if (handlerTimeoutId) clearTimeout(handlerTimeoutId);
@@ -151,14 +258,12 @@ export async function handleInteraction(
  */
 export function replyOrEdit(
 	interaction: RepliableInteraction | CommandInteraction,
-	content:
-		| string
-		| InteractionReplyOptions
-		| InteractionEditReplyOptions
-		| MessagePayload,
+	content: ResponsePayload,
 ): Promise<Message> {
 	if (interaction.replied || interaction.deferred) {
-		return interaction.editReply(content as InteractionEditReplyOptions);
+		return interaction.editReply(
+			content as InteractionEditReplyOptions,
+		) as Promise<Message>;
 	}
 
 	const options: InteractionReplyOptions =

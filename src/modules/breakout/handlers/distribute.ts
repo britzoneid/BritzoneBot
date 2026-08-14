@@ -10,11 +10,7 @@ import {
 	type VoiceChannel,
 } from 'discord.js';
 import { preflightBreakout } from '@/lib/discord/permission.js';
-import {
-	handleInteraction,
-	replyOrEdit,
-	sendPublicAnnouncement,
-} from '@/lib/discord/response.js';
+import { handleInteraction, replyOrEdit } from '@/lib/discord/response.js';
 import { logger } from '@/lib/logger.js';
 import { executeDistribute } from '@/modules/breakout/operations/distribute.js';
 import { getRooms } from '@/modules/breakout/state/state.js';
@@ -129,7 +125,7 @@ export async function handleDistributeCommand(
 
 	await handleInteraction(
 		interaction,
-		async () => {
+		async (ctx) => {
 			const facilitatorMembers: import('discord.js').GuildMember[] = [];
 			const regularMembers: import('discord.js').GuildMember[] = [];
 
@@ -184,7 +180,7 @@ export async function handleDistributeCommand(
 			);
 
 			log.info('📤 Sending preview with confirmation buttons');
-			const response = await replyOrEdit(interaction, {
+			const response = await ctx.reply({
 				embeds: [previewEmbed],
 				components: [row],
 			});
@@ -247,7 +243,7 @@ export async function handleDistributeCommand(
 								) {
 									lastReportedCompleted = progressState.completed;
 									try {
-										await interaction.editReply({
+										await ctx.editReply({
 											content: `⏳ Distributing users to breakout rooms... (${progressState.completed}/${progressState.total} member${progressState.total === 1 ? '' : 's'} moved)`,
 											embeds: [previewEmbed],
 											components: [],
@@ -277,7 +273,7 @@ export async function handleDistributeCommand(
 							}
 
 							if (!result.success) {
-								await interaction.editReply({
+								await ctx.editReply({
 									content: `❌ ${result.message}`,
 									embeds: [],
 									components: [],
@@ -298,12 +294,12 @@ export async function handleDistributeCommand(
 							});
 
 							log.info('📤 Distribution completed successfully');
-							await interaction.editReply({
-								content: null,
+							await ctx.editReply({
+								content: null as unknown as string,
 								embeds: [finalEmbed],
 								components: [],
 							});
-							await sendPublicAnnouncement(interaction, {
+							await ctx.sendPublic({
 								embeds: [finalEmbed],
 							});
 							resolve();
@@ -326,7 +322,7 @@ export async function handleDistributeCommand(
 								cancelButton.setDisabled(true),
 							);
 						try {
-							await interaction.editReply({
+							await ctx.editReply({
 								content: '⏱️ Distribution request timed out.',
 								embeds: [previewEmbed],
 								components: [disabledRow],

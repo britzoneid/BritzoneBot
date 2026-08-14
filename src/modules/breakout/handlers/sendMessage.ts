@@ -46,12 +46,11 @@ export async function handleSendMessageCommand(
 
 	await handleInteraction(
 		interaction,
-		async () => {
+		async (ctx) => {
 			const result = await sendMessageToChannel(channel, message);
 
-			await replyOrEdit(interaction, {
+			await ctx.reply({
 				content: result.message,
-				flags: !result.success ? MessageFlags.Ephemeral : undefined,
 			});
 		},
 		{ deferReply: true, ephemeral: true },

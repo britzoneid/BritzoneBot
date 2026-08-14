@@ -5,7 +5,6 @@ import type {
 import { MessageFlags } from 'discord.js';
 import { describe, expect, it, vi } from 'vitest';
 import helpCommand, { HELP_GUIDE_TEXT } from '@/commands/utility/help.js';
-import * as responseModule from '@/lib/discord/response.js';
 import type { SlashCommand } from '@/types/index.js';
 
 describe('Help Command (/help)', () => {
@@ -27,25 +26,21 @@ describe('Help Command (/help)', () => {
 	});
 
 	it('sends an ephemeral reply with the help guide text upon execution', async () => {
-		const replyOrEditSpy = vi
-			.spyOn(responseModule, 'replyOrEdit')
-			.mockResolvedValue({} as never);
-
+		const replyMock = vi.fn().mockResolvedValue({});
 		const mockInteraction = {
 			id: 'interaction-help-1',
 			replied: false,
 			deferred: false,
-			reply: vi.fn().mockResolvedValue({}),
+			reply: replyMock,
 		} as unknown as CommandInteraction;
 
 		const slashCmd = helpCommand as SlashCommand;
 		await slashCmd.execute(mockInteraction);
 
-		expect(replyOrEditSpy).toHaveBeenCalledWith(mockInteraction, {
+		expect(replyMock).toHaveBeenCalledWith({
 			content: HELP_GUIDE_TEXT,
 			flags: MessageFlags.Ephemeral,
+			withResponse: true,
 		});
-
-		replyOrEditSpy.mockRestore();
 	});
 });

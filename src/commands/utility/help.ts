@@ -1,9 +1,5 @@
-import {
-	type CommandInteraction,
-	MessageFlags,
-	SlashCommandBuilder,
-} from 'discord.js';
-import { handleInteraction, replyOrEdit } from '@/lib/discord/response.js';
+import { type CommandInteraction, SlashCommandBuilder } from 'discord.js';
+import { handleInteraction } from '@/lib/discord/response.js';
 import type { Command } from '@/types/index.js';
 
 export const HELP_GUIDE_TEXT = `### 🤖 Discord Bot — Quick Guide for Bot Manager
@@ -71,11 +67,8 @@ const command: Command = {
 	async execute(interaction: CommandInteraction): Promise<void> {
 		await handleInteraction(
 			interaction,
-			async () => {
-				await replyOrEdit(interaction, {
-					content: HELP_GUIDE_TEXT,
-					flags: MessageFlags.Ephemeral,
-				});
+			async (ctx) => {
+				await ctx.reply(HELP_GUIDE_TEXT);
 			},
 			{ ephemeral: true },
 		);

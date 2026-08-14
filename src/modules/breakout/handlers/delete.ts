@@ -5,11 +5,7 @@ import {
 } from 'discord.js';
 import { confirmAction } from '@/lib/discord/confirm.js';
 import { preflightBreakout } from '@/lib/discord/permission.js';
-import {
-	handleInteraction,
-	replyOrEdit,
-	sendPublicAnnouncement,
-} from '@/lib/discord/response.js';
+import { handleInteraction, replyOrEdit } from '@/lib/discord/response.js';
 import { logger } from '@/lib/logger.js';
 import { executeDelete } from '@/modules/breakout/operations/delete.js';
 import { getMainRoom, getRooms } from '@/modules/breakout/state/state.js';
@@ -63,7 +59,7 @@ export async function handleDeleteCommand(
 	if (totalMembers > 0 && !mainRoom) {
 		await handleInteraction(
 			interaction,
-			async () => {
+			async (ctx) => {
 				await confirmAction({
 					interaction,
 					content: `⚠️ ${totalMembers} member(s) are still in breakout rooms and no main room is configured. Deleting will disconnect them from voice.`,
@@ -72,15 +68,15 @@ export async function handleDeleteCommand(
 					onConfirm: async () => {
 						const result = await executeDelete(interaction);
 						if (result.success) {
-							await interaction.editReply({
+							await ctx.editReply({
 								content: result.message,
 								components: [],
 							});
-							await sendPublicAnnouncement(interaction, {
+							await ctx.sendPublic({
 								content: `🗑️ ${result.message}`,
 							});
 						} else {
-							await interaction.editReply({
+							await ctx.editReply({
 								content: result.message || 'Failed to delete breakout rooms.',
 								components: [],
 							});
@@ -95,19 +91,16 @@ export async function handleDeleteCommand(
 
 	await handleInteraction(
 		interaction,
-		async () => {
+		async (ctx) => {
 			const result = await executeDelete(interaction);
 
 			if (result.success) {
-				await replyOrEdit(interaction, result.message);
-				await sendPublicAnnouncement(interaction, {
+				await ctx.reply(result.message);
+				await ctx.sendPublic({
 					content: `🗑️ ${result.message}`,
 				});
 			} else {
-				await replyOrEdit(
-					interaction,
-					result.message || 'Failed to delete breakout rooms.',
-				);
+				await ctx.reply(result.message || 'Failed to delete breakout rooms.');
 			}
 		},
 		{ deferReply: true, ephemeral: true },
