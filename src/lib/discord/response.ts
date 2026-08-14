@@ -74,11 +74,20 @@ export interface InteractionHandlerOptions {
 }
 
 /**
+ * Options that extend Discord's InteractionReplyOptions to support a friendly `ephemeral` boolean directive.
+ */
+export interface ExtendedInteractionReplyOptions
+	extends Omit<InteractionReplyOptions, 'flags'> {
+	flags?: InteractionReplyOptions['flags'];
+	ephemeral?: boolean;
+}
+
+/**
  * Valid payload formats acceptable when sending replies or editing responses.
  */
 export type ResponsePayload =
 	| string
-	| InteractionReplyOptions
+	| ExtendedInteractionReplyOptions
 	| InteractionEditReplyOptions
 	| MessagePayload;
 
@@ -350,10 +359,22 @@ export function replyOrEdit(
 		) as Promise<Message>;
 	}
 
-	const options: InteractionReplyOptions =
-		typeof content === 'string'
-			? { content, withResponse: true }
-			: { ...(content as InteractionReplyOptions), withResponse: true };
+	if (typeof content === 'string') {
+		return interaction.reply({
+			content,
+			withResponse: true,
+		}) as unknown as Promise<Message>;
+	}
+
+	const rawOptions = content as ExtendedInteractionReplyOptions;
+	const options: InteractionReplyOptions = {
+		...rawOptions,
+		withResponse: true,
+	};
+
+	if (rawOptions.ephemeral && !options.flags) {
+		options.flags = MessageFlags.Ephemeral;
+	}
 
 	return interaction.reply(options) as unknown as Promise<Message>;
 }

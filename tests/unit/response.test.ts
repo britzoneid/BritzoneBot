@@ -199,6 +199,27 @@ describe('Discord Response Utilities (response.ts)', () => {
 			});
 			expect(editReplyMock).not.toHaveBeenCalled();
 		});
+
+		it('normalizes ephemeral: true to MessageFlags.Ephemeral when fresh', async () => {
+			const replyMock = vi.fn().mockResolvedValue({ id: 'msg-1' });
+			const mockInteraction = {
+				replied: false,
+				deferred: false,
+				reply: replyMock,
+			} as unknown as CommandInteraction;
+
+			await replyOrEdit(mockInteraction, {
+				content: 'Private message',
+				ephemeral: true,
+			});
+
+			expect(replyMock).toHaveBeenCalledWith({
+				content: 'Private message',
+				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
+				withResponse: true,
+			});
+		});
 	});
 
 	describe('sendPublicAnnouncement', () => {

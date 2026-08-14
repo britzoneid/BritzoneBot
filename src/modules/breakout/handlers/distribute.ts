@@ -5,7 +5,6 @@ import {
 	type ChatInputCommandInteraction,
 	ComponentType,
 	GuildMember,
-	MessageFlags,
 	type StageChannel,
 	type VoiceChannel,
 } from 'discord.js';
@@ -26,106 +25,107 @@ export async function handleDistributeCommand(
 ): Promise<void> {
 	if (!interaction.guildId || !interaction.guild) return;
 
-	const mainRoom = interaction.options.getChannel('mainroom', true) as
-		| VoiceChannel
-		| StageChannel;
-
-	if (!mainRoom?.isVoiceBased()) {
-		await replyOrEdit(interaction, {
-			content: 'Selected main room must be a voice or stage channel.',
-			flags: MessageFlags.Ephemeral,
-		});
-		return;
-	}
-
-	if (interaction.member instanceof GuildMember) {
-		const category = mainRoom.parent ?? undefined;
-		const check = preflightBreakout({
-			member: interaction.member,
-			voiceChannel: mainRoom,
-			category,
-			requireUserMove: true,
-		});
-
-		if (!check.ok) {
-			await replyOrEdit(interaction, {
-				content: check.reason ?? 'Permission check failed.',
-				flags: MessageFlags.Ephemeral,
-			});
-			return;
-		}
-	}
-
-	const excludeInput = interaction.options.getString('exclude');
-	const facilitatorsInput = interaction.options.getString('facilitators');
-
-	const log = logger.child({
-		subcommand: 'distribute',
-		guildId: interaction.guildId,
-		mainRoom: mainRoom.name,
-	});
-	log.info('🎯 Main room selected');
-
-	// Process excluded users if provided
-	const excludedUsers = new Set<string>();
-	if (excludeInput) {
-		const mentionPattern = /<@!?(\d+)>/g;
-		const matches = excludeInput.matchAll(mentionPattern);
-		for (const match of matches) {
-			excludedUsers.add(match[1]);
-		}
-		log.debug({ count: excludedUsers.size }, '🚫 Excluded users identified');
-	}
-
-	// Process facilitators if provided (exclude takes precedence)
-	const facilitators = new Set<string>();
-	if (facilitatorsInput) {
-		const mentionPattern = /<@!?(\d+)>/g;
-		const matches = facilitatorsInput.matchAll(mentionPattern);
-		for (const match of matches) {
-			if (!excludedUsers.has(match[1])) {
-				facilitators.add(match[1]);
-			}
-		}
-		log.debug({ count: facilitators.size }, '🗣️ Facilitators identified');
-	}
-
-	const breakoutRooms = getRooms(interaction.guild);
-
-	if (breakoutRooms.length === 0) {
-		log.warn('❌ Error: No breakout rooms found');
-		await replyOrEdit(
-			interaction,
-			'No breakout rooms found! Please create breakout rooms first with `/breakout create`.',
-		);
-		return;
-	}
-
-	// Gather all members from main room and existing breakout rooms
-	const allTargetMembers = new Map<string, import('discord.js').GuildMember>();
-	for (const [id, member] of mainRoom.members) {
-		allTargetMembers.set(id, member);
-	}
-	for (const room of breakoutRooms) {
-		if (room.members && room.members.size > 0) {
-			for (const [id, member] of room.members) {
-				allTargetMembers.set(id, member);
-			}
-		}
-	}
-
-	if (allTargetMembers.size === 0) {
-		log.warn(`⚠️ No users found in ${mainRoom.name} or breakout rooms`);
-		await replyOrEdit(
-			interaction,
-			`There are no users in ${mainRoom.name} or breakout rooms to distribute.`,
-		);
-		return;
-	}
-
 	await handleInteraction(
 		interaction,
 		async (ctx) => {
+			const mainRoom = interaction.options.getChannel('mainroom', true) as
+				| VoiceChannel
+				| StageChannel;
+
+			if (!mainRoom?.isVoiceBased()) {
+				await ctx.reply('Selected main room must be a voice or stage channel.');
+				return;
+			}
+
+			if (interaction.member instanceof GuildMember) {
+				const category = mainRoom.parent ?? undefined;
+				const check = preflightBreakout({
+					member: interaction.member,
+					voiceChannel: mainRoom,
+					category,
+					requireUserMove: true,
+				});
+
+				if (!check.ok) {
+					await ctx.reply(check.reason ?? 'Permission check failed.');
+					return;
+				}
+			}
+
+			const excludeInput = interaction.options.getString('exclude');
+			const facilitatorsInput = interaction.options.getString('facilitators');
+
+			const log = logger.child({
+				subcommand: 'distribute',
+				guildId: interaction.guildId,
+				mainRoom: mainRoom.name,
+			});
+			log.info('🎯 Main room selected');
+
+			// Process excluded users if provided
+			const excludedUsers = new Set<string>();
+			if (excludeInput) {
+				const mentionPattern = /<@!?(\d+)>/g;
+				const matches = excludeInput.matchAll(mentionPattern);
+				for (const match of matches) {
+					excludedUsers.add(match[1]);
+				}
+				log.debug(
+					{ count: excludedUsers.size },
+					'🚫 Excluded users identified',
+				);
+			}
+
+			// Process facilitators if provided (exclude takes precedence)
+			const facilitators = new Set<string>();
+			if (facilitatorsInput) {
+				const mentionPattern = /<@!?(\d+)>/g;
+				const matches = facilitatorsInput.matchAll(mentionPattern);
+				for (const match of matches) {
+					if (!excludedUsers.has(match[1])) {
+						facilitators.add(match[1]);
+					}
+				}
+				log.debug({ count: facilitators.size }, '🗣️ Facilitators identified');
+			}
+
+			const guild = interaction.guild;
+			if (!guild) return;
+
+			const breakoutRooms = getRooms(guild);
+
+			if (breakoutRooms.length === 0) {
+				log.warn('❌ Error: No breakout rooms found');
+				await ctx.reply(
+					'No breakout rooms found! Please create breakout rooms first with `/breakout create`.',
+				);
+				return;
+			}
+
+			// Gather all members from main room and existing breakout rooms
+			const allTargetMembers = new Map<
+				string,
+				import('discord.js').GuildMember
+			>();
+			for (const [id, member] of mainRoom.members) {
+				allTargetMembers.set(id, member);
+			}
+			for (const room of breakoutRooms) {
+				if (room.members && room.members.size > 0) {
+					for (const [id, member] of room.members) {
+						allTargetMembers.set(id, member);
+					}
+				}
+			}
+
+			if (allTargetMembers.size === 0) {
+				log.warn(`⚠️ No users found in ${mainRoom.name} or breakout rooms`);
+				await ctx.reply(
+					`There are no users in ${mainRoom.name} or breakout rooms to distribute.`,
+				);
+				return;
+			}
+
 			const facilitatorMembers: import('discord.js').GuildMember[] = [];
 			const regularMembers: import('discord.js').GuildMember[] = [];
 
@@ -195,10 +195,10 @@ export async function handleDistributeCommand(
 				collector.on('collect', async (i) => {
 					try {
 						if (i.user.id !== interaction.user.id) {
-							await i.reply({
+							await replyOrEdit(i, {
 								content:
 									'You are not authorized to interact with this distribution preview.',
-								flags: MessageFlags.Ephemeral,
+								ephemeral: true,
 							});
 							return;
 						}

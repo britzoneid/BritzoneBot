@@ -4,7 +4,6 @@ import {
 	ButtonStyle,
 	type ChatInputCommandInteraction,
 	ComponentType,
-	MessageFlags,
 } from 'discord.js';
 import { replyOrEdit } from '@/lib/discord/response.js';
 import { logger } from '@/lib/logger.js';
@@ -63,9 +62,9 @@ export async function confirmAction(
 		collector.on('collect', async (i) => {
 			try {
 				if (i.user.id !== interaction.user.id) {
-					await i.reply({
+					await replyOrEdit(i, {
 						content: 'You are not authorized to interact with this prompt.',
-						flags: MessageFlags.Ephemeral,
+						ephemeral: true,
 					});
 					return;
 				}

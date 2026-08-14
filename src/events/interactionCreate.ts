@@ -1,5 +1,5 @@
-import type { Interaction, InteractionReplyOptions } from 'discord.js';
-import { Events, MessageFlags } from 'discord.js';
+import type { Interaction } from 'discord.js';
+import { Events } from 'discord.js';
 import { replyOrEdit } from '@/lib/discord/response.js';
 import { logger } from '@/lib/logger.js';
 import type {
@@ -74,7 +74,7 @@ const event: Event<typeof Events.InteractionCreate> = {
 				);
 				await replyOrEdit(interaction, {
 					content: '❌ Command execution failed (missing execute handler).',
-					flags: MessageFlags.Ephemeral,
+					ephemeral: true,
 				});
 			}
 		} catch (error) {
@@ -84,9 +84,9 @@ const event: Event<typeof Events.InteractionCreate> = {
 			);
 
 			// Handle different interaction states (replied, deferred, or untouched)
-			const errorReply: InteractionReplyOptions = {
+			const errorReply = {
 				content: '❌ An error occurred while executing this command.',
-				flags: MessageFlags.Ephemeral,
+				ephemeral: true,
 			};
 
 			try {
