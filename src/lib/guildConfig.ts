@@ -50,8 +50,7 @@ export function getGuildConfigStatus(
 	guildId?: string,
 	configMap: GuildConfigMap = loadGuildConfig(),
 ): GuildConfigStatus {
-	const hasConfig = guildConfigExists() || Object.keys(configMap).length > 0;
-	if (!hasConfig) {
+	if (Object.keys(configMap).length === 0) {
 		return 'FILE_MISSING';
 	}
 
