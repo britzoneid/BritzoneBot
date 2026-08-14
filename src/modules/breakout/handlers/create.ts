@@ -1,15 +1,7 @@
-import {
-	type ChatInputCommandInteraction,
-	GuildMember,
-	MessageFlags,
-} from 'discord.js';
+import { type ChatInputCommandInteraction, GuildMember } from 'discord.js';
 import { confirmAction } from '@/lib/discord/confirm.js';
 import { preflightBreakout } from '@/lib/discord/permission.js';
-import {
-	handleInteraction,
-	replyOrEdit,
-	sendPublicAnnouncement,
-} from '@/lib/discord/response.js';
+import { handleInteraction } from '@/lib/discord/response.js';
 import { logger } from '@/lib/logger.js';
 import { executeCreate } from '@/modules/breakout/operations/create.js';
 import { hasExistingBreakoutRooms } from '@/modules/breakout/services/room.js';
@@ -23,52 +15,52 @@ export async function handleCreateCommand(
 ): Promise<void> {
 	if (!interaction.guildId || !interaction.guild) return;
 
-	if (interaction.member instanceof GuildMember) {
-		const category =
-			interaction.channel && 'parent' in interaction.channel
-				? interaction.channel.parent
-				: undefined;
-		const check = preflightBreakout({
-			member: interaction.member,
-			category: category ?? undefined,
-			requireManageChannels: true,
-		});
+	await handleInteraction(
+		interaction,
+		async (ctx) => {
+			if (interaction.member instanceof GuildMember) {
+				const category =
+					interaction.channel && 'parent' in interaction.channel
+						? interaction.channel.parent
+						: undefined;
+				const check = preflightBreakout({
+					member: interaction.member,
+					category: category ?? undefined,
+					requireManageChannels: true,
+				});
 
-		if (!check.ok) {
-			await replyOrEdit(interaction, {
-				content: check.reason ?? 'Permission check failed.',
-				flags: MessageFlags.Ephemeral,
-			});
-			return;
-		}
-	}
-
-	const numRooms = interaction.options.getInteger('number', true);
-	const log = logger.child({
-		subcommand: 'create',
-		guildId: interaction.guildId,
-		numRooms,
-	});
-
-	log.info('🔢 Creating breakout rooms');
-
-	const existing = await hasExistingBreakoutRooms(interaction.guild);
-	const mainRoom = getMainRoom(interaction.guild);
-
-	let totalMembers = 0;
-	if (existing.exists) {
-		for (const room of existing.rooms) {
-			if (room.members && room.members.size > 0) {
-				totalMembers += room.members.size;
+				if (!check.ok) {
+					await ctx.reply(check.reason ?? 'Permission check failed.');
+					return;
+				}
 			}
-		}
-	}
 
-	// Interactive confirmation if existing rooms have members and no main room is configured
-	if (totalMembers > 0 && !mainRoom) {
-		await handleInteraction(
-			interaction,
-			async () => {
+			const numRooms = interaction.options.getInteger('number', true);
+			const log = logger.child({
+				subcommand: 'create',
+				guildId: interaction.guildId,
+				numRooms,
+			});
+
+			log.info('🔢 Creating breakout rooms');
+
+			const guild = interaction.guild;
+			if (!guild) return;
+
+			const existing = await hasExistingBreakoutRooms(guild);
+			const mainRoom = getMainRoom(guild);
+
+			let totalMembers = 0;
+			if (existing.exists) {
+				for (const room of existing.rooms) {
+					if (room.members && room.members.size > 0) {
+						totalMembers += room.members.size;
+					}
+				}
+			}
+
+			// Interactive confirmation if existing rooms have members and no main room is configured
+			if (totalMembers > 0 && !mainRoom) {
 				await confirmAction({
 					interaction,
 					content: `⚠️ ${totalMembers} member(s) are still in existing breakout rooms and no main room is configured. Creating new rooms will disconnect them from voice.`,
@@ -77,42 +69,36 @@ export async function handleCreateCommand(
 					onConfirm: async () => {
 						const result = await executeCreate(interaction, numRooms);
 						if (result.success) {
-							await interaction.editReply({
+							await ctx.editReply({
 								content: result.message,
 								components: [],
 							});
-							await sendPublicAnnouncement(interaction, {
+							await ctx.sendPublic({
 								content: `🛠️ ${result.message}`,
 							});
 						} else {
-							await interaction.editReply({
+							await ctx.editReply({
 								content: result.message || 'Failed to create breakout rooms.',
 								components: [],
 							});
 						}
 					},
 				});
-			},
-			{ deferReply: true, ephemeral: true, handlerTimeoutMs: 120_000 },
-		);
-		return;
-	}
+				return;
+			}
 
-	await handleInteraction(
-		interaction,
-		async () => {
 			const result = await executeCreate(interaction, numRooms);
 
 			if (result.success) {
-				await replyOrEdit(interaction, result.message);
-				await sendPublicAnnouncement(interaction, {
+				await ctx.reply(result.message);
+				await ctx.sendPublic({
 					content: `🛠️ ${result.message}`,
 				});
 			} else {
 				log.error({ result }, '❌ Error creating breakout rooms');
-				await replyOrEdit(interaction, result.message);
+				await ctx.reply(result.message);
 			}
 		},
-		{ deferReply: true, ephemeral: true },
+		{ deferReply: true, ephemeral: true, handlerTimeoutMs: 120_000 },
 	);
 }

@@ -1,9 +1,9 @@
 import {
 	type CommandInteraction,
-	type GuildMember,
+	GuildMember,
 	SlashCommandBuilder,
 } from 'discord.js';
-import { handleInteraction, replyOrEdit } from '@/lib/discord/response.js';
+import { handleInteraction } from '@/lib/discord/response.js';
 import type { Command } from '@/types/index.js';
 
 const command: Command = {
@@ -11,19 +11,19 @@ const command: Command = {
 		.setName('user')
 		.setDescription('Provides information about the user.'),
 	async execute(interaction: CommandInteraction): Promise<void> {
-		await handleInteraction(interaction, async () => {
-			const member = interaction.member as GuildMember | null;
-			if (!member) {
-				await replyOrEdit(
-					interaction,
-					'Could not retrieve member information.',
-				);
+		await handleInteraction(interaction, async (ctx) => {
+			const member = ctx.interaction.member;
+			if (!(member instanceof GuildMember)) {
+				await ctx.reply({
+					content: 'Could not retrieve member information.',
+					ephemeral: true,
+				});
 				return;
 			}
 
 			const joinedAt = member.joinedAt || 'Unknown';
-			const response = `This command was run by ${interaction.user.username}, who joined on ${joinedAt}.`;
-			await replyOrEdit(interaction, response);
+			const response = `This command was run by ${ctx.interaction.user.username}, who joined on ${joinedAt}.`;
+			await ctx.reply(response);
 		});
 	},
 };

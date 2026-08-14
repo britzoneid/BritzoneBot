@@ -2,7 +2,6 @@ import {
 	ChannelType,
 	type ChatInputCommandInteraction,
 	GuildMember,
-	MessageFlags,
 	SlashCommandBuilder,
 } from 'discord.js';
 import { preflightBreakout } from '@/lib/discord/permission.js';
@@ -197,7 +196,7 @@ const command: Command = {
 		if (!interaction.guildId || !interaction.member) {
 			await replyOrEdit(interaction, {
 				content: 'This command can only be used in a server.',
-				flags: MessageFlags.Ephemeral,
+				ephemeral: true,
 			});
 			return;
 		}
@@ -209,7 +208,7 @@ const command: Command = {
 				await replyOrEdit(interaction, {
 					content:
 						check.reason ?? 'You do not have permission to run this command.',
-					flags: MessageFlags.Ephemeral,
+					ephemeral: true,
 				});
 				return;
 			}
@@ -230,7 +229,7 @@ const command: Command = {
 				);
 				await replyOrEdit(interaction, {
 					content: `There is an interrupted '${currentOp.type}' operation in progress. Please finish it or clear it before starting a '${subcommand}' operation.`,
-					flags: MessageFlags.Ephemeral,
+					ephemeral: true,
 				});
 				return;
 			}
@@ -244,7 +243,7 @@ const command: Command = {
 			log.error({ subcommand }, '❌ No handler registered for subcommand');
 			await replyOrEdit(interaction, {
 				content: 'This subcommand is not supported.',
-				flags: MessageFlags.Ephemeral,
+				ephemeral: true,
 			});
 			return;
 		}
