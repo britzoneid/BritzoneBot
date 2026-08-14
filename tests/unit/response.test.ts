@@ -6,6 +6,7 @@ import {
 import { describe, expect, it, vi } from 'vitest';
 import {
 	handleInteraction,
+	type InteractionContext,
 	replyOrEdit,
 	sendPublicAnnouncement,
 } from '@/lib/discord/response.js';
@@ -69,7 +70,9 @@ describe('Discord Response Utilities (response.ts)', () => {
 		});
 
 		it('provides InteractionContext to the handler with working helper methods', async () => {
-			const replyMock = vi.fn().mockResolvedValue({ id: 'msg-1' });
+			const replyMock = vi.fn().mockResolvedValue({
+				resource: { message: { id: 'msg-1' } },
+			});
 			const mockInteraction = {
 				id: 'int-1',
 				replied: false,
@@ -77,7 +80,7 @@ describe('Discord Response Utilities (response.ts)', () => {
 				reply: replyMock,
 			} as unknown as RepliableInteraction;
 
-			let receivedCtx: unknown;
+			let receivedCtx: InteractionContext | undefined;
 			const success = await handleInteraction(
 				mockInteraction,
 				async (ctx) => {
@@ -89,11 +92,94 @@ describe('Discord Response Utilities (response.ts)', () => {
 
 			expect(success).toBe(true);
 			expect(receivedCtx).toBeDefined();
+			expect(receivedCtx?.interaction).toBe(mockInteraction);
+			expect(receivedCtx?.isEphemeral).toBe(true);
+			expect(receivedCtx?.isDeferred).toBe(false);
 			expect(replyMock).toHaveBeenCalledWith({
 				content: 'Hello from context',
 				flags: MessageFlags.Ephemeral,
 				withResponse: true,
 			});
+		});
+
+		it('defers reply with Ephemeral flag when deferReply and ephemeral are true', async () => {
+			const deferReplyMock = vi.fn().mockResolvedValue(undefined);
+			const mockInteraction = {
+				id: 'int-1',
+				replied: false,
+				deferred: false,
+				deferReply: deferReplyMock,
+			} as unknown as RepliableInteraction;
+
+			const mockHandler = vi.fn().mockResolvedValue(undefined);
+
+			const success = await handleInteraction(mockInteraction, mockHandler, {
+				deferReply: true,
+				ephemeral: true,
+			});
+
+			expect(deferReplyMock).toHaveBeenCalledWith({
+				flags: MessageFlags.Ephemeral,
+			});
+			expect(mockHandler).toHaveBeenCalledOnce();
+			expect(success).toBe(true);
+		});
+
+		it('handles handler timeout correctly and notifies user', async () => {
+			vi.useFakeTimers();
+			const replyMock = vi.fn().mockResolvedValue({ id: 'msg-err' });
+			const mockInteraction = {
+				id: 'int-1',
+				replied: false,
+				deferred: false,
+				reply: replyMock,
+			} as unknown as RepliableInteraction;
+
+			const longRunningHandler = () =>
+				new Promise<void>((resolve) => {
+					setTimeout(resolve, 5000);
+				});
+
+			const handlePromise = handleInteraction(
+				mockInteraction,
+				longRunningHandler,
+				{ handlerTimeoutMs: 1000, errorMessage: 'Timed out' },
+			);
+
+			await vi.advanceTimersByTimeAsync(1500);
+			const success = await handlePromise;
+
+			expect(success).toBe(false);
+			expect(replyMock).toHaveBeenCalledWith({
+				content: 'Timed out',
+				withResponse: true,
+			});
+			vi.useRealTimers();
+		});
+
+		it('handles deferReply timeout correctly and aborts handler', async () => {
+			vi.useFakeTimers();
+			const neverSettlingDefer = () => new Promise<void>(() => {});
+			const mockInteraction = {
+				id: 'int-1',
+				replied: false,
+				deferred: false,
+				deferReply: neverSettlingDefer,
+			} as unknown as RepliableInteraction;
+
+			const mockHandler = vi.fn();
+
+			const handlePromise = handleInteraction(mockInteraction, mockHandler, {
+				deferReply: true,
+				deferTimeoutMs: 500,
+			});
+
+			await vi.advanceTimersByTimeAsync(1000);
+			const success = await handlePromise;
+
+			expect(success).toBe(false);
+			expect(mockHandler).not.toHaveBeenCalled();
+			vi.useRealTimers();
 		});
 
 		it('notifies the user on handler error when notifyOnError is true', async () => {
@@ -116,7 +202,6 @@ describe('Discord Response Utilities (response.ts)', () => {
 			expect(success).toBe(false);
 			expect(replyMock).toHaveBeenCalledWith({
 				content: 'Custom error message',
-				flags: undefined,
 				withResponse: true,
 			});
 		});

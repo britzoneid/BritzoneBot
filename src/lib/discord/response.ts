@@ -22,10 +22,9 @@ import type {
 	InteractionEditReplyOptions,
 	InteractionReplyOptions,
 	Message,
-	MessagePayload,
 	RepliableInteraction,
 } from 'discord.js';
-import { MessageFlags } from 'discord.js';
+import { MessageFlags, MessagePayload } from 'discord.js';
 import { logger } from '@/lib/logger.js';
 
 /**
@@ -162,6 +161,16 @@ export type InteractionHandler<
 > = (ctx: InteractionContext<T>) => Promise<void>;
 
 /**
+ * Custom error indicating an operation timed out.
+ */
+export class TimeoutError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = 'TimeoutError';
+	}
+}
+
+/**
  * Safely extracts an error code from an Error object if present.
  * @param error The error to extract code from.
  * @returns The error code if present, otherwise undefined.
@@ -184,14 +193,14 @@ async function executeWithTimeout<T>(
 	try {
 		const timeoutPromise = new Promise<never>((_, reject) => {
 			timeoutId = setTimeout(
-				() => reject(new Error(timeoutErrorMessage)),
+				() => reject(new TimeoutError(timeoutErrorMessage)),
 				timeoutMs,
 			);
 		});
 
 		return await Promise.race([task(), timeoutPromise]);
 	} finally {
-		if (timeoutId) clearTimeout(timeoutId);
+		if (timeoutId !== undefined) clearTimeout(timeoutId);
 	}
 }
 
@@ -230,10 +239,10 @@ async function safeDeferReply(
 			return false;
 		}
 
-		if (errorCode === 'EAI_AGAIN' || error.message === 'Defer reply timeout') {
+		if (errorCode === 'EAI_AGAIN' || error instanceof TimeoutError) {
 			logger.warn(
 				{ interactionId: interaction.id, err: error },
-				'🌐 Network issue while deferring interaction',
+				'🌐 Network issue or timeout while deferring interaction',
 			);
 			return false;
 		}
@@ -260,21 +269,22 @@ function createInteractionContext<
 		isEphemeral: ephemeral,
 		reply: (content: ResponsePayload) => {
 			if (!interaction.replied && !interaction.deferred && ephemeral) {
-				const payload: ExtendedInteractionReplyOptions =
-					typeof content === 'string'
-						? { content, ephemeral: true }
-						: {
-								ephemeral: true,
-								...(content as ExtendedInteractionReplyOptions),
-							};
+				if (typeof content === 'string') {
+					return replyOrEdit(interaction, { content, ephemeral: true });
+				}
+				if (content instanceof MessagePayload) {
+					return replyOrEdit(interaction, content);
+				}
+				const payload: ExtendedInteractionReplyOptions = {
+					ephemeral: true,
+					...(content as ExtendedInteractionReplyOptions),
+				};
 				return replyOrEdit(interaction, payload);
 			}
 			return replyOrEdit(interaction, content);
 		},
 		editReply: (content) => {
-			return interaction.editReply(
-				content as InteractionEditReplyOptions,
-			) as Promise<Message>;
+			return replyOrEdit(interaction, content);
 		},
 		sendPublic: (content) => {
 			return sendPublicAnnouncement(interaction, content);
@@ -373,6 +383,47 @@ export async function handleInteraction<
 }
 
 /**
+ * Safely extracts a Message from an interaction.reply() response object if present.
+ */
+function extractMessageFromReply(res: unknown): Message | null {
+	if (
+		res &&
+		typeof res === 'object' &&
+		'resource' in res &&
+		res.resource &&
+		typeof res.resource === 'object' &&
+		'message' in res.resource &&
+		res.resource.message
+	) {
+		return res.resource.message as Message;
+	}
+	if (res && typeof res === 'object' && 'id' in res) {
+		return res as Message;
+	}
+	return null;
+}
+
+/**
+ * Resolves a Message from the reply result or falls back to fetchReply if supported.
+ */
+async function resolveMessageFromReply(
+	interaction: RepliableInteraction | CommandInteraction,
+	res: unknown,
+): Promise<Message> {
+	const extracted = extractMessageFromReply(res);
+	if (extracted) return extracted;
+
+	if (
+		'fetchReply' in interaction &&
+		typeof interaction.fetchReply === 'function'
+	) {
+		return await interaction.fetchReply();
+	}
+
+	return res as Message;
+}
+
+/**
  * Low-level polymorphic dispatch utility for sending interaction replies.
  *
  * Automatically inspects `interaction.replied` and `interaction.deferred`:
@@ -386,21 +437,38 @@ export async function handleInteraction<
  * @param content The response content, embeds, or options.
  * @returns Promise resolving to the sent or edited Discord `Message`.
  */
-export function replyOrEdit(
+export async function replyOrEdit(
 	interaction: RepliableInteraction | CommandInteraction,
 	content: ResponsePayload,
 ): Promise<Message> {
 	if (interaction.replied || interaction.deferred) {
-		return interaction.editReply(
+		if (
+			typeof content === 'object' &&
+			content !== null &&
+			!(content instanceof MessagePayload)
+		) {
+			const { ephemeral: _, ...cleanEditOptions } =
+				content as ExtendedInteractionReplyOptions;
+			return (await interaction.editReply(
+				cleanEditOptions as InteractionEditReplyOptions,
+			)) as Message;
+		}
+		return (await interaction.editReply(
 			content as InteractionEditReplyOptions,
-		) as Promise<Message>;
+		)) as Message;
 	}
 
 	if (typeof content === 'string') {
-		return interaction.reply({
+		const res = await interaction.reply({
 			content,
 			withResponse: true,
-		}) as unknown as Promise<Message>;
+		});
+		return await resolveMessageFromReply(interaction, res);
+	}
+
+	if (content instanceof MessagePayload) {
+		const res = await interaction.reply(content);
+		return await resolveMessageFromReply(interaction, res);
 	}
 
 	const rawOptions = content as ExtendedInteractionReplyOptions;
@@ -410,11 +478,14 @@ export function replyOrEdit(
 		withResponse: true,
 	};
 
-	if (isEphemeral && !options.flags) {
-		options.flags = MessageFlags.Ephemeral;
+	if (isEphemeral) {
+		options.flags =
+			(typeof options.flags === 'number' ? options.flags : 0) |
+			MessageFlags.Ephemeral;
 	}
 
-	return interaction.reply(options) as unknown as Promise<Message>;
+	const res = await interaction.reply(options);
+	return await resolveMessageFromReply(interaction, res);
 }
 
 /**
