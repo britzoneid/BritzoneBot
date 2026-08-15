@@ -34,12 +34,24 @@ describe('timerPresets', () => {
 			expect(schedule45).toEqual(FGD_TIMER_PRESETS[45]);
 		});
 
-		it('calculates clean dynamic thresholds for custom durations', () => {
-			// For a custom 40 minute session: 20m, 10m, 5m
-			const schedule40 = getTimerSchedule(40);
-			expect(schedule40).toEqual([20, 10, 5]);
+		it('calculates custom thresholds [min(30, 2/3 D), 10, 5] for durations >= 30m', () => {
+			// For a custom 35 minute session: 23m (2/3 of 35), 10m, 5m
+			const schedule35 = getTimerSchedule(35);
+			expect(schedule35).toEqual([23, 10, 5]);
 
-			// For a custom 15 minute session: 8m, 5m
+			// For a custom 40 minute session: 27m (2/3 of 40), 10m, 5m
+			const schedule40 = getTimerSchedule(40);
+			expect(schedule40).toEqual([27, 10, 5]);
+
+			// For a custom 50 minute session: min(30, 33) = 30m, 10m, 5m
+			const schedule50 = getTimerSchedule(50);
+			expect(schedule50).toEqual([30, 10, 5]);
+
+			// For a custom 75 minute session: min(30, 50) = 30m, 10m, 5m
+			const schedule75 = getTimerSchedule(75);
+			expect(schedule75).toEqual([30, 10, 5]);
+
+			// For fallback sub-30 minute duration (e.g., 15m): 8m, 5m
 			const schedule15 = getTimerSchedule(15);
 			expect(schedule15).toEqual([8, 5]);
 		});
