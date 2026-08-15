@@ -1,3 +1,5 @@
+import type { TimerData } from '@/modules/breakout/state/state.js';
+
 export type PresetDuration = 0.05 | 30 | 45 | 60 | 90;
 
 /**
@@ -58,4 +60,95 @@ export function formatScheduleSummary(schedule: number[]): string {
 	if (schedule.length === 0) return 'No intermediate reminders scheduled.';
 	const parts = schedule.map((m) => `${m}m`);
 	return `Reminders scheduled at ${parts.join(', ')} remaining.`;
+}
+
+/**
+ * Formats detailed active timer status into a readable markdown response.
+ */
+export function formatTimerStatus(
+	timerData: TimerData,
+	now: number = Date.now(),
+): string {
+	const {
+		totalMinutes,
+		startTime,
+		breakoutRooms,
+		autoRecall,
+		mainRoomId,
+		gracePeriodSeconds = 60,
+		sentReminders = [],
+		fiveMinSent,
+	} = timerData;
+
+	const durationMs = totalMinutes * 60 * 1000;
+	const endTime = startTime + durationMs;
+	const graceMs = autoRecall ? gracePeriodSeconds * 1000 : 0;
+	const recallTime = endTime + graceMs;
+
+	const startUnix = Math.floor(startTime / 1000);
+	const endUnix = Math.floor(endTime / 1000);
+	const recallUnix = Math.floor(recallTime / 1000);
+
+	const durationText =
+		totalMinutes < 1
+			? `${Math.round(totalMinutes * 60)} seconds`
+			: `${totalMinutes} minutes`;
+
+	// Status determination
+	let statusText = `🟢 Active (ends <t:${endUnix}:R>)`;
+	if (now >= recallTime) {
+		statusText = '🏁 Expired / Session Ended';
+	} else if (now >= endTime) {
+		statusText = autoRecall
+			? `⏳ Grace Period (auto-recalling <t:${recallUnix}:R>)`
+			: "🏁 Time's up (awaiting manual recall)";
+	}
+
+	// Reminders status
+	const schedule = getTimerSchedule(totalMinutes);
+	const sentSet = new Set<number>(sentReminders);
+	if (fiveMinSent) {
+		sentSet.add(5);
+	}
+
+	let reminderStatus = 'None scheduled';
+	if (schedule.length > 0) {
+		reminderStatus = schedule
+			.map((m) => {
+				const isSent =
+					sentSet.has(m) || (now >= endTime - m * 60 * 1000 && now < endTime);
+				return isSent ? `✅ ${m}m (sent)` : `⏳ ${m}m (pending)`;
+			})
+			.join(', ');
+	}
+
+	// Auto-recall text
+	let autoRecallText = 'Disabled';
+	if (autoRecall && mainRoomId) {
+		autoRecallText = `Enabled (<#${mainRoomId}>${
+			gracePeriodSeconds > 0
+				? ` with ${gracePeriodSeconds}s grace period`
+				: ' immediately'
+		})`;
+	}
+
+	const roomCount = breakoutRooms.length;
+	const roomMentions = breakoutRooms.map((id) => `<#${id}>`).join(' ');
+	const roomsText =
+		roomCount > 0
+			? `${roomMentions} (${roomCount} ${roomCount === 1 ? 'room' : 'rooms'})`
+			: 'None';
+
+	const lines = [
+		'⏱️ **Breakout Timer Status**',
+		`• **Status:** ${statusText}`,
+		`• **Duration:** ${durationText}`,
+		`• **Started:** <t:${startUnix}:T> (<t:${startUnix}:R>)`,
+		`• **Target End Time:** <t:${endUnix}:T> (<t:${endUnix}:R>)`,
+		`• **Reminders:** ${reminderStatus}`,
+		`• **Auto-Recall:** ${autoRecallText}`,
+		`• **Tracked Rooms:** ${roomsText}`,
+	];
+
+	return lines.join('\n');
 }

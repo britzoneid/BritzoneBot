@@ -115,15 +115,16 @@ const command: Command = {
 		.addSubcommand((subcommand) =>
 			subcommand
 				.setName('timer')
-				.setDescription('Sets a timer for the breakout session')
+				.setDescription('Sets or checks a timer for the breakout session')
 				.addStringOption((option) =>
 					option
 						.setName('minutes')
 						.setDescription(
-							'FGD timer duration preset (or select Cancel / Custom)',
+							'FGD timer duration preset (or select Status / Cancel / Custom)',
 						)
 						.setRequired(false)
 						.addChoices(
+							{ name: 'ℹ️ Check active timer status', value: 'status' },
 							{ name: '❌ Cancel active timer', value: 'cancel' },
 							{
 								name: '⚙️ Custom duration (specify custom_minutes)',

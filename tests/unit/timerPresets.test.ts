@@ -3,8 +3,10 @@ import {
 	FGD_TIMER_PRESETS,
 	formatReminderMessage,
 	formatScheduleSummary,
+	formatTimerStatus,
 	getTimerSchedule,
 } from '@/modules/breakout/constants/timerPresets.js';
+import type { TimerData } from '@/modules/breakout/state/state.js';
 
 describe('timerPresets', () => {
 	describe('FGD_TIMER_PRESETS lookup table', () => {
@@ -71,6 +73,96 @@ describe('timerPresets', () => {
 			expect(formatScheduleSummary([])).toBe(
 				'No intermediate reminders scheduled.',
 			);
+		});
+	});
+
+	describe('formatTimerStatus', () => {
+		const baseStartTime = 1720000000000;
+
+		it('formats active running timer status with reminders, auto-recall, and rooms', () => {
+			const timerData: TimerData = {
+				guildId: 'guild-1',
+				startTime: baseStartTime,
+				totalMinutes: 45,
+				breakoutRooms: ['room-1', 'room-2'],
+				fiveMinSent: false,
+				sentReminders: [22],
+				autoRecall: true,
+				mainRoomId: 'main-room-1',
+				gracePeriodSeconds: 60,
+			};
+
+			const now = baseStartTime + 25 * 60 * 1000; // 25 min in
+			const result = formatTimerStatus(timerData, now);
+
+			expect(result).toContain('⏱️ **Breakout Timer Status**');
+			expect(result).toContain('• **Status:** 🟢 Active');
+			expect(result).toContain('• **Duration:** 45 minutes');
+			expect(result).toContain('• **Started:** <t:1720000000:T>');
+			expect(result).toContain('• **Target End Time:** <t:1720002700:T>');
+			expect(result).toContain('✅ 22m (sent)');
+			expect(result).toContain('⏳ 10m (pending)');
+			expect(result).toContain('⏳ 3m (pending)');
+			expect(result).toContain(
+				'• **Auto-Recall:** Enabled (<#main-room-1> with 60s grace period)',
+			);
+			expect(result).toContain(
+				'• **Tracked Rooms:** <#room-1> <#room-2> (2 rooms)',
+			);
+		});
+
+		it('formats status during grace period', () => {
+			const timerData: TimerData = {
+				guildId: 'guild-1',
+				startTime: baseStartTime,
+				totalMinutes: 30,
+				breakoutRooms: ['room-1'],
+				fiveMinSent: true,
+				sentReminders: [15, 5],
+				autoRecall: true,
+				mainRoomId: 'main-room-1',
+				gracePeriodSeconds: 60,
+			};
+
+			const now = baseStartTime + 30 * 60 * 1000 + 10 * 1000; // 10s into grace period
+			const result = formatTimerStatus(timerData, now);
+
+			expect(result).toContain('⏳ Grace Period');
+			expect(result).toContain('• **Duration:** 30 minutes');
+		});
+
+		it('formats expired timer status', () => {
+			const timerData: TimerData = {
+				guildId: 'guild-1',
+				startTime: baseStartTime,
+				totalMinutes: 30,
+				breakoutRooms: ['room-1'],
+				fiveMinSent: true,
+				autoRecall: true,
+				gracePeriodSeconds: 60,
+			};
+
+			const now = baseStartTime + 35 * 60 * 1000; // past recall time
+			const result = formatTimerStatus(timerData, now);
+
+			expect(result).toContain('🏁 Expired / Session Ended');
+		});
+
+		it('formats sub-minute (3s) duration properly', () => {
+			const timerData: TimerData = {
+				guildId: 'guild-1',
+				startTime: baseStartTime,
+				totalMinutes: 0.05,
+				breakoutRooms: [],
+				fiveMinSent: false,
+				autoRecall: false,
+			};
+
+			const result = formatTimerStatus(timerData, baseStartTime);
+
+			expect(result).toContain('• **Duration:** 3 seconds');
+			expect(result).toContain('• **Auto-Recall:** Disabled');
+			expect(result).toContain('• **Tracked Rooms:** None');
 		});
 	});
 });

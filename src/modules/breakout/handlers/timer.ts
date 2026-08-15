@@ -4,6 +4,7 @@ import { handleInteraction } from '@/lib/discord/response.js';
 import { logger } from '@/lib/logger.js';
 import {
 	formatScheduleSummary,
+	formatTimerStatus,
 	getTimerSchedule,
 } from '@/modules/breakout/constants/timerPresets.js';
 import {
@@ -13,6 +14,7 @@ import {
 import {
 	getMainRoom,
 	getRooms,
+	getTimerData,
 	setTimerData,
 	type TimerData,
 } from '@/modules/breakout/state/state.js';
@@ -36,6 +38,25 @@ export async function handleTimerCommand(
 			const minutesOption = interaction.options.getString('minutes');
 			const customMinutesOption =
 				interaction.options.getInteger('custom_minutes');
+
+			if (
+				minutesOption === 'status' ||
+				(!minutesOption && customMinutesOption === null)
+			) {
+				const activeTimer = await getTimerData(guildId);
+				if (!activeTimer) {
+					if (minutesOption === 'status') {
+						await ctx.reply('ℹ️ No active breakout timer for this server.');
+					} else {
+						await ctx.reply(
+							'ℹ️ No active breakout timer. Please select a duration preset or provide a custom duration in minutes (`/breakout timer minutes:<preset>`).',
+						);
+					}
+					return;
+				}
+				await ctx.reply(formatTimerStatus(activeTimer));
+				return;
+			}
 
 			if (minutesOption === 'cancel') {
 				const canceled = await cancelBreakoutTimer(guildId);
