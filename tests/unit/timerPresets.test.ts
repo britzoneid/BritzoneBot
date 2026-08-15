@@ -50,28 +50,13 @@ describe('timerPresets', () => {
 			// For a custom 75 minute session: min(30, 50) = 30m, 10m, 5m
 			const schedule75 = getTimerSchedule(75);
 			expect(schedule75).toEqual([30, 10, 5]);
-
-			// For fallback sub-30 minute duration (e.g., 15m): 8m, 5m
-			const schedule15 = getTimerSchedule(15);
-			expect(schedule15).toEqual([8, 5]);
 		});
 
-		it('handles short durations and boundary branches correctly', () => {
-			// For a custom 10 minute session: 5m, 3m
-			const schedule10 = getTimerSchedule(10);
-			expect(schedule10).toEqual([5, 3]);
-
-			// For a custom 5 minute session: 3m, 2m
-			const schedule5 = getTimerSchedule(5);
-			expect(schedule5).toEqual([3, 2]);
-
-			// For a custom 2 minute session: 1m
-			const schedule2 = getTimerSchedule(2);
-			expect(schedule2).toEqual([1]);
-
-			// For a custom 1 minute session: no intermediate threshold valid
-			const schedule1 = getTimerSchedule(1);
-			expect(schedule1).toEqual([]);
+		it('returns empty schedule for non-preset durations under 30 minutes', () => {
+			expect(getTimerSchedule(25)).toEqual([]);
+			expect(getTimerSchedule(15)).toEqual([]);
+			expect(getTimerSchedule(10)).toEqual([]);
+			expect(getTimerSchedule(1)).toEqual([]);
 		});
 	});
 

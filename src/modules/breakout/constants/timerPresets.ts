@@ -24,49 +24,27 @@ export function formatReminderMessage(remainingMinutes: number): string {
  * Get reminder schedule thresholds for a given duration (in minutes).
  * If totalMinutes matches a preset, the exact tuned lookup schedule is returned.
  * For custom durations >= 30 minutes, reminders are scheduled at [min(30, 2/3 D), 10, 5].
- * Otherwise, dynamic points are calculated as fallback for sub-30 minute durations.
+ * Durations under 30 minutes (non-preset) return an empty schedule.
  */
 export function getTimerSchedule(totalMinutes: number): number[] {
 	if (totalMinutes in FGD_TIMER_PRESETS) {
 		return FGD_TIMER_PRESETS[totalMinutes as PresetDuration];
 	}
 
+	if (totalMinutes < 30) {
+		return [];
+	}
+
 	const thresholds = new Set<number>();
-
-	if (totalMinutes >= 30) {
-		const firstReminder = Math.min(30, Math.round((2 / 3) * totalMinutes));
-		if (firstReminder > 0 && firstReminder < totalMinutes) {
-			thresholds.add(firstReminder);
-		}
-		if (10 < totalMinutes) {
-			thresholds.add(10);
-		}
-		if (5 < totalMinutes) {
-			thresholds.add(5);
-		}
-	} else {
-		// Fallback for sub-30 minute durations
-		const halfway = Math.round(totalMinutes * 0.5);
-		if (halfway > 0 && halfway < totalMinutes) {
-			thresholds.add(halfway);
-		}
-
-		if (totalMinutes >= 20) {
-			const wrapup = Math.round(totalMinutes * 0.25);
-			if (wrapup > 0 && wrapup < totalMinutes) {
-				thresholds.add(wrapup);
-			}
-		}
-
-		let finalCall = 5;
-		if (totalMinutes <= 10 && totalMinutes > 5) {
-			finalCall = 3;
-		} else if (totalMinutes <= 5) {
-			finalCall = Math.max(1, Math.floor(totalMinutes / 2));
-		}
-		if (finalCall > 0 && finalCall < totalMinutes) {
-			thresholds.add(finalCall);
-		}
+	const firstReminder = Math.min(30, Math.round((2 / 3) * totalMinutes));
+	if (firstReminder > 0 && firstReminder < totalMinutes) {
+		thresholds.add(firstReminder);
+	}
+	if (10 < totalMinutes) {
+		thresholds.add(10);
+	}
+	if (5 < totalMinutes) {
+		thresholds.add(5);
 	}
 
 	// Return sorted descending (earliest reminder first)
