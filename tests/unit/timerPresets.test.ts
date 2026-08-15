@@ -164,5 +164,55 @@ describe('timerPresets', () => {
 			expect(result).toContain('• **Auto-Recall:** Disabled');
 			expect(result).toContain('• **Tracked Rooms:** None');
 		});
+
+		it('formats awaiting manual recall when autoRecall is false and now >= endTime', () => {
+			const timerData: TimerData = {
+				guildId: 'guild-1',
+				startTime: baseStartTime,
+				totalMinutes: 30,
+				breakoutRooms: ['room-1'],
+				fiveMinSent: true,
+				sentReminders: [15, 5],
+				autoRecall: false,
+			};
+
+			// Exactly at endTime
+			const atEndResult = formatTimerStatus(
+				timerData,
+				baseStartTime + 30 * 60 * 1000,
+			);
+			expect(atEndResult).toContain(
+				"• **Status:** 🏁 Time's up (awaiting manual recall)",
+			);
+
+			// Well after endTime
+			const afterEndResult = formatTimerStatus(
+				timerData,
+				baseStartTime + 45 * 60 * 1000,
+			);
+			expect(afterEndResult).toContain(
+				"• **Status:** 🏁 Time's up (awaiting manual recall)",
+			);
+		});
+
+		it('reports reminder status strictly based on recorded sent state', () => {
+			const timerData: TimerData = {
+				guildId: 'guild-1',
+				startTime: baseStartTime,
+				totalMinutes: 45,
+				breakoutRooms: ['room-1'],
+				fiveMinSent: false,
+				sentReminders: [22], // only 22m recorded as sent
+				autoRecall: true,
+			};
+
+			// Even if time has passed the 10m mark, 10m and 3m remain pending if not in sentReminders
+			const now = baseStartTime + 40 * 60 * 1000;
+			const result = formatTimerStatus(timerData, now);
+
+			expect(result).toContain('✅ 22m (sent)');
+			expect(result).toContain('⏳ 10m (pending)');
+			expect(result).toContain('⏳ 3m (pending)');
+		});
 	});
 });

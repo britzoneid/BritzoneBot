@@ -96,12 +96,15 @@ export function formatTimerStatus(
 
 	// Status determination
 	let statusText = `🟢 Active (ends <t:${endUnix}:R>)`;
-	if (now >= recallTime) {
-		statusText = '🏁 Expired / Session Ended';
-	} else if (now >= endTime) {
-		statusText = autoRecall
-			? `⏳ Grace Period (auto-recalling <t:${recallUnix}:R>)`
-			: "🏁 Time's up (awaiting manual recall)";
+	if (now >= endTime) {
+		if (autoRecall) {
+			statusText =
+				now >= recallTime
+					? '🏁 Expired / Session Ended'
+					: `⏳ Grace Period (auto-recalling <t:${recallUnix}:R>)`;
+		} else {
+			statusText = "🏁 Time's up (awaiting manual recall)";
+		}
 	}
 
 	// Reminders status
@@ -115,8 +118,7 @@ export function formatTimerStatus(
 	if (schedule.length > 0) {
 		reminderStatus = schedule
 			.map((m) => {
-				const isSent =
-					sentSet.has(m) || (now >= endTime - m * 60 * 1000 && now < endTime);
+				const isSent = sentSet.has(m);
 				return isSent ? `✅ ${m}m (sent)` : `⏳ ${m}m (pending)`;
 			})
 			.join(', ');
