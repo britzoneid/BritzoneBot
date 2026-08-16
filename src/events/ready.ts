@@ -1,4 +1,5 @@
 import { Events } from 'discord.js';
+import { acquireDistributedLock } from '@/lib/distributedLock.js';
 import { logger } from '@/lib/logger.js';
 import { monitorBreakoutTimer } from '@/modules/breakout/services/timer.js';
 import { getAllGuildStates } from '@/modules/breakout/state/state.js';
@@ -15,6 +16,8 @@ const event: Event<typeof Events.ClientReady> = {
 			{ user: client.user },
 			`✅ Ready! Logged in as ${client.user?.tag}`,
 		);
+
+		await acquireDistributedLock(client);
 
 		// Resume active timers after bot is ready and client cache is available
 		try {

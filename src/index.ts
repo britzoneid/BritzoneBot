@@ -9,6 +9,7 @@ import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Client, Collection, GatewayIntentBits, RESTEvents } from 'discord.js';
+import { releaseDistributedLock } from '@/lib/distributedLock.js';
 import { logger } from '@/lib/logger.js';
 import { flushState, initializeState } from '@/modules/breakout/state/state.js';
 import type { BritzoneClient, Command, Event } from '@/types/index.js';
@@ -185,6 +186,7 @@ const handleShutdown = async (signal: string) => {
 	forceExitTimeout.unref();
 
 	try {
+		await releaseDistributedLock();
 		client.destroy();
 		logger.info('🔌 Discord client destroyed.');
 
