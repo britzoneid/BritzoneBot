@@ -44,7 +44,8 @@ export function formatBreakoutStatus({
 			const truncatedDetails: string[] = [];
 			let currentLength = 0;
 			for (const detail of roomDetails) {
-				const newLength = currentLength + detail.length + (truncatedDetails.length > 0 ? 2 : 0); // +2 for ", "
+				const newLength =
+					currentLength + detail.length + (truncatedDetails.length > 0 ? 2 : 0); // +2 for ", "
 				if (newLength > MAX_ROOM_DETAILS_LENGTH) {
 					truncated = true;
 					break;
@@ -56,7 +57,9 @@ export function formatBreakoutStatus({
 		}
 
 		const summaryLine = `• **Total Rooms:** ${breakoutRooms.length} (${totalMembers} ${totalMembers === 1 ? 'member' : 'members'} total)`;
-		const truncationNote = truncated ? ` *(showing ${roomListText.split(',').length}/${breakoutRooms.length} rooms)*` : '';
+		const truncationNote = truncated
+			? ` *(showing ${roomListText.split(',').length}/${breakoutRooms.length} rooms)*`
+			: '';
 		roomsText = `${roomListText}${truncationNote}\n${summaryLine}`;
 	}
 
