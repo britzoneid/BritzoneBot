@@ -6,3 +6,4 @@ data/breakoutState.json
 log/
 dist/
 *.tsbuildinfo
+src/lib/buildInfo.generated.ts

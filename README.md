@@ -148,9 +148,10 @@ BritzoneBot offers a suite of slash commands to manage breakout rooms. All break
 
 | Command   | Description                                              | Permissions |
 |-----------|----------------------------------------------------------|-------------|
-| `/ping`   | Replies with "Pong!" and the bot's WebSocket latency.    | Send Messages |
-| `/server` | Displays the server name and member count.               | None        |
-| `/user`   | Displays the invoking user's name and join date.         | None        |
+| `/ping`    | Replies with "Pong!" and the bot's WebSocket latency.    | Send Messages |
+| `/server`  | Displays the server name and member count.               | None        |
+| `/user`    | Displays the invoking user's name and join date.         | None        |
+| `/version` | Displays bot version, build metadata, and runtime info.  | None        |
 
 ---
 

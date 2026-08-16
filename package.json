@@ -6,10 +6,11 @@
 	"main": "dist/index.js",
 	"scripts": {
 		"clean": "rimraf dist",
-		"build": "bun run clean && tsc -p tsconfig.build.json",
+		"build:info": "bun scripts/generateBuildInfo.ts",
+		"build": "bun run clean && bun run build:info && tsc -p tsconfig.build.json",
 		"start": "bun dist/index.js",
 		"deploy": "bun dist/deployCommandsLocal.js",
-		"dev": "bun --watch src/index.ts",
+		"dev": "bun run build:info && bun --watch src/index.ts",
 		"format": "biome format --write",
 		"lint": "biome lint",
 		"typecheck": "tsc --noEmit",
