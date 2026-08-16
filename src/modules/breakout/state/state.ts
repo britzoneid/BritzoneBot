@@ -14,6 +14,7 @@ export type BreakoutSubcommand =
 	| 'recall'
 	| 'delete'
 	| 'timer'
+	| 'timer-cancel'
 	| 'broadcast'
 	| 'send-message'
 	| 'status';

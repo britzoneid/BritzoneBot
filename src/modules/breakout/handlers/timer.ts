@@ -6,10 +6,7 @@ import {
 	formatScheduleSummary,
 	getTimerSchedule,
 } from '@/modules/breakout/constants/timerPresets.js';
-import {
-	cancelBreakoutTimer,
-	monitorBreakoutTimer,
-} from '@/modules/breakout/services/timer.js';
+import { monitorBreakoutTimer } from '@/modules/breakout/services/timer.js';
 import {
 	getMainRoom,
 	getRooms,
@@ -36,16 +33,6 @@ export async function handleTimerCommand(
 			const minutesOption = interaction.options.getString('minutes');
 			const customMinutesOption =
 				interaction.options.getInteger('custom_minutes');
-
-			if (minutesOption === 'cancel') {
-				const canceled = await cancelBreakoutTimer(guildId);
-				if (canceled) {
-					await ctx.reply('⏱️ **Breakout timer canceled.**');
-				} else {
-					await ctx.reply('ℹ️ No active breakout timer to cancel.');
-				}
-				return;
-			}
 
 			let minutes: number | null = null;
 

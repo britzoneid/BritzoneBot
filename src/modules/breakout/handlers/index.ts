@@ -6,3 +6,4 @@ export { handleRecallCommand } from './recall.js';
 export { handleSendMessageCommand } from './sendMessage.js';
 export { handleStatusCommand } from './status.js';
 export { handleTimerCommand } from './timer.js';
+export { handleTimerCancelCommand } from './timerCancel.js';
