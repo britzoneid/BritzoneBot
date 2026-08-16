@@ -14,6 +14,7 @@ import {
 	handleDistributeCommand,
 	handleRecallCommand,
 	handleSendMessageCommand,
+	handleStatusCommand,
 	handleTimerCommand,
 } from '@/modules/breakout/handlers/index.js';
 import {
@@ -34,6 +35,7 @@ const subcommandHandlers: Record<
 	timer: handleTimerCommand,
 	broadcast: handleBroadcastCommand,
 	'send-message': handleSendMessageCommand,
+	status: handleStatusCommand,
 };
 
 const command: Command = {
@@ -115,16 +117,15 @@ const command: Command = {
 		.addSubcommand((subcommand) =>
 			subcommand
 				.setName('timer')
-				.setDescription('Sets or checks a timer for the breakout session')
+				.setDescription('Sets a timer for the breakout session')
 				.addStringOption((option) =>
 					option
 						.setName('minutes')
 						.setDescription(
-							'FGD timer duration preset (or select Status / Cancel / Custom)',
+							'FGD timer duration preset (or select Cancel / Custom)',
 						)
 						.setRequired(false)
 						.addChoices(
-							{ name: 'ℹ️ Check active timer status', value: 'status' },
 							{ name: '❌ Cancel active timer', value: 'cancel' },
 							{
 								name: '⚙️ Custom duration (specify custom_minutes)',
@@ -164,6 +165,12 @@ const command: Command = {
 						.setMaxValue(300)
 						.setRequired(false),
 				),
+		)
+		// Status subcommand
+		.addSubcommand((subcommand) =>
+			subcommand
+				.setName('status')
+				.setDescription('Display current breakout rooms and timer status'),
 		)
 		// Broadcast subcommand
 		.addSubcommand((subcommand) =>

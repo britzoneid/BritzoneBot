@@ -15,7 +15,8 @@ export type BreakoutSubcommand =
 	| 'delete'
 	| 'timer'
 	| 'broadcast'
-	| 'send-message';
+	| 'send-message'
+	| 'status';
 
 /**
  * Single operation step data
