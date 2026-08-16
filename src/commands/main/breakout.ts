@@ -243,24 +243,26 @@ const command: Command = {
 		const subcommand =
 			interaction.options.getSubcommand() as BreakoutSubcommand;
 
-		// Check for interrupted operations
-		const inProgress = await hasOperationInProgress(interaction.guildId);
-		if (inProgress) {
-			const currentOp = await getCurrentOperation(interaction.guildId);
+		// Check for interrupted operations (exempt status command)
+		if (subcommand !== 'status') {
+			const inProgress = await hasOperationInProgress(interaction.guildId);
+			if (inProgress) {
+				const currentOp = await getCurrentOperation(interaction.guildId);
 
-			if (currentOp && currentOp.type !== subcommand) {
-				log.warn(
-					{ currentType: currentOp.type, requestedType: subcommand },
-					'⚠️ Found interrupted operation, but user requested different type',
-				);
-				await replyOrEdit(interaction, {
-					content: `There is an interrupted '${currentOp.type}' operation in progress. Please finish it or clear it before starting a '${subcommand}' operation.`,
-					ephemeral: true,
-				});
-				return;
-			}
-			if (currentOp && currentOp.type === subcommand) {
-				log.info(`Note: Resuming ${subcommand} operation.`);
+				if (currentOp && currentOp.type !== subcommand) {
+					log.warn(
+						{ currentType: currentOp.type, requestedType: subcommand },
+						'⚠️ Found interrupted operation, but user requested different type',
+					);
+					await replyOrEdit(interaction, {
+						content: `There is an interrupted '${currentOp.type}' operation in progress. Please finish it or clear it before starting a '${subcommand}' operation.`,
+						ephemeral: true,
+					});
+					return;
+				}
+				if (currentOp && currentOp.type === subcommand) {
+					log.info(`Note: Resuming ${subcommand} operation.`);
+				}
 			}
 		}
 

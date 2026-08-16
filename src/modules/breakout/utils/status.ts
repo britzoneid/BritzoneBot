@@ -32,7 +32,32 @@ export function formatBreakoutStatus({
 			totalMembers += memberCount;
 			return `<#${room.id}> (${memberCount})`;
 		});
-		roomsText = `${roomDetails.join(', ')}\n• **Total Rooms:** ${breakoutRooms.length} (${totalMembers} ${totalMembers === 1 ? 'member' : 'members'} total)`;
+
+		// Truncate room list if it would exceed Discord's character limit
+		// Reserve ~500 chars for header/footer, leave ~1500 for room details
+		const MAX_ROOM_DETAILS_LENGTH = 1500;
+		let roomListText = roomDetails.join(', ');
+		let truncated = false;
+
+		if (roomListText.length > MAX_ROOM_DETAILS_LENGTH) {
+			// Iteratively include rooms until we exceed the limit
+			const truncatedDetails: string[] = [];
+			let currentLength = 0;
+			for (const detail of roomDetails) {
+				const newLength = currentLength + detail.length + (truncatedDetails.length > 0 ? 2 : 0); // +2 for ", "
+				if (newLength > MAX_ROOM_DETAILS_LENGTH) {
+					truncated = true;
+					break;
+				}
+				truncatedDetails.push(detail);
+				currentLength = newLength;
+			}
+			roomListText = truncatedDetails.join(', ');
+		}
+
+		const summaryLine = `• **Total Rooms:** ${breakoutRooms.length} (${totalMembers} ${totalMembers === 1 ? 'member' : 'members'} total)`;
+		const truncationNote = truncated ? ` *(showing ${roomListText.split(',').length}/${breakoutRooms.length} rooms)*` : '';
+		roomsText = `${roomListText}${truncationNote}\n${summaryLine}`;
 	}
 
 	const lines: string[] = [

@@ -91,4 +91,36 @@ describe('formatBreakoutStatus', () => {
 
 		expect(result).toContain('• **Operation in Progress:** ⚠️ `distribute`');
 	});
+
+	it('truncates room list when it would exceed character limit', () => {
+		// Create enough rooms to exceed the 1500 char limit for room details
+		// Each room is approximately "<#room-XXXX> (Y), " ≈ 20-25 chars
+		// We need ~80+ rooms to exceed 1500 chars
+		const manyRooms = Array.from({ length: 100 }, (_, i) =>
+			fakeRoom(`room-${i.toString().padStart(5, '0')}`, i % 10),
+		);
+
+		const result = formatBreakoutStatus({
+			mainRoom: undefined,
+			breakoutRooms: manyRooms,
+			timerData: null,
+		});
+
+		// Verify the result stays under Discord's 2000 char limit
+		expect(result.length).toBeLessThan(2000);
+
+		// Verify total room count is preserved
+		expect(result).toContain('• **Total Rooms:** 100');
+
+		// Verify truncation notice is present
+		expect(result).toContain('showing');
+		expect(result).toContain('/100 rooms');
+
+		// Calculate expected total members
+		const totalMembers = Array.from({ length: 100 }, (_, i) => i % 10).reduce(
+			(a, b) => a + b,
+			0,
+		);
+		expect(result).toContain(`(${totalMembers} members total)`);
+	});
 });
