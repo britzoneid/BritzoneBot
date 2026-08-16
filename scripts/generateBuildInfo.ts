@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -15,8 +15,15 @@ function getGitOutput(command: string): string | null {
 
 function isGitDirty(): boolean {
 	try {
-		execSync(
-			"git diff-index --quiet HEAD -- ':!src/lib/buildInfo.generated.ts'",
+		execFileSync(
+			'git',
+			[
+				'diff-index',
+				'--quiet',
+				'HEAD',
+				'--',
+				':!src/lib/buildInfo.generated.ts',
+			],
 			{
 				stdio: ['ignore', 'ignore', 'ignore'],
 			},
