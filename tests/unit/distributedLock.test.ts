@@ -16,7 +16,7 @@ import { logger } from '@/lib/logger.js';
 describe('Distributed Instance Lock (distributedLock.ts)', () => {
 	beforeEach(() => {
 		vi.restoreAllMocks();
-		vi.useFakeTimers();
+		vi.useFakeTimers({ shouldAdvanceTime: true });
 	});
 
 	afterEach(async () => {
@@ -174,7 +174,7 @@ describe('Distributed Instance Lock (distributedLock.ts)', () => {
 				},
 			} as unknown as Client;
 
-			await distributedLock.acquireDistributedLock(client);
+			await distributedLock.acquireDistributedLock(client, 0);
 			expect(warnSpy).toHaveBeenCalledWith(
 				'⚠️ No guilds available to bind distributed lock. Skipping.',
 			);
@@ -211,7 +211,7 @@ describe('Distributed Instance Lock (distributedLock.ts)', () => {
 				},
 			} as unknown as Client;
 
-			await distributedLock.acquireDistributedLock(client);
+			await distributedLock.acquireDistributedLock(client, 0);
 
 			expect(sendMock).toHaveBeenCalledWith(
 				expect.stringContaining('🔒 [INSTANCE_LOCK]'),
@@ -263,7 +263,7 @@ describe('Distributed Instance Lock (distributedLock.ts)', () => {
 				},
 			} as unknown as Client;
 
-			await distributedLock.acquireDistributedLock(client);
+			await distributedLock.acquireDistributedLock(client, 0);
 
 			expect(staleDeleteMock).toHaveBeenCalled();
 			expect(sendMock).toHaveBeenCalledWith(
@@ -271,7 +271,7 @@ describe('Distributed Instance Lock (distributedLock.ts)', () => {
 			);
 		});
 
-		it('exits with code 1 and destroys client on collision with local process', async () => {
+		it('exits with code 1, destroys client, and halts without sending on local collision', async () => {
 			vi.spyOn(guildConfig, 'loadGuildConfig').mockReturnValue({
 				'guild-1': { managerRoleId: 'role-1' },
 			});
@@ -279,16 +279,17 @@ describe('Distributed Instance Lock (distributedLock.ts)', () => {
 			const fatalSpy = vi
 				.spyOn(logger, 'fatal')
 				.mockImplementation(() => logger);
-			const exitSpy = vi
-				.spyOn(process, 'exit')
-				.mockImplementation((() => {}) as never);
+			const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+				throw new Error('PROCESS_EXIT_1');
+			});
 
 			const destroyMock = vi.fn().mockResolvedValue(undefined);
+			const sendMock = vi.fn();
 
 			const activeMessage = {
 				content: `🔒 [INSTANCE_LOCK] ${JSON.stringify({
 					instanceId: 'different-uuid',
-					developer: 'local-user@' + os.hostname(),
+					developer: `local-user@${os.hostname()}`,
 					hostname: os.hostname(),
 					pid: 4321,
 					timestamp: Date.now() - 5_000, // 5s ago (< 25s TTL)
@@ -304,7 +305,7 @@ describe('Distributed Instance Lock (distributedLock.ts)', () => {
 						.fn()
 						.mockResolvedValue(new Collection([['msg-1', activeMessage]])),
 				},
-				send: vi.fn(),
+				send: sendMock,
 			} as unknown as TextChannel;
 
 			const fakeGuild = {
@@ -322,7 +323,9 @@ describe('Distributed Instance Lock (distributedLock.ts)', () => {
 				destroy: destroyMock,
 			} as unknown as Client;
 
-			await distributedLock.acquireDistributedLock(client);
+			await expect(
+				distributedLock.acquireDistributedLock(client, 0),
+			).rejects.toThrow('PROCESS_EXIT_1');
 
 			expect(fatalSpy).toHaveBeenCalledWith(
 				expect.objectContaining({ pid: 4321 }),
@@ -332,9 +335,10 @@ describe('Distributed Instance Lock (distributedLock.ts)', () => {
 			);
 			expect(destroyMock).toHaveBeenCalled();
 			expect(exitSpy).toHaveBeenCalledWith(1);
+			expect(sendMock).not.toHaveBeenCalled();
 		});
 
-		it('exits with code 1 and destroys client on collision with remote developer', async () => {
+		it('exits with code 1, destroys client, and halts without sending on remote collision', async () => {
 			vi.spyOn(guildConfig, 'loadGuildConfig').mockReturnValue({
 				'guild-1': { managerRoleId: 'role-1' },
 			});
@@ -342,11 +346,12 @@ describe('Distributed Instance Lock (distributedLock.ts)', () => {
 			const fatalSpy = vi
 				.spyOn(logger, 'fatal')
 				.mockImplementation(() => logger);
-			const exitSpy = vi
-				.spyOn(process, 'exit')
-				.mockImplementation((() => {}) as never);
+			const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+				throw new Error('PROCESS_EXIT_1');
+			});
 
 			const destroyMock = vi.fn().mockResolvedValue(undefined);
+			const sendMock = vi.fn();
 
 			const activeMessage = {
 				content: `🔒 [INSTANCE_LOCK] ${JSON.stringify({
@@ -367,7 +372,7 @@ describe('Distributed Instance Lock (distributedLock.ts)', () => {
 						.fn()
 						.mockResolvedValue(new Collection([['msg-1', activeMessage]])),
 				},
-				send: vi.fn(),
+				send: sendMock,
 			} as unknown as TextChannel;
 
 			const fakeGuild = {
@@ -385,7 +390,9 @@ describe('Distributed Instance Lock (distributedLock.ts)', () => {
 				destroy: destroyMock,
 			} as unknown as Client;
 
-			await distributedLock.acquireDistributedLock(client);
+			await expect(
+				distributedLock.acquireDistributedLock(client, 0),
+			).rejects.toThrow('PROCESS_EXIT_1');
 
 			expect(fatalSpy).toHaveBeenCalledWith(
 				expect.objectContaining({
@@ -398,6 +405,86 @@ describe('Distributed Instance Lock (distributedLock.ts)', () => {
 				),
 			);
 			expect(destroyMock).toHaveBeenCalled();
+			expect(exitSpy).toHaveBeenCalledWith(1);
+			expect(sendMock).not.toHaveBeenCalled();
+		});
+
+		it('yields and deletes own message if two-phase verification detects an earlier competing message', async () => {
+			vi.spyOn(guildConfig, 'loadGuildConfig').mockReturnValue({
+				'guild-1': { managerRoleId: 'role-1' },
+			});
+
+			const fatalSpy = vi
+				.spyOn(logger, 'fatal')
+				.mockImplementation(() => logger);
+			const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+				throw new Error('PROCESS_EXIT_1');
+			});
+
+			const ownDeleteMock = vi.fn().mockResolvedValue(undefined);
+			const ownMessage = {
+				id: '200000000000000000', // Higher snowflake (later)
+				delete: ownDeleteMock,
+			} as unknown as Message;
+
+			const competitorMessage = {
+				id: '100000000000000000', // Lower snowflake (earlier)
+				content: `🔒 [INSTANCE_LOCK] ${JSON.stringify({
+					instanceId: 'competing-uuid',
+					developer: 'competitor@remote',
+					hostname: 'remote',
+					pid: 7777,
+					timestamp: Date.now() - 100,
+				})}`,
+			} as unknown as Message;
+
+			const sendMock = vi.fn().mockResolvedValue(ownMessage);
+			let fetchCallCount = 0;
+			const fetchMessagesMock = vi.fn().mockImplementation(() => {
+				fetchCallCount++;
+				if (fetchCallCount === 1) {
+					// Phase 1: Pre-send sees nothing
+					return Promise.resolve(new Collection());
+				}
+				// Phase 2: Post-send sees both own message and competitor message
+				return Promise.resolve(
+					new Collection([
+						[ownMessage.id, ownMessage],
+						[competitorMessage.id, competitorMessage],
+					]),
+				);
+			});
+
+			const channel = {
+				name: distributedLock.LOCK_CHANNEL_NAME,
+				type: ChannelType.GuildText,
+				messages: {
+					fetch: fetchMessagesMock,
+				},
+				send: sendMock,
+			} as unknown as TextChannel;
+
+			const fakeGuild = {
+				id: 'guild-1',
+				name: 'Test Guild',
+				channels: {
+					fetch: vi.fn().mockResolvedValue(new Collection([['ch-1', channel]])),
+				},
+			} as unknown as Guild;
+
+			const client = {
+				guilds: {
+					cache: new Collection([['guild-1', fakeGuild]]),
+				},
+				destroy: vi.fn().mockResolvedValue(undefined),
+			} as unknown as Client;
+
+			await expect(
+				distributedLock.acquireDistributedLock(client, 0),
+			).rejects.toThrow('PROCESS_EXIT_1');
+
+			expect(ownDeleteMock).toHaveBeenCalled();
+			expect(fatalSpy).toHaveBeenCalled();
 			expect(exitSpy).toHaveBeenCalledWith(1);
 		});
 
@@ -443,13 +530,65 @@ describe('Distributed Instance Lock (distributedLock.ts)', () => {
 				},
 			} as unknown as Client;
 
-			await distributedLock.acquireDistributedLock(client);
+			await distributedLock.acquireDistributedLock(client, 0);
 
 			// Fast-forward time by 10s (heartbeat interval)
 			await vi.advanceTimersByTimeAsync(distributedLock.HEARTBEAT_INTERVAL_MS);
 
 			expect(editMock).toHaveBeenCalledWith(
 				expect.stringContaining('🔒 [INSTANCE_LOCK]'),
+			);
+		});
+
+		it('handles missing/deleted lock message during heartbeat cycle gracefully', async () => {
+			vi.spyOn(guildConfig, 'loadGuildConfig').mockReturnValue({
+				'guild-1': { managerRoleId: 'role-1' },
+			});
+
+			const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => logger);
+			const lockMessage = {
+				id: 'msg-lock-1',
+			} as unknown as Message;
+
+			const sendMock = vi.fn().mockResolvedValue(lockMessage);
+			const fetchMessageMock = vi.fn().mockImplementation((arg: unknown) => {
+				if (typeof arg === 'string' && arg === 'msg-lock-1') {
+					// Return null on heartbeat fetch to simulate external deletion
+					return Promise.resolve(null);
+				}
+				return Promise.resolve(new Collection());
+			});
+
+			const channel = {
+				name: distributedLock.LOCK_CHANNEL_NAME,
+				type: ChannelType.GuildText,
+				messages: {
+					fetch: fetchMessageMock,
+				},
+				send: sendMock,
+			} as unknown as TextChannel;
+
+			const fakeGuild = {
+				id: 'guild-1',
+				name: 'Test Guild',
+				channels: {
+					fetch: vi.fn().mockResolvedValue(new Collection([['ch-1', channel]])),
+				},
+			} as unknown as Guild;
+
+			const client = {
+				guilds: {
+					cache: new Collection([['guild-1', fakeGuild]]),
+				},
+			} as unknown as Client;
+
+			await distributedLock.acquireDistributedLock(client, 0);
+
+			// Advance heartbeat timer
+			await vi.advanceTimersByTimeAsync(distributedLock.HEARTBEAT_INTERVAL_MS);
+
+			expect(warnSpy).toHaveBeenCalledWith(
+				expect.stringContaining('Lock message was deleted or not found'),
 			);
 		});
 
@@ -495,7 +634,7 @@ describe('Distributed Instance Lock (distributedLock.ts)', () => {
 				},
 			} as unknown as Client;
 
-			await distributedLock.acquireDistributedLock(client);
+			await distributedLock.acquireDistributedLock(client, 0);
 
 			await distributedLock.releaseDistributedLock();
 
