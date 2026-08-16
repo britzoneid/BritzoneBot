@@ -4,6 +4,7 @@ import { handleInteraction } from '@/lib/discord/response.js';
 import { logger } from '@/lib/logger.js';
 import {
 	formatScheduleSummary,
+	formatTimerStatus,
 	getTimerSchedule,
 } from '@/modules/breakout/constants/timerPresets.js';
 import {
@@ -13,6 +14,7 @@ import {
 import {
 	getMainRoom,
 	getRooms,
+	getTimerData,
 	setTimerData,
 	type TimerData,
 } from '@/modules/breakout/state/state.js';
@@ -33,7 +35,28 @@ export async function handleTimerCommand(
 			const guildId = interaction.guildId;
 			if (!guildId) return;
 
-			const minutesOption = interaction.options.getString('minutes', true);
+			const minutesOption = interaction.options.getString('minutes');
+			const customMinutesOption =
+				interaction.options.getInteger('custom_minutes');
+
+			if (
+				minutesOption === 'status' ||
+				(!minutesOption && customMinutesOption === null)
+			) {
+				const activeTimer = await getTimerData(guildId);
+				if (!activeTimer) {
+					if (minutesOption === 'status') {
+						await ctx.reply('ℹ️ No active breakout timer for this server.');
+					} else {
+						await ctx.reply(
+							'ℹ️ No active breakout timer. Please select a duration preset or provide a custom duration in minutes (`/breakout timer minutes:<preset>`).',
+						);
+					}
+					return;
+				}
+				await ctx.reply(formatTimerStatus(activeTimer));
+				return;
+			}
 
 			if (minutesOption === 'cancel') {
 				const canceled = await cancelBreakoutTimer(guildId);
@@ -45,16 +68,41 @@ export async function handleTimerCommand(
 				return;
 			}
 
-			const minutes = Number.parseFloat(minutesOption);
+			let minutes: number | null = null;
+
+			if (customMinutesOption !== null) {
+				if (customMinutesOption < 30) {
+					await ctx.reply(
+						'⚠️ Custom timer duration must be at least 30 minutes.',
+					);
+					return;
+				}
+				minutes = customMinutesOption;
+			} else if (minutesOption === 'custom') {
+				await ctx.reply(
+					'⚠️ Please provide the `custom_minutes` option (minimum 30 minutes) when choosing Custom duration.',
+				);
+				return;
+			} else if (minutesOption) {
+				minutes = Number.parseFloat(minutesOption);
+			}
+
+			if (minutes === null || Number.isNaN(minutes) || minutes <= 0) {
+				await ctx.reply(
+					'⚠️ Please select a duration preset or provide a custom duration in minutes (minimum 30 minutes).',
+				);
+				return;
+			}
+
+			if (minutes !== 0.05 && minutes < 30) {
+				await ctx.reply('⚠️ Timer duration must be at least 30 minutes.');
+				return;
+			}
+
 			const autoRecallOption =
 				interaction.options.getBoolean('auto_recall') ?? true;
 			const gracePeriodOption = interaction.options.getInteger('grace_period');
 			const gracePeriodSeconds = gracePeriodOption ?? 60;
-
-			if (!minutes || minutes <= 0) {
-				await ctx.reply('⚠️ Please select a valid duration in minutes.');
-				return;
-			}
 
 			const mainRoom = getMainRoom(guild);
 			const breakoutRooms = getRooms(guild);

@@ -115,22 +115,36 @@ const command: Command = {
 		.addSubcommand((subcommand) =>
 			subcommand
 				.setName('timer')
-				.setDescription('Sets a timer for the breakout session')
+				.setDescription('Sets or checks a timer for the breakout session')
 				.addStringOption((option) =>
 					option
 						.setName('minutes')
 						.setDescription(
-							'FGD timer duration in minutes (or select Cancel to stop active timer)',
+							'FGD timer duration preset (or select Status / Cancel / Custom)',
 						)
-						.setRequired(true)
+						.setRequired(false)
 						.addChoices(
+							{ name: 'ℹ️ Check active timer status', value: 'status' },
 							{ name: '❌ Cancel active timer', value: 'cancel' },
+							{
+								name: '⚙️ Custom duration (specify custom_minutes)',
+								value: 'custom',
+							},
 							{ name: '3 seconds (Testing)', value: '0.05' },
 							{ name: '30 minutes (Reminders at 15m, 5m)', value: '30' },
 							{ name: '45 minutes (Reminders at 22m, 10m, 3m)', value: '45' },
 							{ name: '60 minutes (Reminders at 30m, 15m, 5m)', value: '60' },
 							{ name: '90 minutes (Reminders at 45m, 20m, 5m)', value: '90' },
 						),
+				)
+				.addIntegerOption((option) =>
+					option
+						.setName('custom_minutes')
+						.setDescription(
+							'Custom FGD timer duration in minutes (minimum 30 minutes)',
+						)
+						.setMinValue(30)
+						.setRequired(false),
 				)
 				.addBooleanOption((option) =>
 					option
