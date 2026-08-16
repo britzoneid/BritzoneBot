@@ -13,6 +13,7 @@ import { logger } from '@/lib/logger.js';
 export const LOCK_CHANNEL_NAME = 'bot-instance-lock';
 export const LOCK_EXPIRATION_MS = 25_000;
 export const HEARTBEAT_INTERVAL_MS = 10_000;
+export const SETTLING_DELAY_MS = 500;
 export const CURRENT_INSTANCE_ID = crypto.randomUUID();
 
 export interface LockPayload {
@@ -40,6 +41,33 @@ export function getDeveloperIdentity(): string {
 	}
 	const devName = process.env.DEV_NAME || username;
 	return `${devName}@${os.hostname()}`;
+}
+
+async function handleCollision(
+	data: LockPayload,
+	client: Client,
+): Promise<never> {
+	const isSameMachine = data.hostname === os.hostname();
+
+	if (isSameMachine) {
+		logger.fatal(
+			{ pid: data.pid },
+			`❌ Another bot instance is already running on this machine in another terminal (PID: ${data.pid})!`,
+		);
+	} else {
+		logger.fatal(
+			{
+				runningDev: data.developer,
+				hostname: data.hostname,
+				pid: data.pid,
+			},
+			`❌ Another developer (${data.developer} on ${data.hostname}) is already running this bot!`,
+		);
+	}
+
+	logger.fatal('👉 Stop the active instance before starting this one.');
+	await client.destroy();
+	process.exit(1);
 }
 
 export async function getOrCreateLockChannel(
@@ -101,8 +129,16 @@ export async function getOrCreateLockChannel(
 	}
 }
 
-export async function acquireDistributedLock(client: Client): Promise<void> {
+export async function acquireDistributedLock(
+	client: Client,
+	settlingDelayMs: number = SETTLING_DELAY_MS,
+): Promise<void> {
 	try {
+		if (activeHeartbeatTimer) {
+			clearInterval(activeHeartbeatTimer);
+			activeHeartbeatTimer = null;
+		}
+
 		const guildConfigs = loadGuildConfig();
 		const targetGuildId =
 			Object.keys(guildConfigs)[0] || client.guilds.cache.first()?.id;
@@ -130,7 +166,8 @@ export async function acquireDistributedLock(client: Client): Promise<void> {
 		activeLockChannel = channel;
 		const devId = getDeveloperIdentity();
 
-		const messages = await channel.messages.fetch({ limit: 10 });
+		// Phase 1: Pre-send scan
+		const messages = await channel.messages.fetch({ limit: 100 });
 		const lockMessages = messages.filter((m) =>
 			m.content.startsWith('🔒 [INSTANCE_LOCK]'),
 		);
@@ -147,31 +184,19 @@ export async function acquireDistributedLock(client: Client): Promise<void> {
 				const isDifferentInstance = data.instanceId !== CURRENT_INSTANCE_ID;
 
 				if (isRecent && isDifferentInstance) {
-					const isSameMachine = data.hostname === os.hostname();
-
-					if (isSameMachine) {
-						logger.fatal(
-							{ pid: data.pid },
-							`❌ Another bot instance is already running on this machine in another terminal (PID: ${data.pid})!`,
-						);
-					} else {
-						logger.fatal(
-							{
-								runningDev: data.developer,
-								hostname: data.hostname,
-								pid: data.pid,
-							},
-							`❌ Another developer (${data.developer} on ${data.hostname}) is already running this bot!`,
-						);
-					}
-
-					logger.fatal('👉 Stop the active instance before starting this one.');
-					await client.destroy();
-					process.exit(1);
+					await handleCollision(data, client);
 				}
 
 				await lockMsg.delete().catch(() => {});
-			} catch {
+			} catch (err) {
+				// Re-throw if it was a collision exit from handleCollision
+				if (
+					err instanceof Error &&
+					(err.message.includes('process.exit') ||
+						err.message.includes('PROCESS_EXIT'))
+				) {
+					throw err;
+				}
 				// Corrupted message, overwrite safely by deleting
 				await lockMsg.delete().catch(() => {});
 			}
@@ -190,6 +215,45 @@ export async function acquireDistributedLock(client: Client): Promise<void> {
 		);
 		currentLockMessageId = lockMsg.id;
 
+		// Phase 2: Post-send confirmation (Resolving Check-then-Act Race)
+		if (settlingDelayMs > 0) {
+			await new Promise((resolve) => setTimeout(resolve, settlingDelayMs));
+		}
+
+		const postMessages = await channel.messages.fetch({ limit: 100 });
+		for (const msg of postMessages.values()) {
+			if (
+				msg.id === lockMsg.id ||
+				!msg.content.startsWith('🔒 [INSTANCE_LOCK]')
+			) {
+				continue;
+			}
+			try {
+				const jsonStr = msg.content.replace('🔒 [INSTANCE_LOCK]', '').trim();
+				const data = JSON.parse(jsonStr) as LockPayload;
+				const age = Date.now() - data.timestamp;
+				const isRecent = age < LOCK_EXPIRATION_MS;
+				const isDifferentInstance = data.instanceId !== CURRENT_INSTANCE_ID;
+
+				if (isRecent && isDifferentInstance) {
+					// Compare Discord Snowflake IDs: smaller ID means posted earlier by Discord
+					if (BigInt(msg.id) < BigInt(lockMsg.id)) {
+						await lockMsg.delete().catch(() => {});
+						currentLockMessageId = null;
+						await handleCollision(data, client);
+					}
+				}
+			} catch (err) {
+				if (
+					err instanceof Error &&
+					(err.message.includes('process.exit') ||
+						err.message.includes('PROCESS_EXIT'))
+				) {
+					throw err;
+				}
+			}
+		}
+
 		logger.info(
 			{ developer: devId, channel: `#${channel.name}` },
 			'🔐 Instance lock acquired successfully',
@@ -198,18 +262,23 @@ export async function acquireDistributedLock(client: Client): Promise<void> {
 		activeHeartbeatTimer = setInterval(async () => {
 			try {
 				if (!currentLockMessageId || !activeLockChannel) return;
-				const msg =
-					await activeLockChannel.messages.fetch(currentLockMessageId);
-				if (msg) {
-					const update: LockPayload = {
-						instanceId: CURRENT_INSTANCE_ID,
-						developer: devId,
-						hostname: os.hostname(),
-						pid: process.pid,
-						timestamp: Date.now(),
-					};
-					await msg.edit(`🔒 [INSTANCE_LOCK] ${JSON.stringify(update)}`);
+				const msg = await activeLockChannel.messages
+					.fetch(currentLockMessageId)
+					.catch(() => null);
+				if (!msg) {
+					logger.warn(
+						'⚠️ Lock message was deleted or not found during heartbeat',
+					);
+					return;
 				}
+				const update: LockPayload = {
+					instanceId: CURRENT_INSTANCE_ID,
+					developer: devId,
+					hostname: os.hostname(),
+					pid: process.pid,
+					timestamp: Date.now(),
+				};
+				await msg.edit(`🔒 [INSTANCE_LOCK] ${JSON.stringify(update)}`);
 			} catch (err) {
 				logger.warn({ err }, '⚠️ Heartbeat update failed');
 			}
@@ -217,6 +286,13 @@ export async function acquireDistributedLock(client: Client): Promise<void> {
 
 		activeHeartbeatTimer.unref();
 	} catch (err) {
+		if (
+			err instanceof Error &&
+			(err.message.includes('process.exit') ||
+				err.message.includes('PROCESS_EXIT'))
+		) {
+			throw err;
+		}
 		logger.error({ err }, '❌ Unexpected error in acquireDistributedLock');
 	}
 }
@@ -229,7 +305,9 @@ export async function releaseDistributedLock(): Promise<void> {
 
 	if (activeLockChannel && currentLockMessageId) {
 		try {
-			const msg = await activeLockChannel.messages.fetch(currentLockMessageId);
+			const msg = await activeLockChannel.messages
+				.fetch(currentLockMessageId)
+				.catch(() => null);
 			if (msg) await msg.delete();
 			logger.info('🔓 Distributed lock released from Discord');
 		} catch {
