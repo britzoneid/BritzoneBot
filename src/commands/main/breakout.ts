@@ -123,13 +123,9 @@ const command: Command = {
 				.addStringOption((option) =>
 					option
 						.setName('minutes')
-						.setDescription('FGD timer duration preset (or select Custom)')
+						.setDescription('FGD timer duration preset')
 						.setRequired(false)
 						.addChoices(
-							{
-								name: '⚙️ Custom duration (specify custom_minutes)',
-								value: 'custom',
-							},
 							{ name: '3 seconds (Testing)', value: '0.05' },
 							{ name: '20 minutes (Reminders at 10m, 5m)', value: '20' },
 							{ name: '30 minutes (Reminders at 15m, 5m)', value: '30' },

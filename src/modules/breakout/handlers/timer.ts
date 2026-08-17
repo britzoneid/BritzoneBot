@@ -44,11 +44,6 @@ export async function handleTimerCommand(
 					return;
 				}
 				minutes = customMinutesOption;
-			} else if (minutesOption === 'custom') {
-				await ctx.reply(
-					'⚠️ Please provide the `custom_minutes` option (minimum 30 minutes) when choosing Custom duration.',
-				);
-				return;
 			} else if (minutesOption) {
 				minutes = Number.parseFloat(minutesOption);
 			}
