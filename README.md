@@ -104,7 +104,37 @@ Edit `guildConfig.json` with your Discord server IDs and manager role IDs:
 }
 ```
 
-### 4. Build and Deploy
+### 4. Bot Permissions & OAuth2 Setup
+
+When inviting the bot or configuring its role in your Discord server, grant the following OAuth2 scopes and permissions to ensure all features (slash commands, breakout rooms, and distributed instance locking) function correctly.
+
+#### OAuth2 Scopes
+- `bot`
+- `applications.commands`
+
+#### Required Permissions
+
+| Feature / Module | Permission | Why It Is Required |
+|------------------|------------|---------------------|
+| **General & Commands** | `View Channel` | View text channels to handle slash commands. |
+| | `Send Messages` | Post command responses, confirmations, and announcements. |
+| | `Embed Links` | Send rich status, distribution previews, and diagnostic embeds. |
+| | `Read Message History` | Fetch messages and state verification. |
+| **Distributed Lock** | `Manage Channels` | Auto-create the `#bot-instance-lock` channel if it does not exist. |
+| | `Manage Roles` *(Manage Permissions)* | Configure private channel permission overwrites for `#bot-instance-lock`. |
+| | `Manage Messages` | Delete stale lock records and collision notices during cleanup. |
+| **Breakout Rooms** | `Manage Channels` | Dynamically create and delete breakout voice channels. |
+| | `Move Members` | Move participants into breakout rooms and recall them to the main room. |
+| | `Connect` | Manage voice channels within categories via Discord REST API. |
+| | `Manage Messages` | Clean up active countdown and periodic reminder messages when expired or cancelled. |
+
+> [!TIP]
+> **Calculated Permission Integer**: `286349328` (`0x110FB410`)  
+> **Invite URL Template**:  
+> `https://discord.com/api/oauth2/authorize?client_id=YOUR_BOT_ID&permissions=286349328&scope=bot%20applications.commands`  
+> *(For private development/staging servers, granting **Administrator** (`8`) is also sufficient).*
+
+### 5. Build and Deploy
 
 ```sh
 # Compile TypeScript → JavaScript
@@ -114,7 +144,7 @@ bun run build
 bun run deploy
 ```
 
-### 5. Run the Bot
+### 6. Run the Bot
 
 | Mode        | Command      | Notes                                        |
 |-------------|--------------|----------------------------------------------|
