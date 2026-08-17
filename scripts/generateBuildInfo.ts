@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -10,6 +10,28 @@ function getGitOutput(command: string): string | null {
 		}).trim();
 	} catch {
 		return null;
+	}
+}
+
+function isGitDirty(): boolean {
+	try {
+		execFileSync(
+			'git',
+			[
+				'diff-index',
+				'--quiet',
+				'HEAD',
+				'--',
+				':!src/lib/buildInfo.generated.ts',
+			],
+			{
+				stdio: ['ignore', 'ignore', 'ignore'],
+			},
+		);
+		return false;
+	} catch {
+		// Only report dirty if we are in a valid Git repository
+		return getGitOutput('git rev-parse HEAD') !== null;
 	}
 }
 
@@ -33,8 +55,7 @@ function generateBuildInfo(): void {
 		process.env.GIT_BRANCH ||
 		getGitOutput('git rev-parse --abbrev-ref HEAD') ||
 		'unknown';
-	const dirtyOutput = getGitOutput('git status --porcelain');
-	const dirty = dirtyOutput !== null ? dirtyOutput.length > 0 : false;
+	const dirty = isGitDirty();
 	const builtAt = new Date().toISOString();
 
 	const targetPath = path.join(rootDir, 'src', 'lib', 'buildInfo.generated.ts');

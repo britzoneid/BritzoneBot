@@ -13,9 +13,9 @@
 		"dev": "bun run build:info && bun --watch src/index.ts",
 		"format": "biome format --write",
 		"lint": "biome lint",
-		"typecheck": "tsc --noEmit",
-		"test": "vitest run",
-		"test:watch": "vitest",
+		"typecheck": "bun run build:info && tsc --noEmit",
+		"test": "bun run build:info && vitest run",
+		"test:watch": "bun run build:info && vitest",
 		"knip": "knip",
 		"release": "release-it"
 	},
