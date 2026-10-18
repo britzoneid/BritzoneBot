@@ -81,7 +81,7 @@ const CHANNEL_MANAGEMENT_PERMISSIONS = [
 ];
 
 /** Permissions the bot needs to move members in and out of a voice channel. */
-const VOICE_MOVE_PERMISSIONS = [
+export const VOICE_MOVE_PERMISSIONS = [
 	PermissionsBitField.Flags.Connect,
 	PermissionsBitField.Flags.MoveMembers,
 	PermissionsBitField.Flags.ViewChannel,
