@@ -3,6 +3,7 @@ import {
 	type Guild,
 	GuildMember,
 	PermissionsBitField,
+	type StageChannel,
 	type VoiceChannel,
 } from 'discord.js';
 import { describe, expect, it } from 'vitest';
@@ -193,6 +194,59 @@ describe('Discord Permission Utilities (permission.ts)', () => {
 	});
 
 	describe('preflightBreakout composite check', () => {
+		it('collects missing move permissions across voice and stage channels', () => {
+			const source = {
+				name: 'Source',
+				permissionsFor: () => ({
+					has: (perm: bigint) => perm !== PermissionsBitField.Flags.MoveMembers,
+				}),
+			} as unknown as VoiceChannel;
+			const destination = {
+				name: 'Stage destination',
+				permissionsFor: () => ({
+					has: (perm: bigint) => perm !== PermissionsBitField.Flags.Connect,
+				}),
+			} as unknown as StageChannel;
+			const member = {
+				id: 'owner',
+				guild: { ownerId: 'owner', members: { me: {} } },
+				permissions: { has: () => true },
+			} as unknown as GuildMember;
+
+			const result = preflightBreakout({
+				member,
+				voiceChannels: [source, destination],
+				requireUserMove: true,
+			});
+
+			expect(result.ok).toBe(false);
+			expect(result.reason).toContain(
+				'**Move Members** in voice channel Source',
+			);
+			expect(result.reason).toContain(
+				'**Connect** in voice channel Stage destination',
+			);
+			expect(result.reason).toContain("I'm missing 2 permissions:");
+		});
+
+		it('allows moving across channels without Manage Channels permission', () => {
+			const channel = {
+				name: 'Voice room',
+				permissionsFor: () => ({
+					has: (perm: bigint) =>
+						perm !== PermissionsBitField.Flags.ManageChannels,
+				}),
+			} as unknown as VoiceChannel;
+			const member = {
+				id: 'owner',
+				guild: { ownerId: 'owner', members: { me: {} } },
+			} as unknown as GuildMember;
+
+			expect(preflightBreakout({ member, voiceChannels: [channel] })).toEqual({
+				ok: true,
+			});
+		});
+
 		it('reports missing guildConfig.json when file is absent', () => {
 			const member = {
 				id: 'user-1',

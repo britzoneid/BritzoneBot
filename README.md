@@ -178,6 +178,12 @@ BritzoneBot offers a suite of slash commands to manage breakout rooms. All break
 |              |                |                                                                    | `message` *(String, Required)* – The message content. |
 | `/breakout`  | `reset`        | Clears a stuck operation record so other subcommands can run again. Rooms, members and timers are left untouched. Re-run `bun run deploy` after upgrading to register this subcommand. | None |
 
+### Move audience
+
+`/move-all-audience source:<Voice/Stage Channel> destination:<Voice/Stage Channel>` previews the source members and asks for confirmation before moving them. It requires the configured manager role (or guild ownership) and **Move Members** permission. The bot checks **Connect**, **Move Members**, and **View Channel** in both channels before showing the preview.
+
+The final reply reports how many members moved and includes reasons for failed moves. Other members are still attempted after an individual failure; lengthy failure details are truncated to fit the reply.
+
 ### 🛠️ Utility Commands
 
 | Command   | Description                                              | Permissions |
