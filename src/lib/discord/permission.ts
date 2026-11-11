@@ -157,6 +157,8 @@ export interface BreakoutPreflightOptions {
 	member: GuildMember;
 	category?: CategoryChannel | GuildBasedChannel | null;
 	voiceChannel?: VoiceChannel | StageChannel | GuildBasedChannel | null;
+	/** Additional voice/stage channels to check for move permissions. */
+	voiceChannels?: (VoiceChannel | StageChannel)[];
 	textChannel?: TextChannel | GuildTextBasedChannel | GuildBasedChannel | null;
 	channels?: (GuildBasedChannel | null | undefined)[];
 	requireUserMove?: boolean;
@@ -179,6 +181,7 @@ export function preflightBreakout(
 		member,
 		category,
 		voiceChannel,
+		voiceChannels = [],
 		textChannel,
 		channels,
 		requireUserMove,
@@ -293,6 +296,13 @@ export function preflightBreakout(
 			voiceChannel,
 			VOICE_MOVE_PERMISSIONS,
 			`in voice channel ${voiceChannel.name}`,
+		);
+	}
+	for (const channel of voiceChannels) {
+		recordMissing(
+			channel,
+			VOICE_MOVE_PERMISSIONS,
+			`in voice channel ${channel.name}`,
 		);
 	}
 
