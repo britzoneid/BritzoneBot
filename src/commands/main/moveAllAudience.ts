@@ -1,20 +1,14 @@
 import {
 	ChannelType,
 	type ChatInputCommandInteraction,
-	GuildMember,
+	type GuildMember,
 	SlashCommandBuilder,
 	type StageChannel,
 	type VoiceChannel,
 } from 'discord.js';
 import { confirmAction } from '@/lib/discord/confirm.js';
 import { moveUser } from '@/lib/discord/member.js';
-import {
-	canInvokeBreakout,
-	canMemberMoveMembers,
-	formatPermissionNames,
-	getMissingBotPermissions,
-	VOICE_MOVE_PERMISSIONS,
-} from '@/lib/discord/permission.js';
+import { preflightBreakoutFor } from '@/lib/discord/permission.js';
 import { handleInteraction } from '@/lib/discord/response.js';
 import { logger } from '@/lib/logger.js';
 import type { Command, MoveFailure, MoveResult } from '@/types/index.js';
@@ -71,48 +65,12 @@ const command: Command = {
 					return;
 				}
 
-				if (!(interaction.member instanceof GuildMember)) {
-					await ctx.reply('Unable to verify your permissions.');
-					return;
-				}
-				const member = interaction.member;
-
-				if (!canInvokeBreakout(member)) {
-					await ctx.reply(
-						'You do not have the required manager role for this server.',
-					);
-					return;
-				}
-
-				if (!canMemberMoveMembers(member)) {
-					await ctx.reply(
-						'You need the **Move Members** permission to use this command.',
-					);
-					return;
-				}
-
-				const guild = interaction.guild;
-				if (!guild) return;
-
-				const permissionFailures: string[] = [];
-				for (const channel of [source, destination]) {
-					const missing = getMissingBotPermissions(
-						guild,
-						channel,
-						VOICE_MOVE_PERMISSIONS,
-					);
-					if (missing.length > 0) {
-						permissionFailures.push(
-							`**${formatPermissionNames(missing)}** in ${channel.name}`,
-						);
-					}
-				}
-				if (permissionFailures.length > 0) {
-					await ctx.reply(
-						`I'm missing permissions:\n${permissionFailures
-							.map((failure) => `• ${failure}`)
-							.join('\n')}\nAsk an admin to grant them.`,
-					);
+				const check = preflightBreakoutFor(interaction, {
+					voiceChannels: [source, destination],
+					requireUserMove: true,
+				});
+				if (!check.ok) {
+					await ctx.reply(check.reason ?? 'Permission check failed.');
 					return;
 				}
 
@@ -174,7 +132,7 @@ const command: Command = {
 									userId: target.id,
 									userTag: target.user.tag,
 									reason:
-										error instanceof Error ? error.message : 'Unknown error',
+										error instanceof Error ? error.message : String(error),
 								});
 							}
 						}
@@ -189,14 +147,22 @@ const command: Command = {
 						];
 						if (failed.length > 0) {
 							summaryLines.push(
-								`⚠️ Failed to move: ${failed
-									.map((f) => f.userTag ?? f.userId ?? 'unknown')
-									.join(', ')}`,
+								`⚠️ Failed to move:\n${failed
+									.map(
+										(f) =>
+											`• ${f.userTag ?? f.userId ?? 'unknown'}: ${f.reason}`,
+									)
+									.join('\n')}`,
 							);
 						}
 
+						const summary = summaryLines.join('\n');
+						const omittedNote = '\n… Additional failure details omitted.';
 						await ctx.editReply({
-							content: summaryLines.join('\n'),
+							content:
+								summary.length > 2000
+									? summary.slice(0, 2000 - omittedNote.length) + omittedNote
+									: summary,
 							components: [],
 						});
 					},
