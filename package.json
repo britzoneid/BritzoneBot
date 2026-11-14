@@ -9,7 +9,7 @@
 		"build:info": "bun scripts/generateBuildInfo.ts",
 		"build": "bun run clean && bun run build:info && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
 		"start": "NODE_ENV=production bun dist/index.js",
-		"deploy": "bun dist/deployCommandsLocal.js",
+		"commands:sync": "bun run build:info && bun src/syncCommands.ts",
 		"dev": "bun run build:info && bun --watch src/index.ts",
 		"format": "biome format --write",
 		"lint": "biome lint",

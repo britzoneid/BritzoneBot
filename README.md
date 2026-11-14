@@ -83,7 +83,7 @@ LOG_LEVEL=info   # trace | debug | info | warn | error | fatal | silent
 
 #### Guild Configuration
 
-Create a `guildConfig.json` file in the root directory to map each guild ID to its server name and manager role ID. This file is required for both registering slash commands (`bun run deploy`) and enforcing permissions:
+Create a `guildConfig.json` file in the root directory to map each guild ID to its server name and manager role ID. This file is required for both registering slash commands (`bun run commands:sync --all`) and enforcing permissions:
 
 ```sh
 cp guildConfig.json.example guildConfig.json
@@ -141,8 +141,39 @@ When inviting the bot or configuring its role in your Discord server, grant the 
 bun run build
 
 # Register slash commands to all guilds in guildConfig.json
-bun run deploy
+bun run commands:sync --all
 ```
+
+### Synchronizing command definitions
+
+After changing command names, descriptions, options, or subcommands, explicitly
+synchronize the definitions with Discord:
+
+```sh
+# Update only a configured testing server
+bun run commands:sync --guild <guild-id>
+
+# Update every configured server
+bun run commands:sync --all
+
+bun run commands:sync --help
+```
+
+`commands:sync` replaces the old `deploy` script. It uses the current TypeScript
+source, generates its required build metadata, and does not require a prior build.
+It prints the application ID, target servers, command names, and a final summary.
+A failed registration returns a nonzero exit status while other targets are still
+attempted. Missing targets, unknown guilds, and invalid or empty command loads
+abort before registration.
+
+Each selected guild's command set is replaced, including removal of definitions
+no longer present in source. Global commands are unaffected. Starting or restarting
+the bot does not register commands automatically.
+
+For production updates, build and synchronize from the same checkout, check that
+synchronization succeeded, then restart the bot using your process manager.
+Command handler changes still require restarting the bot; synchronization updates
+Discord's command definitions only.
 
 ### 6. Run the Bot
 
@@ -176,7 +207,7 @@ BritzoneBot offers a suite of slash commands to manage breakout rooms. All break
 | `/breakout`  | `broadcast`    | Broadcasts a message to all active breakout rooms.                 | `message` *(String, Required)* – The message content. |
 | `/breakout`  | `send-message` | Sends a message to a specific voice channel's text chat.           | `channel` *(Voice Channel, Required)* – Target channel. |
 |              |                |                                                                    | `message` *(String, Required)* – The message content. |
-| `/breakout`  | `reset`        | Clears a stuck operation record so other subcommands can run again. Rooms, members and timers are left untouched. Re-run `bun run deploy` after upgrading to register this subcommand. | None |
+| `/breakout`  | `reset`        | Clears a stuck operation record so other subcommands can run again. Rooms, members and timers are left untouched. Re-run `bun run commands:sync --all` after upgrading to register this subcommand. | None |
 
 ### Move audience
 

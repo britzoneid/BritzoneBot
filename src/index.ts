@@ -6,15 +6,16 @@
  */
 
 import 'dotenv/config';
-import fs from 'node:fs';
 import path from 'node:path';
 import { Client, Collection, GatewayIntentBits, RESTEvents } from 'discord.js';
 import { disableActivePrompts } from '@/lib/discord/components.js';
 import { releaseDistributedLock } from '@/lib/distributedLock.js';
+import { loadCommands } from '@/lib/loadCommands.js';
 import { logger } from '@/lib/logger.js';
 import { listModuleFiles, moduleExtensionOf } from '@/lib/moduleFiles.js';
 import { flushState, initializeState } from '@/modules/breakout/state/state.js';
-import type { BritzoneClient, Command, Event } from '@/types/index.js';
+import type { Command } from '@/types/command.js';
+import type { BritzoneClient, Event } from '@/types/index.js';
 
 const __dirname = import.meta.dirname;
 const moduleExtension = moduleExtensionOf(import.meta.url);
@@ -83,35 +84,12 @@ client.rest.on(RESTEvents.Response, (request, response) => {
 
 logger.info('📂 Loading commands...');
 
-const foldersPath = path.join(__dirname, 'commands');
-const commandFolders = fs.readdirSync(foldersPath);
-
-for (const folder of commandFolders) {
-	const commandsPath = path.join(foldersPath, folder);
-	const commandFiles = listModuleFiles(commandsPath, moduleExtension);
-
-	for (const file of commandFiles) {
-		const filePath = path.join(commandsPath, file);
-
-		try {
-			// Dynamic import with type casting
-			const module = (await import(filePath)) as { default: Command };
-			const command = module.default;
-
-			// Type guard: ensure command has required properties
-			if ('data' in command && 'execute' in command) {
-				client.commands.set(command.data.name, command);
-				logger.info({ command: command.data.name }, `✅ Command loaded`);
-			} else {
-				logger.warn(
-					{ filePath },
-					`⚠️ [WARNING] Command is missing required "data" or "execute" property.`,
-				);
-			}
-		} catch (error) {
-			logger.error({ err: error, filePath }, `❌ Error loading command`);
-		}
-	}
+const commands = await loadCommands((error, filePath) => {
+	logger.error({ err: error, filePath }, 'Error loading command');
+});
+for (const command of commands) {
+	client.commands.set(command.data.name, command);
+	logger.info({ command: command.data.name }, '✅ Command loaded');
 }
 
 // ============================================================================
