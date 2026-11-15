@@ -38,6 +38,7 @@ bun run type-check
 ```
 
 **Expected output if no errors:**
+
 ```
 (no output means no errors!)
 ```
@@ -65,14 +66,16 @@ bun run dev
 ## 📁 Migration Strategy
 
 ### Step 1: Migrate Type Definitions (Already Done ✅)
+
 - `src/types/command.ts` - Types for your commands
-- `src/types/event.ts` - Types for your event handlers  
+- `src/types/event.ts` - Types for your event handlers
 - `src/types/client.ts` - Extended Client type with your custom properties
 - `src/types/index.ts` - Central export for all types
 
 ### Step 2: Migrate Your Files
 
 **Start with helpers (utility files):**
+
 1. Open `src/helpers/` (already has examples)
 2. Copy one `.js` file: e.g., `helpers/distributeUsers.js`
 3. Convert to TypeScript:
@@ -83,6 +86,7 @@ bun run dev
 **Example: distributeUsers**
 
 **Before** (`distributeUsers.js`):
+
 ```javascript
 /**
  * Distributes users evenly across breakout rooms
@@ -91,13 +95,14 @@ bun run dev
  * @returns {Map<number, string[]>} Map of room index to user IDs
  */
 export function distributeUsers(userIds, roomCount) {
-  const distribution = new Map();
-  // ... implementation
-  return distribution;
+	const distribution = new Map();
+	// ... implementation
+	return distribution;
 }
 ```
 
 **After** (`distributeUsers.ts`):
+
 ```typescript
 /**
  * Distributes users evenly across breakout rooms
@@ -106,20 +111,22 @@ export function distributeUsers(userIds, roomCount) {
  * @returns Map of room index to user IDs
  */
 export function distributeUsers(
-  userIds: string[],
-  roomCount: number,
+	userIds: string[],
+	roomCount: number,
 ): Map<number, string[]> {
-  const distribution = new Map<number, string[]>();
-  // ... implementation (same logic)
-  return distribution;
+	const distribution = new Map<number, string[]>();
+	// ... implementation (same logic)
+	return distribution;
 }
 ```
 
 **Then migrate events** (`src/events/`):
+
 - Ready event ✅ (already migrated as example)
 - InteractionCreate ✅ (already migrated as example)
 
 **Then migrate commands** (`src/commands/`):
+
 - Start with simpler commands
 - Use `ping.ts` as a template
 - Reference `TYPESCRIPT_MIGRATION_GUIDE.md` for complex commands like `breakout.ts`
@@ -145,17 +152,19 @@ bun run build
 Use this template when migrating your files:
 
 ### JavaScript Version
+
 ```javascript
 /**
  * @param {SomeType} param - Description
  * @returns {ReturnType} Description
  */
 export function myFunction(param) {
-  // implementation
+	// implementation
 }
 ```
 
 ### TypeScript Version
+
 ```typescript
 import type { SomeType } from '../types/index.js';
 
@@ -165,11 +174,12 @@ import type { SomeType } from '../types/index.js';
  * @returns Description
  */
 export function myFunction(param: SomeType): ReturnType {
-  // implementation (same logic)
+	// implementation (same logic)
 }
 ```
 
 ### Key Changes:
+
 1. Add file extension to imports: `from '../helpers/myHelper.js'`
 2. Replace JSDoc `@param {Type}` with `: Type`
 3. Add return type: `: ReturnType`
@@ -181,6 +191,7 @@ export function myFunction(param: SomeType): ReturnType {
 ## 📚 Reference Files Provided
 
 ### Complete Examples:
+
 - ✅ `src/index.ts` - Full entry point with comments
 - ✅ `src/events/ready.ts` - Simple event example
 - ✅ `src/events/interactionCreate.ts` - Complex event with error handling
@@ -189,6 +200,7 @@ export function myFunction(param: SomeType): ReturnType {
 - ✅ `src/commands/utility/ping.ts` - Simple command
 
 ### Use these to understand patterns for:
+
 - **Event handlers** → See `src/events/`
 - **Helper functions** → See `src/helpers/`
 - **Commands** → See `src/commands/`
@@ -199,6 +211,7 @@ export function myFunction(param: SomeType): ReturnType {
 ## 🐛 Common Issues & Quick Fixes
 
 ### "Cannot find module" errors
+
 ```typescript
 // ❌ Wrong
 import { helper } from './helpers/helper';
@@ -211,6 +224,7 @@ import { helper } from './helpers/helper.js';
 ---
 
 ### "client.commands is not defined"
+
 ```typescript
 // ❌ Wrong
 const command = client.commands.get(...);
@@ -224,6 +238,7 @@ const command = client.commands.get(...);
 ---
 
 ### Type errors on `interaction.options.get*()`
+
 ```typescript
 // ❌ Wrong
 const count = interaction.options.getInteger('number');
@@ -267,6 +282,7 @@ Generated with Discord.js TypeScript migration guide"
 ## 📖 Full Documentation
 
 For detailed explanations of:
+
 - All TypeScript patterns
 - How discord.js types work
 - Advanced patterns and configurations

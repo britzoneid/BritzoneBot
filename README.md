@@ -5,7 +5,6 @@
 [![License](https://img.shields.io/github/license/britzoneid/BritzoneBot)](https://github.com/britzoneid/BritzoneBot/blob/master/LICENSE)
 [![Bun Version](https://img.shields.io/badge/Bun-%3E=v1.3.0-FBF0DF?logo=bun)](https://bun.sh)
 
-
 BritzoneBot is a Discord bot designed to manage breakout rooms for voice channels in a Discord server. It provides commands to create, distribute users among, recall members from, and delete breakout sessions with robust error handling, operation checkpointing, and persistent state management.
 
 ## ✨ Features
@@ -93,14 +92,14 @@ Edit `guildConfig.json` with your Discord server IDs and manager role IDs:
 
 ```json
 {
-  "YourGuildID1": {
-    "name": "YourServerName1",
-    "managerRoleId": "YourManagerRoleID1"
-  },
-  "YourGuildID2": {
-    "name": "YourServerName2",
-    "managerRoleId": "YourManagerRoleID2"
-  }
+	"YourGuildID1": {
+		"name": "YourServerName1",
+		"managerRoleId": "YourManagerRoleID1"
+	},
+	"YourGuildID2": {
+		"name": "YourServerName2",
+		"managerRoleId": "YourManagerRoleID2"
+	}
 }
 ```
 
@@ -109,24 +108,25 @@ Edit `guildConfig.json` with your Discord server IDs and manager role IDs:
 When inviting the bot or configuring its role in your Discord server, grant the following OAuth2 scopes and permissions to ensure all features (slash commands, breakout rooms, and distributed instance locking) function correctly.
 
 #### OAuth2 Scopes
+
 - `bot`
 - `applications.commands`
 
 #### Required Permissions
 
-| Feature / Module | Permission | Why It Is Required |
-|------------------|------------|---------------------|
-| **General & Commands** | `View Channel` | View text channels to handle slash commands. |
-| | `Send Messages` | Post command responses, confirmations, and announcements. |
-| | `Embed Links` | Send rich status, distribution previews, and diagnostic embeds. |
-| | `Read Message History` | Fetch messages and state verification. |
-| **Distributed Lock** | `Manage Channels` | Auto-create the `#bot-instance-lock` channel if it does not exist. |
-| | `Manage Roles` *(Manage Permissions)* | Configure private channel permission overwrites for `#bot-instance-lock`. |
-| | `Manage Messages` | Delete stale lock records and collision notices during cleanup. |
-| **Breakout Rooms** | `Manage Channels` | Dynamically create and delete breakout voice channels. |
-| | `Move Members` | Move participants into breakout rooms and recall them to the main room. |
-| | `Connect` | Manage voice channels within categories via Discord REST API. |
-| | `Manage Messages` | Clean up active countdown messages when expired or cancelled. |
+| Feature / Module       | Permission                            | Why It Is Required                                                        |
+| ---------------------- | ------------------------------------- | ------------------------------------------------------------------------- |
+| **General & Commands** | `View Channel`                        | View text channels to handle slash commands.                              |
+|                        | `Send Messages`                       | Post command responses, confirmations, and announcements.                 |
+|                        | `Embed Links`                         | Send rich status, distribution previews, and diagnostic embeds.           |
+|                        | `Read Message History`                | Fetch messages and state verification.                                    |
+| **Distributed Lock**   | `Manage Channels`                     | Auto-create the `#bot-instance-lock` channel if it does not exist.        |
+|                        | `Manage Roles` _(Manage Permissions)_ | Configure private channel permission overwrites for `#bot-instance-lock`. |
+|                        | `Manage Messages`                     | Delete stale lock records and collision notices during cleanup.           |
+| **Breakout Rooms**     | `Manage Channels`                     | Dynamically create and delete breakout voice channels.                    |
+|                        | `Move Members`                        | Move participants into breakout rooms and recall them to the main room.   |
+|                        | `Connect`                             | Manage voice channels within categories via Discord REST API.             |
+|                        | `Manage Messages`                     | Clean up active countdown messages when expired or cancelled.             |
 
 > [!TIP]
 > **Calculated Permission Integer**: `286349328` (`0x110FB410`)  
@@ -177,10 +177,10 @@ Discord's command definitions only.
 
 ### 6. Run the Bot
 
-| Mode        | Command      | Notes                                        |
-|-------------|--------------|----------------------------------------------|
-| Production  | `bun start`  | Runs the compiled output. Use a process manager (`pm2`, `systemd`) for uptime. |
-| Development | `bun dev`    | Live-reload via Bun's watch mode.            |
+| Mode        | Command     | Notes                                                                          |
+| ----------- | ----------- | ------------------------------------------------------------------------------ |
+| Production  | `bun start` | Runs the compiled output. Use a process manager (`pm2`, `systemd`) for uptime. |
+| Development | `bun dev`   | Live-reload via Bun's watch mode.                                              |
 
 ---
 
@@ -190,24 +190,24 @@ BritzoneBot offers a suite of slash commands to manage breakout rooms. All break
 
 ### 🏠 Breakout Commands
 
-| Command      | Subcommand     | Description                                                        | Options |
-|--------------|----------------|--------------------------------------------------------------------|---------|
-| `/breakout`  | `create`       | Creates multiple breakout voice channels.                          | `number` *(Integer, Required)* – Number of rooms to create (≥ 1). |
-| `/breakout`  | `distribute`   | Previews and distributes users from a main room into breakout rooms. Shows a confirmation prompt before moving. | `mainroom` *(Voice/Stage Channel, Required)* – The source voice channel. |
-|              |                |                                                                    | `exclude` *(String, Optional)* – User mentions to keep in the main room. |
-|              |                |                                                                    | `facilitators` *(String, Optional)* – User mentions to assign into breakout rooms first (one per room when possible). |
-| `/breakout`  | `recall`       | Moves all members from breakout rooms back to the main voice channel. Breakout rooms remain intact. | `mainroom` *(Voice/Stage Channel, Required)* – The destination channel. |
-| `/breakout`  | `delete`       | Deletes all breakout room channels.                                | None |
-| `/breakout`  | `timer`        | Sets a countdown timer for the breakout session. Sends periodic reminders and handles auto-recall on expiration. | `minutes` *(String, Optional)* – Duration preset: 20, 30, 45, 60, 90 minutes, or 3 seconds (testing). |
-|              |                |                                                                    | `custom_minutes` *(Integer, Optional)* – Custom duration, minimum 30 minutes. Takes precedence over `minutes`. |
-|              |                |                                                                    | `auto_recall` *(Boolean, Optional)* – Automatically recall members to main room when time is up (default: `true`). |
-|              |                |                                                                    | `grace_period` *(Integer, Optional)* – Grace period in seconds before auto-recalling members (0–300s, default: `60s`). |
-| `/breakout`  | `timer-cancel` | Cancels the active breakout session timer.                         | None |
-| `/breakout`  | `status`       | Displays current breakout rooms, timer state and any operation in progress. | None |
-| `/breakout`  | `broadcast`    | Broadcasts a message to all active breakout rooms.                 | `message` *(String, Required)* – The message content. |
-| `/breakout`  | `send-message` | Sends a message to a specific voice channel's text chat.           | `channel` *(Voice Channel, Required)* – Target channel. |
-|              |                |                                                                    | `message` *(String, Required)* – The message content. |
-| `/breakout`  | `reset`        | Clears a stuck operation record so other subcommands can run again. Rooms, members and timers are left untouched. Re-run `bun run commands:sync --all` after upgrading to register this subcommand. | None |
+| Command     | Subcommand     | Description                                                                                                                                                                                         | Options                                                                                                                |
+| ----------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `/breakout` | `create`       | Creates multiple breakout voice channels.                                                                                                                                                           | `number` _(Integer, Required)_ – Number of rooms to create (≥ 1).                                                      |
+| `/breakout` | `distribute`   | Previews and distributes users from a main room into breakout rooms. Shows a confirmation prompt before moving.                                                                                     | `mainroom` _(Voice/Stage Channel, Required)_ – The source voice channel.                                               |
+|             |                |                                                                                                                                                                                                     | `exclude` _(String, Optional)_ – User mentions to keep in the main room.                                               |
+|             |                |                                                                                                                                                                                                     | `facilitators` _(String, Optional)_ – User mentions to assign into breakout rooms first (one per room when possible).  |
+| `/breakout` | `recall`       | Moves all members from breakout rooms back to the main voice channel. Breakout rooms remain intact.                                                                                                 | `mainroom` _(Voice/Stage Channel, Required)_ – The destination channel.                                                |
+| `/breakout` | `delete`       | Deletes all breakout room channels.                                                                                                                                                                 | None                                                                                                                   |
+| `/breakout` | `timer`        | Sets a countdown timer for the breakout session. Sends periodic reminders and handles auto-recall on expiration.                                                                                    | `minutes` _(String, Optional)_ – Duration preset: 20, 30, 45, 60, 90 minutes, or 3 seconds (testing).                  |
+|             |                |                                                                                                                                                                                                     | `custom_minutes` _(Integer, Optional)_ – Custom duration, minimum 30 minutes. Takes precedence over `minutes`.         |
+|             |                |                                                                                                                                                                                                     | `auto_recall` _(Boolean, Optional)_ – Automatically recall members to main room when time is up (default: `true`).     |
+|             |                |                                                                                                                                                                                                     | `grace_period` _(Integer, Optional)_ – Grace period in seconds before auto-recalling members (0–300s, default: `60s`). |
+| `/breakout` | `timer-cancel` | Cancels the active breakout session timer.                                                                                                                                                          | None                                                                                                                   |
+| `/breakout` | `status`       | Displays current breakout rooms, timer state and any operation in progress.                                                                                                                         | None                                                                                                                   |
+| `/breakout` | `broadcast`    | Broadcasts a message to all active breakout rooms.                                                                                                                                                  | `message` _(String, Required)_ – The message content.                                                                  |
+| `/breakout` | `send-message` | Sends a message to a specific voice channel's text chat.                                                                                                                                            | `channel` _(Voice Channel, Required)_ – Target channel.                                                                |
+|             |                |                                                                                                                                                                                                     | `message` _(String, Required)_ – The message content.                                                                  |
+| `/breakout` | `reset`        | Clears a stuck operation record so other subcommands can run again. Rooms, members and timers are left untouched. Re-run `bun run commands:sync --all` after upgrading to register this subcommand. | None                                                                                                                   |
 
 ### Move audience
 
@@ -217,12 +217,12 @@ The final reply reports how many members moved and includes reasons for failed m
 
 ### 🛠️ Utility Commands
 
-| Command   | Description                                              | Permissions |
-|-----------|----------------------------------------------------------|-------------|
-| `/ping`    | Replies with "Pong!" and the bot's WebSocket latency.    | Send Messages |
-| `/server`  | Displays the server name and member count.               | None        |
-| `/user`    | Displays the invoking user's name and join date.         | None        |
-| `/version` | Displays bot version, build metadata, and runtime info.  | None        |
+| Command    | Description                                             | Permissions   |
+| ---------- | ------------------------------------------------------- | ------------- |
+| `/ping`    | Replies with "Pong!" and the bot's WebSocket latency.   | Send Messages |
+| `/server`  | Displays the server name and member count.              | None          |
+| `/user`    | Displays the invoking user's name and join date.        | None          |
+| `/version` | Displays bot version, build metadata, and runtime info. | None          |
 
 ---
 
@@ -232,7 +232,7 @@ Every breakout operation (`create`, `distribute`, `recall`, `delete`) is tracked
 
 1. The state file records which steps have already completed.
 2. Re-running the same subcommand **resumes** from the last checkpoint.
-3. Running a *different* room-mutating subcommand (`create`, `distribute`, `recall`, `delete`, `timer`) while one is in progress is blocked with an explanatory message.
+3. Running a _different_ room-mutating subcommand (`create`, `distribute`, `recall`, `delete`, `timer`) while one is in progress is blocked with an explanatory message.
 4. Completed operations are moved to history — without their step map — and the active operation slot is cleared.
 
 This ensures no duplicate channels are created, no users are moved twice, and no rooms are double-deleted.
@@ -287,4 +287,3 @@ Contributions are welcome! Please open an issue or submit a pull request for any
 ## 📜 License
 
 This project is licensed under the AGPLv3 License - see the [LICENSE](LICENSE) file for details.
-

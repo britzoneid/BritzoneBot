@@ -1,7 +1,7 @@
 # Docker / Pino Logging Crash Investigation Report
 
 **Date:** 2026-02-17  
-**Status:** Superseded — retained as background only (see *Current State* below)  
+**Status:** Superseded — retained as background only (see _Current State_ below)
 
 > **Current state (2026-09-07).** This report no longer describes the shipped
 > configuration. Docker was deprecated and removed from the project in
@@ -11,7 +11,7 @@
 >
 > The conclusion below stated that file logging had been "commented out/reverted",
 > which contradicted the code for several releases. That claim is corrected in
-> *Conclusion for this PR*. The analysis of the Docker/Alpine failure is kept
+> _Conclusion for this PR_. The analysis of the Docker/Alpine failure is kept
 > because it stays relevant if the project is ever containerised again.
 
 ## Problem Statement

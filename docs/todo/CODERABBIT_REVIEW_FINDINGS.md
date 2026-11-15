@@ -31,15 +31,18 @@
 If an interrupted operation exists and the user lacks permissions, the code calls `interaction.reply()` twice, causing a `DiscordAPIError: Interaction has already been replied to` at runtime.
 
 **Current Flow:**
+
 1. Line 154 checks if `inProgress` is true
 2. Line 154 calls `replyOrEdit(interaction, ...)` which calls `interaction.reply()`
 3. Execution falls through to the permission check at Line 167
 4. Line 168 calls `interaction.reply()` again → **runtime error**
 
 **CodeRabbit Analysis:**
+
 > Either return early after notifying about the interrupted operation, or use `replyOrEdit` consistently in the permission check block.
 
 **Suggested Fix:**
+
 ```typescript
 // Check for interrupted operations first
 const inProgress = await stateManager.hasOperationInProgress(interaction.guildId);
@@ -90,10 +93,12 @@ Critical infinite recursion exists between `resumeOperation` and the operation h
 4. Goto step 1 → **stack overflow**
 
 The same cycle exists in:
+
 - `distributeToBreakoutRooms` (Line 197)
 - `endBreakoutSession` (Line 328)
 
 **CodeRabbit Analysis:**
+
 > Update `resumeOperation` to either clear the in-progress flag in stateManager before calling those functions or call them with an internal "isResume" boolean that skips the `hasOperationInProgress` check.
 
 **Suggested Fix:**
@@ -101,18 +106,19 @@ Add an internal `_isResume` flag to skip the in-progress check on resume:
 
 ```typescript
 export async function createBreakoutRooms(
-  interaction: CommandInteraction,
-  numRooms: number,
-  force: boolean = false,
-  _isResume: boolean = false, // NEW FLAG
+	interaction: CommandInteraction,
+	numRooms: number,
+	force: boolean = false,
+	_isResume: boolean = false, // NEW FLAG
 ): Promise<OperationResult> {
-  // ...
-  // Check if there's an operation in progress
-  const inProgress = await stateManager.hasOperationInProgress(guildId);
-  if (inProgress && !_isResume) { // SKIP CHECK ON RESUME
-    return await resumeOperation(interaction);
-  }
-  // ... rest of function
+	// ...
+	// Check if there's an operation in progress
+	const inProgress = await stateManager.hasOperationInProgress(guildId);
+	if (inProgress && !_isResume) {
+		// SKIP CHECK ON RESUME
+		return await resumeOperation(interaction);
+	}
+	// ... rest of function
 }
 ```
 
@@ -141,20 +147,25 @@ case 'end':
 In the force-cleanup path, `interaction.channel` is cast to `VoiceChannel` without validation. However, `interaction.channel` is the text/slash-command channel where the command was invoked—it is almost certainly a `TextChannel`, not a `VoiceChannel`.
 
 Casting it to `VoiceChannel` and passing it to `endBreakoutSession` as the main channel will cause:
+
 - Members to be moved to a text channel (Discord API error)
 - Undefined behavior
 - Runtime failures
 
 **Current Code:**
+
 ```typescript
 if (force && existingRooms.exists && interaction.channel) {
-  console.log(`🔄 Force flag enabled, cleaning up ${existingRooms.rooms.length} existing rooms`);
-  const mainChannel = interaction.channel; // Use current channel as fallback
-  await endBreakoutSession(interaction, mainChannel as VoiceChannel, true); // UNSAFE CAST
+	console.log(
+		`🔄 Force flag enabled, cleaning up ${existingRooms.rooms.length} existing rooms`,
+	);
+	const mainChannel = interaction.channel; // Use current channel as fallback
+	await endBreakoutSession(interaction, mainChannel as VoiceChannel, true); // UNSAFE CAST
 }
 ```
 
 **CodeRabbit Analysis:**
+
 > This should use a proper fallback (e.g., the stored main room from `breakoutRoomManager`, or require the user to specify one).
 
 **Suggested Fix:**
@@ -162,22 +173,24 @@ Retrieve the stored main room or handle gracefully:
 
 ```typescript
 if (force && existingRooms.exists && interaction.channel) {
-  console.log(`🔄 Force flag enabled, cleaning up ${existingRooms.rooms.length} existing rooms`);
-  
-  const storedMain = breakoutRoomManager.getMainRoom(guildId);
-  if (storedMain) {
-    await endBreakoutSession(interaction, storedMain, true);
-  } else {
-    // No main room known — just delete rooms without moving members
-    for (const room of existingRooms.rooms) {
-      try { 
-        await room.delete('Force cleanup'); 
-      } catch { 
-        /* ignore */ 
-      }
-    }
-    breakoutRoomManager.clearSession(guildId);
-  }
+	console.log(
+		`🔄 Force flag enabled, cleaning up ${existingRooms.rooms.length} existing rooms`,
+	);
+
+	const storedMain = breakoutRoomManager.getMainRoom(guildId);
+	if (storedMain) {
+		await endBreakoutSession(interaction, storedMain, true);
+	} else {
+		// No main room known — just delete rooms without moving members
+		for (const room of existingRooms.rooms) {
+			try {
+				await room.delete('Force cleanup');
+			} catch {
+				/* ignore */
+			}
+		}
+		breakoutRoomManager.clearSession(guildId);
+	}
 }
 ```
 
@@ -199,6 +212,7 @@ All other public methods call `await this.initialize()` before accessing `inMemo
 If `getTimerData` is the first method called (e.g., after a restart, checking for an active timer), it reads from the uninitialized empty `{}` and returns `null` even though timer data exists on disk.
 
 **Current Code:**
+
 ```typescript
 async getTimerData(guildId: string): Promise<TimerData | null> {
   const timerKey = `timer_${guildId}`;
@@ -207,9 +221,11 @@ async getTimerData(guildId: string): Promise<TimerData | null> {
 ```
 
 **CodeRabbit Analysis:**
+
 > All other public methods call `await this.initialize()` before accessing `inMemoryState`. `getTimerData` skips this, so if it's the first method called (e.g., after a restart, checking for an active timer), it will read from the uninitialized empty `{}` and return `null` even if timer data exists on disk.
 
 **Suggested Fix:**
+
 ```typescript
 async getTimerData(guildId: string): Promise<TimerData | null> {
   await this.initialize(); // ADD THIS LINE
@@ -240,19 +256,22 @@ Updated `distributeToBreakoutRooms` function signature to accept `VoiceBasedChan
 If a user selects a stage channel, `distributeToBreakoutRooms` receives a `StageChannel` masquerading as a `VoiceChannel`. This could cause subtle runtime issues since stage channels have different permission and behavior semantics than voice channels.
 
 **CodeRabbit Analysis:**
+
 > Either restrict the `distribute` subcommand's `mainroom` option to `ChannelType.GuildVoice` only (like `end` does), or handle the `StageChannel` case explicitly.
 
 **Suggested Fix Option 1 - Restrict channel type:**
+
 ```typescript
 const mainroom = new ChannelSelectMenuBuilder()
-  .setCustomId('distribute_mainroom')
-  .setPlaceholder('Select main voice channel')
-  .setChannelTypes(ChannelType.GuildVoice) // ONLY VOICE CHANNELS
-  .setMinValues(1)
-  .setMaxValues(1);
+	.setCustomId('distribute_mainroom')
+	.setPlaceholder('Select main voice channel')
+	.setChannelTypes(ChannelType.GuildVoice) // ONLY VOICE CHANNELS
+	.setMinValues(1)
+	.setMaxValues(1);
 ```
 
 **Suggested Fix Option 2 - Handle both types:**
+
 ```typescript
 const mainRoom = interaction.options.getChannel('mainroom');
 if (mainRoom.type !== ChannelType.GuildVoice) {
@@ -278,31 +297,37 @@ await distributeToBreakoutRooms(interaction, mainRoom as VoiceChannel);
 `monitorBreakoutTimer` returns a `Promise<void>` but is not awaited and has no `.catch()` handler. If it throws, the rejection will be unhandled.
 
 **Current Code:**
+
 ```typescript
 await stateManager.setTimerData(interaction.guildId, timerData);
 // Start the timer monitoring process
 monitorBreakoutTimer(timerData, interaction);
 
 await replyOrEdit(
-  interaction,
-  `⏱️ Breakout timer set for ${minutes} minutes. Reminder will be sent at 5 minute mark.`,
+	interaction,
+	`⏱️ Breakout timer set for ${minutes} minutes. Reminder will be sent at 5 minute mark.`,
 );
 ```
 
 **CodeRabbit Analysis:**
+
 > `monitorBreakoutTimer` returns a `Promise<void>` but is not awaited and has no `.catch()`. If it throws, the rejection will be unhandled.
 
 **Suggested Fix:**
+
 ```typescript
 await stateManager.setTimerData(interaction.guildId, timerData);
 // Start the timer monitoring process
 monitorBreakoutTimer(timerData, interaction).catch((err) =>
-  console.error(`❌ Timer monitor failed for guild ${interaction.guildId}:`, err),
+	console.error(
+		`❌ Timer monitor failed for guild ${interaction.guildId}:`,
+		err,
+	),
 );
 
 await replyOrEdit(
-  interaction,
-  `⏱️ Breakout timer set for ${minutes} minutes. Reminder will be sent at 5 minute mark.`,
+	interaction,
+	`⏱️ Breakout timer set for ${minutes} minutes. Reminder will be sent at 5 minute mark.`,
 );
 ```
 
@@ -319,12 +344,14 @@ await replyOrEdit(
 Guild operation state (keyed by `guildId`) and timer data (keyed by `timer_${guildId}`) coexist in the same map with a union type: `Record<string, GuildState | TimerData>`.
 
 **Problems:**
+
 - Every access requires unsafe casts (e.g., `as GuildState`, `as TimerData`)
 - No compile-time guarantee that the right type is stored under the right key
 - Runtime errors if cast types are wrong
 - Fragile string-based key convention (`timer_` prefix)
 
 **CodeRabbit Analysis:**
+
 > Guild operation state (keyed by `guildId`) and timer data (keyed by `timer_${guildId}`) coexist in the same map with a union type. Every access requires a cast (e.g., `as GuildState`, `as TimerData`), and there's no compile-time guarantee that the right type is stored under the right key.
 
 **Suggested Fix:**
@@ -379,17 +406,24 @@ The file filter uses `endsWith('.ts')` which also matches `.d.ts` declaration fi
 Note: `src/index.ts` (line 74) correctly filters only `.js` files, but this location did not.
 
 **CodeRabbit Analysis:**
+
 > `file.endsWith('.ts')` matches `.d.ts` declaration files, which will fail or produce invalid command modules when dynamically imported.
 
 **Resolution:**
 Updated the filter to only match `.js` files since `deployCommandsLocal.ts` runs from the `dist/` directory after TypeScript compilation. Changed from:
+
 ```typescript
-const commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.ts') || file.endsWith('.js'));
+const commandFiles = fs
+	.readdirSync(commandsPath)
+	.filter((file) => file.endsWith('.ts') || file.endsWith('.js'));
 ```
 
 To:
+
 ```typescript
-const commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.js'));
+const commandFiles = fs
+	.readdirSync(commandsPath)
+	.filter((file) => file.endsWith('.js'));
 ```
 
 This ensures only compiled JavaScript files are loaded, excluding `.d.ts` declaration files that would otherwise cause runtime errors.
@@ -411,26 +445,32 @@ The code uses `(interaction.channel as any)?.parent` which bypasses type safety.
 Replaced unsafe `as any` casts with proper type guards using `'parent' in channel` checks. This leverages TypeScript's type narrowing capabilities while maintaining type safety. Also removed the now-unnecessary `getChannelParent` helper function.
 
 **Current Code:**
+
 ```typescript
 const parent = (interaction.channel as any)?.parent || interaction.guild;
 ```
 
 **CodeRabbit Analysis:**
+
 > Instead of `as any`, narrow via a type guard or use a typed accessor.
 
 **Suggested Fix:**
+
 ```typescript
-const parent = interaction.channel && 'parent' in interaction.channel
-  ? interaction.channel.parent ?? interaction.guild
-  : interaction.guild;
+const parent =
+	interaction.channel && 'parent' in interaction.channel
+		? (interaction.channel.parent ?? interaction.guild)
+		: interaction.guild;
 ```
 
 Or using discord.js type guards:
+
 ```typescript
 const channel = interaction.channel;
-const parent = channel instanceof GuildChannel
-  ? channel.parent ?? interaction.guild
-  : interaction.guild;
+const parent =
+	channel instanceof GuildChannel
+		? (channel.parent ?? interaction.guild)
+		: interaction.guild;
 ```
 
 Apply the same fix where the pattern recurs (around line 162).
@@ -452,24 +492,28 @@ When callers pass an array to `distributeUsers`, the function doesn't create a c
 Updated the array handling to always create a copy before shuffling: `const userArray = Array.isArray(users) ? [...users] : Array.from(users.values());`. This prevents unintended side effects on the caller's original array.
 
 **Current Code:**
+
 ```typescript
 const userArray = Array.isArray(users) ? users : Array.from(users.values());
 // ...
 // Shuffle users for randomness
 for (let i = userArray.length - 1; i > 0; i--) {
-  const j = Math.floor(Math.random() * (i + 1));
-  [userArray[i], userArray[j]] = [userArray[j], userArray[i]];
+	const j = Math.floor(Math.random() * (i + 1));
+	[userArray[i], userArray[j]] = [userArray[j], userArray[i]];
 }
 ```
 
 **CodeRabbit Analysis:**
+
 > If callers pass an array, `userArray` references the same array, and the Fisher-Yates shuffle on lines 39–42 reorders it in place. This is an unexpected side effect.
 
 **Suggested Fix:**
 Always copy the input before shuffling:
 
 ```typescript
-const userArray = Array.isArray(users) ? [...users] : Array.from(users.values());
+const userArray = Array.isArray(users)
+	? [...users]
+	: Array.from(users.values());
 // ... rest of function
 ```
 
@@ -491,20 +535,24 @@ The function accepts `interaction: any` which is a significant type-safety gap. 
 Changed the parameter type from `any` to `ChatInputCommandInteraction`, which is the proper Discord.js type that provides the `client` property accessed by the function. Updated imports to include `ChatInputCommandInteraction` from `discord.js`.
 
 **Current Code:**
+
 ```typescript
 export async function monitorBreakoutTimer(timerData: TimerData, interaction: any): Promise<void> {
   // Only accesses: interaction.client
 ```
 
 **CodeRabbit Analysis:**
+
 > This is the most impactful `any` in the reviewed files. The only property accessed is `interaction.client`, so at minimum type it to expose that.
 
 **Suggested Fix Option 1 - Minimal type:**
+
 ```typescript
 export async function monitorBreakoutTimer(timerData: TimerData, interaction: { client: Client }): Promise<void> {
 ```
 
 **Suggested Fix Option 2 - Full interaction type:**
+
 ```typescript
 import type { ChatInputCommandInteraction } from 'discord.js';
 
@@ -530,15 +578,18 @@ export async function monitorBreakoutTimer(
 The Table of Contents link fragments don't match the actual Markdown heading anchors. Static analysis tool (markdownlint MD051) flags all TOC links as invalid.
 
 **Examples:**
+
 - `#why-migrate` should be `#why-migrate-to-typescript`
 - `#phase-1-setup` should be `#phase-1-setup--configuration`
 - `#phase-2-types` should be `#phase-2-type-definitions`
 - `#phase-3-migration` should be `#phase-3-incremental-migration`
 
 **CodeRabbit Analysis:**
+
 > The fragments need to match the auto-generated anchors from the heading text.
 
 **Current Code:**
+
 ```markdown
 1. [Why Migrate to TypeScript?](#why-migrate)
 2. [Phase 1: Setup & Configuration](#phase-1-setup)
@@ -550,6 +601,7 @@ The Table of Contents link fragments don't match the actual Markdown heading anc
 ```
 
 **Suggested Fix:**
+
 ```markdown
 1. [Why Migrate to TypeScript?](#why-migrate-to-typescript)
 2. [Phase 1: Setup & Configuration](#phase-1-setup--configuration)
@@ -573,6 +625,7 @@ The Table of Contents link fragments don't match the actual Markdown heading anc
 The Dockerfile example starts from `node:22-alpine` but uses `bun install` and `bun run build` commands. Bun is not available in the Node.js Alpine image.
 
 **Current Issue:**
+
 ```dockerfile
 FROM node:22-alpine
 
@@ -583,9 +636,11 @@ CMD ["bun", "dist/index.js"]
 ```
 
 **CodeRabbit Analysis:**
+
 > Bun is not available in the Node.js Alpine image. Either use an `oven/bun` base image or switch to `npm`/`node` commands.
 
 **Suggested Fix Option 1 - Use Bun image:**
+
 ```dockerfile
 FROM oven/bun:latest
 
@@ -597,6 +652,7 @@ CMD ["bun", "dist/index.js"]
 ```
 
 **Suggested Fix Option 2 - Use npm:**
+
 ```dockerfile
 FROM node:22-alpine
 
@@ -621,6 +677,7 @@ CMD ["node", "dist/index.js"]
 Multiple fenced code blocks lack language identifiers (e.g., `typescript`, `bash`, `text`). Additionally, some blocks are missing blank lines before and after them.
 
 **CodeRabbit Analysis:**
+
 > A quick pass to add language tags (e.g., ` ```text `) and insert blank lines before headings/fences would resolve all warnings.
 
 **Suggested Fix:**
@@ -630,13 +687,14 @@ Add language specifiers to all code blocks:
 ❌ Before:
 ```
 const x = 5;
-```
+
+````
 
 ✅ After:
 ```typescript
 const x = 5;
-```
-```
+````
+````
 
 Ensure blank lines before and after each fenced code block and before headings.
 
@@ -658,19 +716,20 @@ await replyOrEdit(
   interaction,
   `⏱️ Breakout timer set for ${minutes} minutes. Reminder will be sent at 5 minute mark.`,
 );
-```
+````
 
 **CodeRabbit Analysis:**
+
 > When the total duration is less than 5 minutes the 5-minute reminder is skipped (`fiveMinSent` is set to `true`). This will confuse users.
 
 **Suggested Fix:**
+
 ```typescript
-const reminderNote = minutes > 5
-  ? ' Reminder will be sent at 5 minute mark.'
-  : '';
+const reminderNote =
+	minutes > 5 ? ' Reminder will be sent at 5 minute mark.' : '';
 await replyOrEdit(
-  interaction,
-  `⏱️ Breakout timer set for ${minutes} minutes.${reminderNote}`,
+	interaction,
+	`⏱️ Breakout timer set for ${minutes} minutes.${reminderNote}`,
 );
 ```
 
@@ -687,27 +746,31 @@ await replyOrEdit(
 `member.joinedAt` is a `Date | null`. When a `Date` is interpolated into a template literal, it produces an unfriendly raw string like `"Thu Feb 13 2026 07:03:38 GMT+0000"`.
 
 **Current Code:**
+
 ```typescript
 // member.joinedAt is Date | null
 const response = `User: ${interaction.user.username}, Joined: ${member.joinedAt}`;
 ```
 
 **CodeRabbit Analysis:**
+
 > Consider using `toLocaleDateString()` or Discord's timestamp formatting (`<t:${Math.floor(joinedAt.getTime()/1000)}:D>`) for a user-friendly display.
 
 **Suggested Fix Option 1 - Local date formatting:**
+
 ```typescript
 const joinedDate = member.joinedAt
-  ? member.joinedAt.toLocaleDateString()
-  : 'Unknown';
+	? member.joinedAt.toLocaleDateString()
+	: 'Unknown';
 const response = `User: ${interaction.user.username}, Joined: ${joinedDate}`;
 ```
 
 **Suggested Fix Option 2 - Discord timestamp:**
+
 ```typescript
 const joinedTimestamp = member.joinedAt
-  ? `<t:${Math.floor(member.joinedAt.getTime() / 1000)}:D>`
-  : 'Unknown';
+	? `<t:${Math.floor(member.joinedAt.getTime() / 1000)}:D>`
+	: 'Unknown';
 const response = `User: ${interaction.user.username}, Joined: ${joinedTimestamp}`;
 ```
 
@@ -722,15 +785,18 @@ const response = `User: ${interaction.user.username}, Joined: ${joinedTimestamp}
 
 **Description:**
 The `TimerData` interface is identically defined in both:
+
 - `breakoutStateManager.ts` (lines 44–51)
 - `breakoutTimerHelper.ts` (lines 7–14, exported)
 
 **Impact:**
+
 - Maintenance burden: changes to one copy don't sync
 - Risk of drift between definitions
 - Violates DRY principle
 
 **CodeRabbit Analysis:**
+
 > Remove the local definition and import it from `breakoutTimerHelper.ts` to maintain a single source of truth and prevent drift.
 
 **Suggested Fix:**
@@ -757,11 +823,13 @@ import type { TimerData } from './breakoutTimerHelper.js';
 Every completed operation is pushed to `guildState.history` and persisted to disk. Over time, this array grows without limit.
 
 **Impact:**
+
 - For a long-running bot handling many breakout sessions across multiple guilds, the state file will bloat
 - Memory usage grows unbounded
 - Disk I/O performance degrades
 
 **CodeRabbit Analysis:**
+
 > Over time, this array grows without limit. For a long-running bot handling many breakout sessions across multiple guilds, this will bloat the state file and memory usage.
 
 **Suggested Fix:**
@@ -778,7 +846,7 @@ Or prune by timestamp (if operations have a timestamp property):
 const now = Date.now();
 const ONE_DAY = 24 * 60 * 60 * 1000;
 guildState.history = guildState.history.filter(
-  (op) => (now - op.timestamp) < ONE_DAY
+	(op) => now - op.timestamp < ONE_DAY,
 );
 ```
 
@@ -795,6 +863,7 @@ guildState.history = guildState.history.filter(
 `start` and `deploy` scripts run from the `dist/` directory, but nothing ensures `tsc` was run beforehand. A stale or missing `dist/` would cause confusing runtime errors.
 
 **Current Code:**
+
 ```json
 "scripts": {
   "build": "tsc",
@@ -806,6 +875,7 @@ guildState.history = guildState.history.filter(
 ```
 
 **CodeRabbit Analysis:**
+
 > A stale or missing `dist/` would cause confusing runtime errors.
 
 **Suggested Fix:**
@@ -846,6 +916,7 @@ The heuristic finds a text channel whose name includes the voice channel's name 
 If a voice channel is named "General", it looks for a text channel with "general" in its name. If the convention changes or channels are renamed, this breaks silently.
 
 **CodeRabbit Analysis:**
+
 > This appears to be pre-existing logic, but consider storing associated text channel IDs alongside voice channel IDs in `TimerData.breakoutRooms` for reliability.
 
 **Suggested Fix:**
@@ -854,14 +925,15 @@ Store explicit channel IDs in the data model:
 ```typescript
 // Update TimerData.breakoutRooms structure:
 interface BreakoutRoomEntry {
-  voiceChannelId: string;
-  textChannelId: string; // NEW: explicit storage
-  name: string;
+	voiceChannelId: string;
+	textChannelId: string; // NEW: explicit storage
+	name: string;
 }
 
 // Update lookup:
-const textChannel = guild.channels.cache.get(room.textChannelId)
-  ?? guild.channels.cache.find((ch) => ch.name.includes(roomName.toLowerCase()));
+const textChannel =
+	guild.channels.cache.get(room.textChannelId) ??
+	guild.channels.cache.find((ch) => ch.name.includes(roomName.toLowerCase()));
 ```
 
 ---
@@ -877,41 +949,45 @@ const textChannel = guild.channels.cache.get(room.textChannelId)
 The `TimerData` interface has a permissive index signature `[key: string]: any` which weakens type safety. This allows arbitrary untyped properties to be added without compile-time checks.
 
 **Current Code:**
+
 ```typescript
 export interface TimerData {
-  totalMinutes: number;
-  startTime: number;
-  guildId: string;
-  breakoutRooms: Array<{ id: string; name: string }>;
-  fiveMinSent: boolean;
-  [key: string]: any; // WEAK: allows arbitrary untyped properties
+	totalMinutes: number;
+	startTime: number;
+	guildId: string;
+	breakoutRooms: Array<{ id: string; name: string }>;
+	fiveMinSent: boolean;
+	[key: string]: any; // WEAK: allows arbitrary untyped properties
 }
 ```
 
 **CodeRabbit Analysis:**
+
 > If extra fields are needed, define them explicitly or use `unknown`.
 
 **Suggested Fix Option 1 - Remove if unused:**
+
 ```typescript
 export interface TimerData {
-  totalMinutes: number;
-  startTime: number;
-  guildId: string;
-  breakoutRooms: Array<{ id: string; name: string }>;
-  fiveMinSent: boolean;
-  // Remove [key: string]: any
+	totalMinutes: number;
+	startTime: number;
+	guildId: string;
+	breakoutRooms: Array<{ id: string; name: string }>;
+	fiveMinSent: boolean;
+	// Remove [key: string]: any
 }
 ```
 
 **Suggested Fix Option 2 - Use `unknown` if needed:**
+
 ```typescript
 export interface TimerData {
-  totalMinutes: number;
-  startTime: number;
-  guildId: string;
-  breakoutRooms: Array<{ id: string; name: string }>;
-  fiveMinSent: boolean;
-  [key: string]: unknown; // Force callers to validate types
+	totalMinutes: number;
+	startTime: number;
+	guildId: string;
+	breakoutRooms: Array<{ id: string; name: string }>;
+	fiveMinSent: boolean;
+	[key: string]: unknown; // Force callers to validate types
 }
 ```
 
@@ -930,11 +1006,13 @@ export interface TimerData {
 The code uses raw `1` and `2` for subcommand and subcommand-group option types instead of using the discord.js enum for readability.
 
 **Current Code:**
+
 ```typescript
 if (opt.type === 1 || opt.type === 2) {
 ```
 
 **Suggested Fix:**
+
 ```typescript
 import { Events, ApplicationCommandOptionType } from 'discord.js';
 
@@ -958,6 +1036,7 @@ if (
 After the `isChatInputCommand()` guard, the code uses an unsafe `as any` cast despite narrowing the type. Additionally, the `'execute' in command` runtime check is redundant—commands without `execute` should already be filtered during loading.
 
 **Current Code:**
+
 ```typescript
 try {
   // Type assertion: if interaction is ChatInputCommand, command.execute expects CommandInteraction
@@ -968,6 +1047,7 @@ try {
 ```
 
 **CodeRabbit Analysis:**
+
 > The PR claims "zero `any` types," but this cast bypasses the type system. After the `isChatInputCommand()` guard, `interaction` is `ChatInputCommandInteraction`. You can narrow `command` to `SlashCommand` or adjust the `Command` type so the execute signature accepts `ChatInputCommandInteraction` directly.
 
 **Suggested Fix:**
@@ -976,14 +1056,14 @@ Adjust type signatures to eliminate the cast:
 ```typescript
 // In your Command/SlashCommand type definition:
 export interface SlashCommand {
-  execute(interaction: ChatInputCommandInteraction): Promise<void>;
+	execute(interaction: ChatInputCommandInteraction): Promise<void>;
 }
 
 // Later in the event handler:
 try {
-  await command.execute(interaction); // No cast needed
+	await command.execute(interaction); // No cast needed
 } catch (error) {
-  console.error('Error executing command:', error);
+	console.error('Error executing command:', error);
 }
 ```
 
@@ -1000,6 +1080,7 @@ try {
 Comments correctly state that for `Events.ClientReady`, the callback receives `Client<true>` where `client.user` is non-null. However, the code uses optional chaining (`client.user?.tag`) which contradicts the comment.
 
 **Current Code:**
+
 ```typescript
 async execute(client) {
   // TypeScript automatically knows that:
@@ -1011,9 +1092,11 @@ async execute(client) {
 ```
 
 **CodeRabbit Analysis:**
+
 > Either remove the `?.` to match the comments, or remove the comments claiming it's non-null.
 
 **Suggested Fix:**
+
 ```typescript
 async execute(client) {
   // TypeScript automatically knows that:
@@ -1037,17 +1120,19 @@ async execute(client) {
 `VoiceChannel` in discord.js v14 implements `TextBasedChannel` and always has a `send` method. The runtime check `'send' in room` is dead code—the `else` branch is unreachable.
 
 **Current Code:**
+
 ```typescript
 if ('send' in room) {
-  // This branch always executes
-  results.sent.push(message);
+	// This branch always executes
+	results.sent.push(message);
 } else {
-  // This branch is unreachable for VoiceChannel
-  results.failed.push(message);
+	// This branch is unreachable for VoiceChannel
+	results.failed.push(message);
 }
 ```
 
 **CodeRabbit Analysis:**
+
 > `VoiceChannel` in discord.js v14 implements `TextBasedChannel` and always has a `send` method. The runtime check on Line 50 (`'send' in room`) is dead code — the `else` branch on Line 54 is unreachable. Not harmful, but worth noting for clarity.
 
 **Suggested Fix:**
@@ -1056,10 +1141,10 @@ Remove the unnecessary guard:
 ```typescript
 // Simplified:
 try {
-  await room.send(message);
-  results.sent.push(message);
+	await room.send(message);
+	results.sent.push(message);
 } catch (error) {
-  results.failed.push(message);
+	results.failed.push(message);
 }
 ```
 
@@ -1076,6 +1161,7 @@ try {
 The PR claims strict mode with zero `any` types. However, caught errors use `any` instead of `unknown`, which weakens type safety.
 
 **Current Code:**
+
 ```typescript
 } catch (error: any) {
   console.error(`❌ Failed to send message to ${channel.name}:`, error);
@@ -1087,9 +1173,11 @@ The PR claims strict mode with zero `any` types. However, caught errors use `any
 ```
 
 **CodeRabbit Analysis:**
+
 > Use `unknown` and narrow with `instanceof` to stay consistent with the rest of the codebase.
 
 **Suggested Fix:**
+
 ```typescript
 } catch (error: unknown) {
   const errMsg = error instanceof Error ? error.message : String(error);
@@ -1114,39 +1202,41 @@ The PR claims strict mode with zero `any` types. However, caught errors use `any
 Dispatching six branches with an `if-else` chain is less idiomatic than using a `switch` statement. A switch is clearer and provides a natural place for a `default` fallback.
 
 **Current Code:**
+
 ```typescript
 if (subcommand === 'create') {
-  await handleCreateCommand(interaction);
+	await handleCreateCommand(interaction);
 } else if (subcommand === 'distribute') {
-  await handleDistributeCommand(interaction);
+	await handleDistributeCommand(interaction);
 } else if (subcommand === 'end') {
-  // ... etc
+	// ... etc
 }
 ```
 
 **Suggested Fix:**
+
 ```typescript
 switch (subcommand) {
-  case 'create':
-    await handleCreateCommand(interaction);
-    break;
-  case 'distribute':
-    await handleDistributeCommand(interaction);
-    break;
-  case 'end':
-    await handleEndCommand(interaction);
-    break;
-  case 'timer':
-    await handleTimerCommand(interaction);
-    break;
-  case 'broadcast':
-    await handleBroadcastCommand(interaction);
-    break;
-  case 'send':
-    await handleSendMessageCommand(interaction);
-    break;
-  default:
-    console.warn(`Unknown subcommand: ${subcommand}`);
+	case 'create':
+		await handleCreateCommand(interaction);
+		break;
+	case 'distribute':
+		await handleDistributeCommand(interaction);
+		break;
+	case 'end':
+		await handleEndCommand(interaction);
+		break;
+	case 'timer':
+		await handleTimerCommand(interaction);
+		break;
+	case 'broadcast':
+		await handleBroadcastCommand(interaction);
+		break;
+	case 'send':
+		await handleSendMessageCommand(interaction);
+		break;
+	default:
+		console.warn(`Unknown subcommand: ${subcommand}`);
 }
 ```
 
@@ -1163,21 +1253,26 @@ switch (subcommand) {
 Every bucket creation, user assignment, and room summary is logged individually. For a server with 100+ users, this produces hundreds of log lines per distribution call, making production logs noisy and hard to parse.
 
 **CodeRabbit Analysis:**
+
 > For a server with 100+ users, this produces hundreds of log lines per distribution call. Consider reducing to summary-level logging only.
 
 **Suggested Fix:**
 Reduce to summary-level logging:
 
 ```typescript
-console.log(`🔄 Starting distribution of users among ${breakoutRooms.length} breakout rooms`);
+console.log(
+	`🔄 Starting distribution of users among ${breakoutRooms.length} breakout rooms`,
+);
 // ... distribution logic without per-item logs ...
 console.log(`👤 Total users to distribute: ${userArray.length}`);
 // ... shuffle logic without individual user logs ...
 
 // Log distribution summary only
 Object.keys(distribution).forEach((roomId) => {
-  const room = breakoutRooms.find((r) => r.id === roomId);
-  console.log(`📊 Room ${room?.name} has ${distribution[roomId].length} users assigned`);
+	const room = breakoutRooms.find((r) => r.id === roomId);
+	console.log(
+		`📊 Room ${room?.name} has ${distribution[roomId].length} users assigned`,
+	);
 });
 ```
 
@@ -1194,9 +1289,11 @@ Object.keys(distribution).forEach((roomId) => {
 Unconditional `console.log` calls fire on every function call. In production, when the bot scales to many voice channels, this becomes very noisy.
 
 **CodeRabbit Analysis:**
+
 > A debug-level logger or a conditional flag would let you silence them without code changes.
 
 **Suggested Fix:**
+
 ```typescript
 function getUsers(...) {
   // Option 1: Use environment flag
@@ -1225,52 +1322,60 @@ function getUsers(...) {
 The `deployCommands` function catches errors and logs them but returns `void` with no indication of failure. The outer loop continues deploying to subsequent guilds without knowing a previous deployment failed.
 
 **Current Code:**
+
 ```typescript
-async function deployCommands(guildName: string, guildId: string): Promise<void> {
-  try {
-    // deployment logic
-  } catch (error) {
-    console.error(`Error deploying to guild: ${error}`);
-    // Returns void with no failure indicator
-  }
+async function deployCommands(
+	guildName: string,
+	guildId: string,
+): Promise<void> {
+	try {
+		// deployment logic
+	} catch (error) {
+		console.error(`Error deploying to guild: ${error}`);
+		// Returns void with no failure indicator
+	}
 }
 
 // Caller has no way to know deployment failed:
 for (const guild of guilds) {
-  await deployCommands(guild.name, guild.id); // Continue even if failed
+	await deployCommands(guild.name, guild.id); // Continue even if failed
 }
 ```
 
 **CodeRabbit Analysis:**
+
 > The outer loop on line 83-84 will continue deploying to subsequent guilds without knowing a previous deployment failed. If this is intentional (best-effort), consider at least logging a summary of failed guilds at the end.
 
 **Suggested Fix:**
 Track and report failures:
 
 ```typescript
-async function deployCommands(guildName: string, guildId: string): Promise<boolean> {
-  try {
-    // deployment logic
-    return true;
-  } catch (error) {
-    console.error(`Error deploying to guild ${guildName}:`, error);
-    return false; // Return failure indicator
-  }
+async function deployCommands(
+	guildName: string,
+	guildId: string,
+): Promise<boolean> {
+	try {
+		// deployment logic
+		return true;
+	} catch (error) {
+		console.error(`Error deploying to guild ${guildName}:`, error);
+		return false; // Return failure indicator
+	}
 }
 
 // Caller tracks failures:
 const results = { succeeded: [], failed: [] };
 for (const guild of guilds) {
-  const success = await deployCommands(guild.name, guild.id);
-  if (success) {
-    results.succeeded.push(guild.name);
-  } else {
-    results.failed.push(guild.name);
-  }
+	const success = await deployCommands(guild.name, guild.id);
+	if (success) {
+		results.succeeded.push(guild.name);
+	} else {
+		results.failed.push(guild.name);
+	}
 }
 
 if (results.failed.length > 0) {
-  console.error(`⚠️ Deployment failed for: ${results.failed.join(', ')}`);
+	console.error(`⚠️ Deployment failed for: ${results.failed.join(', ')}`);
 }
 ```
 
@@ -1297,14 +1402,15 @@ Due to token efficiency, the remaining 10 trivial issues are grouped below with 
 
 ## Summary & Priority
 
-| Priority | Count | Examples |
-|----------|-------|----------|
-| 🔴 **Critical** | 4 | Double reply, infinite recursion, uninitialized state |
-| 🟠 **Major** | 7 | Type safety issues, unhandled promises, fragile designs |
-| 🟡 **Minor** | 11 | Documentation, messaging, performance hints |
-| 🔵 **Trivial** | 18 | Style, logging, magic numbers |
+| Priority        | Count | Examples                                                |
+| --------------- | ----- | ------------------------------------------------------- |
+| 🔴 **Critical** | 4     | Double reply, infinite recursion, uninitialized state   |
+| 🟠 **Major**    | 7     | Type safety issues, unhandled promises, fragile designs |
+| 🟡 **Minor**    | 11    | Documentation, messaging, performance hints             |
+| 🔵 **Trivial**  | 18    | Style, logging, magic numbers                           |
 
 **Recommended Fix Order:**
+
 1. **Immediate (Critical):** Issues 1-4 (runtime failures, stack overflow)
 2. **High Priority (Major):** Issues 5-11 (type safety, data integrity)
 3. **Medium Priority (Minor):** Issues 12-21 (UX, documentation, maintenance)

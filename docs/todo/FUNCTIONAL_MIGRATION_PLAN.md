@@ -12,6 +12,7 @@
 This document outlines a comprehensive plan to migrate the breakout module from a class-based Object-Oriented Programming (OOP) approach to a functional programming approach. This migration will reduce boilerplate, improve code clarity, and better reflect the actual usage patterns in the codebase.
 
 **Key metrics:**
+
 - **Files to refactor:** 9 (7 services/operations, 2 state managers)
 - **Estimated effort:** 4-6 hours
 - **Risk level:** Low (no logic changes, only structural)
@@ -43,12 +44,15 @@ Every service and operation follows this anti-pattern:
 
 ```ts
 class SomeService {
-    async doSomething(args) { /* ... */ }
+	async doSomething(args) {
+		/* ... */
+	}
 }
 export default new SomeService();
 ```
 
 **Problems:**
+
 - Classes without instance state are just functions with extra ceremony
 - The singleton pattern (`export default new`) means you never instantiate multiple copies
 - No use of `this` in most methods — a red flag that the class is unnecessary
@@ -57,9 +61,10 @@ export default new SomeService();
 #### 2. **False Abstraction**
 
 Classes are typically used for:
-- **Encapsulation:** Grouping related data + behavior → *Not applicable here (no instance data)*
-- **Inheritance:** Code reuse via subclasses → *Not used anywhere*
-- **Polymorphism:** Different implementations of same interface → *Not used anywhere*
+
+- **Encapsulation:** Grouping related data + behavior → _Not applicable here (no instance data)_
+- **Inheritance:** Code reuse via subclasses → _Not used anywhere_
+- **Polymorphism:** Different implementations of same interface → _Not used anywhere_
 
 None of these benefits apply to our codebase, yet we pay the cost in boilerplate.
 
@@ -75,6 +80,7 @@ This inconsistency makes the codebase harder to understand.
 #### 4. **Import Awkwardness**
 
 Current:
+
 ```ts
 import createOperation from '../operations/CreateOperation.js';
 // ...
@@ -98,33 +104,40 @@ More direct, less indirection.
 ### Benefits for This Codebase
 
 #### 1. **Simplicity**
+
 Functions are the simplest building block. No classes, constructors, `this`, or instantiation patterns to reason about.
 
 #### 2. **Tree-Shaking**
+
 Bundlers can eliminate unused exports more effectively with named function exports than with class methods.
 
 #### 3. **Explicitness**
+
 Function names directly describe what they do: `moveUserToRoom(user, room)` vs `distributionService.moveUserToRoom(user, room)`.
 
 #### 4. **Testability**
+
 Pure functions (input → output) are trivial to test. Stateless functions are nearly as easy.
 
 #### 5. **Composability**
+
 Functions compose naturally:
+
 ```ts
 const result = await pipe(
-  createRooms,
-  distributeUsers,
-  notifyUsers
+	createRooms,
+	distributeUsers,
+	notifyUsers,
 )(interaction);
 ```
 
 #### 6. **TypeScript Alignment**
+
 TypeScript excels at typing functions. Classes add complexity (access modifiers, inheritance, etc.) that TS must track.
 
-### When Classes *Are* Appropriate
+### When Classes _Are_ Appropriate
 
-To be clear, classes aren't bad — they're just wrong *here*. Use classes when you have:
+To be clear, classes aren't bad — they're just wrong _here_. Use classes when you have:
 
 1. **Multiple instances with different state**
    - Example: `User` class where each instance represents a different user
@@ -167,6 +180,7 @@ src/modules/breakout/
 ```
 
 **Characteristics:**
+
 - 9 classes, 7 are stateless singletons
 - PascalCase filenames (class convention)
 - Default exports (`export default new X()`)
@@ -191,6 +205,7 @@ src/modules/breakout/
 ```
 
 **Characteristics:**
+
 - No classes (except for type definitions if needed)
 - camelCase filenames (module convention)
 - Named exports (`export function x()`)
@@ -211,6 +226,7 @@ src/modules/breakout/
 ### Order of Migration
 
 **Phase 1: Stateless Services** (Lowest risk)
+
 1. `services/distribution.ts`
 2. `services/message.ts`
 3. `services/room.ts`
@@ -248,40 +264,46 @@ Rename to camelCase: `DistributionService.ts` → `distribution.ts`
 #### 1.2 Convert Class Methods to Functions
 
 **Before:**
+
 ```ts
 class DistributionService {
-    async hasActiveDistribution(guildId: string): Promise<boolean> {
-        const mainRoom = sessionManager.getMainRoom(guildId);
-        // ... rest of logic
-    }
+	async hasActiveDistribution(guildId: string): Promise<boolean> {
+		const mainRoom = sessionManager.getMainRoom(guildId);
+		// ... rest of logic
+	}
 
-    async moveUserToRoom(user: GuildMember, room: VoiceChannel): Promise<void> {
-        await moveUser(user, room);
-    }
+	async moveUserToRoom(user: GuildMember, room: VoiceChannel): Promise<void> {
+		await moveUser(user, room);
+	}
 }
 
 export default new DistributionService();
 ```
 
 **After:**
+
 ```ts
 /**
  * Checks if a distribution is currently active
  */
 export async function hasActiveDistribution(guildId: string): Promise<boolean> {
-    const mainRoom = getMainRoom(guildId);
-    // ... rest of logic (identical)
+	const mainRoom = getMainRoom(guildId);
+	// ... rest of logic (identical)
 }
 
 /**
  * Moves a user to a specific room
  */
-export async function moveUserToRoom(user: GuildMember, room: VoiceChannel): Promise<void> {
-    await moveUser(user, room);
+export async function moveUserToRoom(
+	user: GuildMember,
+	room: VoiceChannel,
+): Promise<void> {
+	await moveUser(user, room);
 }
 ```
 
 **Changes:**
+
 - Remove `class` declaration
 - Remove `async` from class (keep on methods)
 - Change method syntax to function syntax
@@ -292,12 +314,14 @@ export async function moveUserToRoom(user: GuildMember, room: VoiceChannel): Pro
 #### 1.3 Update Imports
 
 Update consumers from:
+
 ```ts
 import distributionService from '../services/DistributionService.js';
 const result = await distributionService.hasActiveDistribution(guildId);
 ```
 
 To:
+
 ```ts
 import { hasActiveDistribution } from '../services/distribution.js';
 const result = await hasActiveDistribution(guildId);
@@ -308,38 +332,42 @@ const result = await hasActiveDistribution(guildId);
 Operations follow the same pattern as services but have a single `execute` function. Consider naming conventions:
 
 **Before:**
+
 ```ts
 class CreateOperation {
-    async execute(interaction, numRooms, force): Promise<OperationResult> {
-        // ... logic
-    }
+	async execute(interaction, numRooms, force): Promise<OperationResult> {
+		// ... logic
+	}
 }
 export default new CreateOperation();
 ```
 
 **After (Option A - Keep "execute" name):**
+
 ```ts
 export async function execute(
-    interaction: CommandInteraction,
-    numRooms: number,
-    force: boolean = false,
+	interaction: CommandInteraction,
+	numRooms: number,
+	force: boolean = false,
 ): Promise<OperationResult> {
-    // ... logic (identical)
+	// ... logic (identical)
 }
 ```
 
 **After (Option B - More descriptive name):**
+
 ```ts
 export async function executeCreate(
-    interaction: CommandInteraction,
-    numRooms: number,
-    force: boolean = false,
+	interaction: CommandInteraction,
+	numRooms: number,
+	force: boolean = false,
 ): Promise<OperationResult> {
-    // ... logic (identical)
+	// ... logic (identical)
 }
 ```
 
 **Recommendation:** Option B. It makes imports clearer:
+
 ```ts
 import { executeCreate } from '../operations/create.js';
 import { executeDistribute } from '../operations/distribute.js';
@@ -359,29 +387,31 @@ import { execute as executeDistribute } from '../operations/distribute.js';
 State managers are special because they have actual state. Use module-level variables:
 
 **Before (SessionManager.ts):**
+
 ```ts
 export class SessionManager {
-    private sessions: Map<string, BreakoutSession>;
+	private sessions: Map<string, BreakoutSession>;
 
-    constructor() {
-        this.sessions = new Map();
-    }
+	constructor() {
+		this.sessions = new Map();
+	}
 
-    storeRooms(guildId: string, rooms: VoiceChannel[]): void {
-        const session = this.sessions.get(guildId) || {};
-        session.rooms = rooms;
-        this.sessions.set(guildId, session);
-    }
+	storeRooms(guildId: string, rooms: VoiceChannel[]): void {
+		const session = this.sessions.get(guildId) || {};
+		session.rooms = rooms;
+		this.sessions.set(guildId, session);
+	}
 
-    getRooms(guildId: string): VoiceChannel[] {
-        return this.sessions.get(guildId)?.rooms || [];
-    }
+	getRooms(guildId: string): VoiceChannel[] {
+		return this.sessions.get(guildId)?.rooms || [];
+	}
 }
 
 export default new SessionManager();
 ```
 
 **After (session.ts):**
+
 ```ts
 /**
  * Internal state: breakout sessions by guild ID
@@ -392,28 +422,29 @@ const sessions = new Map<string, BreakoutSession>();
  * Stores breakout rooms for a guild
  */
 export function storeRooms(guildId: string, rooms: VoiceChannel[]): void {
-    const session = sessions.get(guildId) || {};
-    session.rooms = rooms;
-    sessions.set(guildId, session);
-    console.log(`📝 Stored ${rooms.length} breakout rooms for guild ${guildId}`);
+	const session = sessions.get(guildId) || {};
+	session.rooms = rooms;
+	sessions.set(guildId, session);
+	console.log(`📝 Stored ${rooms.length} breakout rooms for guild ${guildId}`);
 }
 
 /**
  * Gets the breakout rooms for a guild
  */
 export function getRooms(guildId: string): VoiceChannel[] {
-    return sessions.get(guildId)?.rooms || [];
+	return sessions.get(guildId)?.rooms || [];
 }
 
 /**
  * Clears all sessions (useful for testing)
  */
 export function clearAllSessions(): void {
-    sessions.clear();
+	sessions.clear();
 }
 ```
 
 **Key differences:**
+
 - `private sessions` → `const sessions` at module level
 - Remove `constructor()`
 - Remove `this.` references
@@ -427,6 +458,7 @@ export function clearAllSessions(): void {
 Update `src/commands/main/breakout.ts`:
 
 **Before:**
+
 ```ts
 import createOperation from '../../modules/breakout/operations/CreateOperation.js';
 import distributeOperation from '../../modules/breakout/operations/DistributeOperation.js';
@@ -443,14 +475,28 @@ await endOperation.execute(interaction, mainChannel, force);
 ```
 
 **After:**
+
 ```ts
 import { executeCreate } from '../../modules/breakout/operations/create.js';
 import { executeDistribute } from '../../modules/breakout/operations/distribute.js';
 import { executeEnd } from '../../modules/breakout/operations/end.js';
-import { broadcastToBreakoutRooms, sendMessageToChannel } from '../../modules/breakout/services/message.js';
+import {
+	broadcastToBreakoutRooms,
+	sendMessageToChannel,
+} from '../../modules/breakout/services/message.js';
 import { monitorBreakoutTimer } from '../../modules/breakout/services/timer.js';
-import { getRooms, getMainRoom, setMainRoom, clearSession } from '../../modules/breakout/state/session.js';
-import { hasOperationInProgress, getCurrentOperation, setTimerData, clearTimerData } from '../../modules/breakout/state/state.js';
+import {
+	getRooms,
+	getMainRoom,
+	setMainRoom,
+	clearSession,
+} from '../../modules/breakout/state/session.js';
+import {
+	hasOperationInProgress,
+	getCurrentOperation,
+	setTimerData,
+	clearTimerData,
+} from '../../modules/breakout/state/state.js';
 
 // In handlers:
 await executeCreate(interaction, numRooms, force);
@@ -459,6 +505,7 @@ await executeEnd(interaction, mainChannel, force);
 ```
 
 **Benefits:**
+
 - Explicit imports: you see exactly which functions are used
 - No more `.execute()` or `.method()` ceremony
 - Better IDE autocomplete (named imports)
@@ -481,25 +528,25 @@ import { moveUser } from '../../../lib/discord/member.js';
 import sessionManager from '../state/SessionManager.js';
 
 class DistributionService {
-    /**
-     * Checks if a distribution is currently active
-     */
-    async hasActiveDistribution(guildId: string): Promise<boolean> {
-        const mainRoom = sessionManager.getMainRoom(guildId);
-        if (!mainRoom) return false;
+	/**
+	 * Checks if a distribution is currently active
+	 */
+	async hasActiveDistribution(guildId: string): Promise<boolean> {
+		const mainRoom = sessionManager.getMainRoom(guildId);
+		if (!mainRoom) return false;
 
-        const rooms = sessionManager.getRooms(guildId);
-        if (!rooms || rooms.length === 0) return false;
+		const rooms = sessionManager.getRooms(guildId);
+		if (!rooms || rooms.length === 0) return false;
 
-        return rooms.some((room) => room.members && room.members.size > 0);
-    }
+		return rooms.some((room) => room.members && room.members.size > 0);
+	}
 
-    /**
-     * Moves a user to a specific room
-     */
-    async moveUserToRoom(user: GuildMember, room: VoiceChannel): Promise<void> {
-        await moveUser(user, room);
-    }
+	/**
+	 * Moves a user to a specific room
+	 */
+	async moveUserToRoom(user: GuildMember, room: VoiceChannel): Promise<void> {
+		await moveUser(user, room);
+	}
 }
 
 export default new DistributionService();
@@ -518,25 +565,29 @@ import { getMainRoom, getRooms } from '../state/session.js';
  * Checks if a distribution is currently active
  */
 export async function hasActiveDistribution(guildId: string): Promise<boolean> {
-    const mainRoom = getMainRoom(guildId);
-    if (!mainRoom) return false;
+	const mainRoom = getMainRoom(guildId);
+	if (!mainRoom) return false;
 
-    const rooms = getRooms(guildId);
-    if (!rooms || rooms.length === 0) return false;
+	const rooms = getRooms(guildId);
+	if (!rooms || rooms.length === 0) return false;
 
-    return rooms.some((room) => room.members && room.members.size > 0);
+	return rooms.some((room) => room.members && room.members.size > 0);
 }
 
 /**
  * Moves a user to a specific room
  */
-export async function moveUserToRoom(user: GuildMember, room: VoiceChannel): Promise<void> {
-    await moveUser(user, room);
+export async function moveUserToRoom(
+	user: GuildMember,
+	room: VoiceChannel,
+): Promise<void> {
+	await moveUser(user, room);
 }
 ```
 </details>
 
 **Changes made:**
+
 1. Removed `class` declaration and singleton export
 2. Converted methods to exported `async function`
 3. Updated `sessionManager` imports to named imports
@@ -553,20 +604,20 @@ export async function moveUserToRoom(user: GuildMember, room: VoiceChannel): Pro
 
 ```typescript
 export class CreateOperation {
-    async execute(
-        interaction: CommandInteraction,
-        numRooms: number,
-        force: boolean = false,
-    ): Promise<OperationResult> {
-        const guildId = interaction.guildId;
-        if (!guildId || !interaction.guild) {
-            return {
-                success: false,
-                message: 'This command can only be used in a guild.',
-            };
-        }
-        // ... rest of implementation
-    }
+	async execute(
+		interaction: CommandInteraction,
+		numRooms: number,
+		force: boolean = false,
+	): Promise<OperationResult> {
+		const guildId = interaction.guildId;
+		if (!guildId || !interaction.guild) {
+			return {
+				success: false,
+				message: 'This command can only be used in a guild.',
+			};
+		}
+		// ... rest of implementation
+	}
 }
 
 export default new CreateOperation();
@@ -581,23 +632,24 @@ export default new CreateOperation();
  * Executes the create breakout rooms operation
  */
 export async function executeCreate(
-    interaction: CommandInteraction,
-    numRooms: number,
-    force: boolean = false,
+	interaction: CommandInteraction,
+	numRooms: number,
+	force: boolean = false,
 ): Promise<OperationResult> {
-    const guildId = interaction.guildId;
-    if (!guildId || !interaction.guild) {
-        return {
-            success: false,
-            message: 'This command can only be used in a guild.',
-        };
-    }
-    // ... rest of implementation (identical)
+	const guildId = interaction.guildId;
+	if (!guildId || !interaction.guild) {
+		return {
+			success: false,
+			message: 'This command can only be used in a guild.',
+		};
+	}
+	// ... rest of implementation (identical)
 }
 ```
 </details>
 
 **Changes made:**
+
 1. Removed `class CreateOperation {}`
 2. Renamed `execute` → `executeCreate` for clarity
 3. Converted to exported `async function`
@@ -614,31 +666,31 @@ export async function executeCreate(
 
 ```typescript
 interface BreakoutSession {
-    rooms?: VoiceChannel[];
-    mainRoom?: VoiceBasedChannel;
+	rooms?: VoiceChannel[];
+	mainRoom?: VoiceBasedChannel;
 }
 
 export class SessionManager {
-    private sessions: Map<string, BreakoutSession>;
+	private sessions: Map<string, BreakoutSession>;
 
-    constructor() {
-        this.sessions = new Map<string, BreakoutSession>();
-    }
+	constructor() {
+		this.sessions = new Map<string, BreakoutSession>();
+	}
 
-    storeRooms(guildId: string, rooms: VoiceChannel[]): void {
-        const session = this.sessions.get(guildId) || {};
-        session.rooms = rooms;
-        this.sessions.set(guildId, session);
-    }
+	storeRooms(guildId: string, rooms: VoiceChannel[]): void {
+		const session = this.sessions.get(guildId) || {};
+		session.rooms = rooms;
+		this.sessions.set(guildId, session);
+	}
 
-    getRooms(guildId: string): VoiceChannel[] {
-        const session = this.sessions.get(guildId);
-        return session?.rooms || [];
-    }
+	getRooms(guildId: string): VoiceChannel[] {
+		const session = this.sessions.get(guildId);
+		return session?.rooms || [];
+	}
 
-    clearSession(guildId: string): void {
-        this.sessions.delete(guildId);
-    }
+	clearSession(guildId: string): void {
+		this.sessions.delete(guildId);
+	}
 }
 
 export default new SessionManager();
@@ -650,8 +702,8 @@ export default new SessionManager();
 
 ```typescript
 interface BreakoutSession {
-    rooms?: VoiceChannel[];
-    mainRoom?: VoiceBasedChannel;
+	rooms?: VoiceChannel[];
+	mainRoom?: VoiceBasedChannel;
 }
 
 /**
@@ -664,38 +716,39 @@ const sessions = new Map<string, BreakoutSession>();
  * Stores breakout rooms for a guild
  */
 export function storeRooms(guildId: string, rooms: VoiceChannel[]): void {
-    const session = sessions.get(guildId) || {};
-    session.rooms = rooms;
-    sessions.set(guildId, session);
-    console.log(`📝 Stored ${rooms.length} breakout rooms for guild ${guildId}`);
+	const session = sessions.get(guildId) || {};
+	session.rooms = rooms;
+	sessions.set(guildId, session);
+	console.log(`📝 Stored ${rooms.length} breakout rooms for guild ${guildId}`);
 }
 
 /**
  * Gets the breakout rooms for a guild
  */
 export function getRooms(guildId: string): VoiceChannel[] {
-    const session = sessions.get(guildId);
-    return session?.rooms || [];
+	const session = sessions.get(guildId);
+	return session?.rooms || [];
 }
 
 /**
  * Clears session data for a guild
  */
 export function clearSession(guildId: string): void {
-    sessions.delete(guildId);
-    console.log(`🧹 Cleared breakout session for guild ${guildId}`);
+	sessions.delete(guildId);
+	console.log(`🧹 Cleared breakout session for guild ${guildId}`);
 }
 
 /**
  * Clears all sessions (useful for testing)
  */
 export function clearAllSessions(): void {
-    sessions.clear();
+	sessions.clear();
 }
 ```
 </details>
 
 **Changes made:**
+
 1. Converted `private sessions` → module-level `const sessions`
 2. Removed `constructor()`
 3. Changed `this.sessions` → `sessions` throughout
@@ -731,6 +784,7 @@ git commit -m "refactor: migrate [filename] to functional pattern"
 After completing all migrations:
 
 1. **Start the bot locally**
+
    ```bash
    bun run src/index.ts
    ```
@@ -761,31 +815,30 @@ After completing all migrations:
 ### If Migration Fails
 
 1. **Immediate rollback:**
+
    ```bash
    git checkout main
    git branch -D refactor/functional-architecture
    ```
 
 2. **Partial migration (some files done):**
+
    ```bash
    # Revert specific file
    git checkout HEAD~1 -- src/modules/breakout/services/distribution.ts
-   
-   # Or reset to specific commit
+      # Or reset to specific commit
    git reset --hard <commit-hash>
    ```
 
 3. **Adapter pattern (temporary bridge):**
    If you need to support both patterns during transition:
-   
+
    ```typescript
    // services/distribution.ts (new functional)
    export function hasActiveDistribution(guildId: string) { ... }
-   
-   // services/DistributionService.ts (old class, adapter)
+      // services/DistributionService.ts (old class, adapter)
    import * as distributionFns from './distribution.js';
-   
-   class DistributionService {
+      class DistributionService {
        hasActiveDistribution(guildId: string) {
            return distributionFns.hasActiveDistribution(guildId);
        }
@@ -814,19 +867,21 @@ After completing all migrations:
 ### 2. Export Patterns
 
 **Prefer named exports:**
+
 ```typescript
 // ✅ Good
-export function hasActiveDistribution(guildId: string) { }
-export function moveUserToRoom(user, room) { }
+export function hasActiveDistribution(guildId: string) {}
+export function moveUserToRoom(user, room) {}
 
 // ❌ Avoid (makes tree-shaking harder)
 export default {
-    hasActiveDistribution,
-    moveUserToRoom,
+	hasActiveDistribution,
+	moveUserToRoom,
 };
 ```
 
 **When to use default export:**
+
 - Single-purpose modules (e.g., command definition in `commands/utility/ping.ts`)
 - Framework requirements (e.g., Next.js pages)
 
@@ -842,6 +897,7 @@ export async function hasExistingBreakoutRooms(...) { }
 ```
 
 Don't create one file per function (anti-pattern):
+
 ```typescript
 // ❌ Bad: Too granular
 // services/createRoom.ts
@@ -856,7 +912,9 @@ If a module has internal state, **don't export it directly:**
 ```typescript
 // ✅ Good: State is encapsulated
 const sessions = new Map(); // Not exported
-export function getRooms(id) { return sessions.get(id); }
+export function getRooms(id) {
+	return sessions.get(id);
+}
 
 // ❌ Bad: Exposes internal implementation
 export const sessions = new Map(); // External code can mutate directly
@@ -865,6 +923,7 @@ export const sessions = new Map(); // External code can mutate directly
 ### 5. Type Definitions
 
 Keep shared types/interfaces in:
+
 - `src/types/` for project-wide types
 - Top of module file for module-specific types
 
@@ -897,13 +956,13 @@ Document the "why" and "what", not the "how":
  * Checks if users are currently distributed across breakout rooms.
  * Returns true if at least one room has members in it.
  */
-export async function hasActiveDistribution(guildId: string): Promise<boolean>
+export async function hasActiveDistribution(guildId: string): Promise<boolean>;
 
 // ❌ Bad (obvious from signature)
 /**
  * This function takes a guildId string parameter and returns a Promise of boolean
  */
-export async function hasActiveDistribution(guildId: string): Promise<boolean>
+export async function hasActiveDistribution(guildId: string): Promise<boolean>;
 ```
 
 ---
@@ -913,26 +972,31 @@ export async function hasActiveDistribution(guildId: string): Promise<boolean>
 Use this checklist to track migration progress:
 
 ### Phase 1: Stateless Services
+
 - [ ] `services/DistributionService.ts` → `services/distribution.ts`
 - [ ] `services/MessageService.ts` → `services/message.ts`
 - [ ] `services/RoomService.ts` → `services/room.ts`
 - [ ] `services/TimerService.ts` → `services/timer.ts`
 
 ### Phase 2: Operations
+
 - [ ] `operations/CreateOperation.ts` → `operations/create.ts`
 - [ ] `operations/DistributeOperation.ts` → `operations/distribute.ts`
 - [ ] `operations/EndOperation.ts` → `operations/end.ts`
 
 ### Phase 3: State Managers
+
 - [ ] `state/SessionManager.ts` → `state/session.ts`
 - [ ] `state/StateManager.ts` → `state/state.ts`
 
 ### Phase 4: Update Consumers
+
 - [ ] Update `commands/main/breakout.ts` imports
 - [ ] Search for other usages: `git grep "from.*Operation" src/`
 - [ ] Search for other usages: `git grep "from.*Service" src/`
 
 ### Phase 5: Cleanup & Verification
+
 - [ ] Delete old `*Operation.ts` files
 - [ ] Delete old `*Service.ts` and `*Manager.ts` files
 - [ ] Run type check: `bunx tsc --noEmit`
@@ -941,6 +1005,7 @@ Use this checklist to track migration progress:
 - [ ] Update this document's status to "Completed"
 
 ### Phase 6: Commit & PR
+
 - [ ] Review all changes
 - [ ] Commit with descriptive message
 - [ ] Push branch
@@ -953,11 +1018,12 @@ Use this checklist to track migration progress:
 
 ### Q: Why not keep classes for consistency with Discord.js?
 
-**A:** Discord.js uses classes for entities that have instance state (e.g., `Client`, `Message`, `Guild`). Our services are stateless utilities, which don't benefit from classes. Consistency should be with the *pattern*, not the syntax.
+**A:** Discord.js uses classes for entities that have instance state (e.g., `Client`, `Message`, `Guild`). Our services are stateless utilities, which don't benefit from classes. Consistency should be with the _pattern_, not the syntax.
 
 ### Q: What if we need to add state to a service later?
 
 **A:** You can convert back to a class if needed. But consider:
+
 1. Can the state be module-level? (Like `sessions` in `session.ts`)
 2. Is it truly instance state, or could it be a parameter?
 3. Would dependency injection be better?
@@ -979,6 +1045,7 @@ In most cases, module-level state is sufficient and simpler.
 This migration will modernize the breakout module's architecture, making it simpler, more maintainable, and consistent with modern TypeScript best practices. The risk is low, the benefits are clear, and the migration path is well-defined.
 
 **Next Steps:**
+
 1. Review this document with the team
 2. Get approval to proceed
 3. Follow the checklist in Phases 1-6
