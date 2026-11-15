@@ -59,6 +59,10 @@ Ensure you have [Bun](https://bun.sh) (≥ 1.3.0) installed, then run:
 bun install
 ```
 
+To run tests, also install [Node.js](https://nodejs.org/) in the range supported by
+Vitest 5: `^22.12.0 || ^24.0.0 || >=26.0.0`. Bun runs the package scripts, while
+Vitest uses Node.js. Run the test suite with `bun run test`.
+
 ### 3. Configuration
 
 #### Environment Variables
