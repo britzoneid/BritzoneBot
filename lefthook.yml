@@ -1,5 +1,10 @@
 pre-commit:
+  piped: true
   commands:
-    biome-check:
-      run: bunx @biomejs/biome check --write --no-errors-on-unmatched --files-ignore-unknown=true --colors=off {staged_files}
+    biome-format:
+      priority: 1
+      run: bunx @biomejs/biome format --write --no-errors-on-unmatched --files-ignore-unknown=true --colors=off {staged_files}
       stage_fixed: true
+    biome-check:
+      priority: 2
+      run: bunx @biomejs/biome check --no-errors-on-unmatched --files-ignore-unknown=true --colors=off {staged_files}

@@ -284,6 +284,12 @@ The `/breakout timer` command provides automated schedule tracking and auto-reca
 
 Contributions are welcome! Please open an issue or submit a pull request for any changes or improvements.
 
+The Lefthook pre-commit hook automatically formats and re-stages staged files,
+then runs Biome checks without applying lint fixes or organizing imports. Errors
+block the commit. To apply safe lint fixes explicitly, run
+`bun run lint --write <file>` and review the changes before staging. Use
+`bun run check --write <file>` when you also want formatting and import organization.
+
 ## 📜 License
 
 This project is licensed under the AGPLv3 License - see the [LICENSE](LICENSE) file for details.
